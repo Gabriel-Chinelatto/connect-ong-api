@@ -1,5 +1,6 @@
 package com.example.connectong_api.controller;
 
+import com.example.connectong_api.dto.UsuarioResponseDTO;
 import com.example.connectong_api.model.Usuario;
 import com.example.connectong_api.repository.UsuarioRepository;
 
@@ -62,13 +63,12 @@ public class UsuarioController {
 
         Usuario novo = usuarioRepository.save(usuario);
 
-        // remove senha do retorno
-        Map<String, Object> resposta = new HashMap<>();
-
-        resposta.put("id", novo.getId());
-        resposta.put("nome", novo.getNome());
-        resposta.put("email", novo.getEmail());
-        resposta.put("tipo", novo.getTipo());
+        UsuarioResponseDTO resposta = new UsuarioResponseDTO(
+                novo.getId(),
+                novo.getNome(),
+                novo.getEmail(),
+                novo.getTipo()
+        );
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)
@@ -107,13 +107,13 @@ public class UsuarioController {
                     usuarioEncontrado.getSenha()
             )) {
 
-                // resposta sem senha
-                Map<String, Object> resposta = new HashMap<>();
-
-                resposta.put("id", usuarioEncontrado.getId());
-                resposta.put("nome", usuarioEncontrado.getNome());
-                resposta.put("email", usuarioEncontrado.getEmail());
-                resposta.put("tipo", usuarioEncontrado.getTipo());
+                UsuarioResponseDTO resposta =
+                        new UsuarioResponseDTO(
+                                usuarioEncontrado.getId(),
+                                usuarioEncontrado.getNome(),
+                                usuarioEncontrado.getEmail(),
+                                usuarioEncontrado.getTipo()
+                        );
 
                 return ResponseEntity.ok(resposta);
             }
