@@ -1,19 +1,19 @@
 package com.example.connectong_api.controller;
 
-import com.example.connectong_api.model.Doacao;
-import com.example.connectong_api.service.DoacaoService;
+import com.example.connectong_api.model.Projeto;
+import com.example.connectong_api.service.ProjetoService;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/doacoes")
+@RequestMapping("/projetos")
 @CrossOrigin(origins = "*")
-public class DoacaoController {
+public class ProjetoController {
 
     @Autowired
-    private DoacaoService service;
+    private ProjetoService service;
 
     // =========================
     // LISTAR
@@ -31,9 +31,9 @@ public class DoacaoController {
     // =========================
     @PostMapping
     public ResponseEntity<?> criar(
-            @RequestBody Doacao doacao
+            @RequestBody Projeto projeto
     ) {
 
-        return service.criar(doacao);
+        return service.criar(projeto);
     }
 }
