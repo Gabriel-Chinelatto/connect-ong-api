@@ -22,12 +22,11 @@ public class DoacaoService {
     // =========================
     // LISTAR
     // =========================
+
     public List<DoacaoResponseDTO> listar() {
 
-        List<Doacao> lista =
-                repository.findAll();
-
-        return lista.stream()
+        return repository.findAll()
+                .stream()
                 .map(doacao -> new DoacaoResponseDTO(
                         doacao.getId(),
                         doacao.getNome(),
@@ -44,60 +43,111 @@ public class DoacaoService {
     // =========================
     // CRIAR
     // =========================
-    public ResponseEntity<?> criar(
-            Doacao doacao
-    ) {
 
-        // validações básicas
-        if (doacao.getNome() == null ||
-                doacao.getNome().isEmpty()) {
+    public ResponseEntity<?> criar(Doacao doacao) {
 
-            Map<String, String> erro =
-                    new HashMap<>();
+        if (doacao.getNome() == null || doacao.getNome().isBlank()) {
 
-            erro.put(
-                    "erro",
-                    "Nome da doação é obrigatório"
-            );
+            Map<String, String> erro = new HashMap<>();
+            erro.put("erro", "Nome da doação é obrigatório");
 
-            return ResponseEntity
-                    .badRequest()
-                    .body(erro);
+            return ResponseEntity.badRequest().body(erro);
         }
 
-        if (doacao.getQuantidade() == null ||
-                doacao.getQuantidade() <= 0) {
+        if (doacao.getQuantidade() == null || doacao.getQuantidade() <= 0) {
 
-            Map<String, String> erro =
-                    new HashMap<>();
+            Map<String, String> erro = new HashMap<>();
+            erro.put("erro", "Quantidade inválida");
 
-            erro.put(
-                    "erro",
-                    "Quantidade inválida"
-            );
-
-            return ResponseEntity
-                    .badRequest()
-                    .body(erro);
+            return ResponseEntity.badRequest().body(erro);
         }
 
-        Doacao nova =
-                repository.save(doacao);
+        Doacao nova = repository.save(doacao);
 
-        DoacaoResponseDTO resposta =
-                new DoacaoResponseDTO(
-                        nova.getId(),
-                        nova.getNome(),
-                        nova.getDescricao(),
-                        nova.getQuantidade(),
-                        nova.getCategoria(),
-                        nova.getTipo(),
-                        nova.getUrgente(),
-                        nova.getNovo()
-                );
+        return ResponseEntity.ok(new DoacaoResponseDTO(
+                nova.getId(),
+                nova.getNome(),
+                nova.getDescricao(),
+                nova.getQuantidade(),
+                nova.getCategoria(),
+                nova.getTipo(),
+                nova.getUrgente(),
+                nova.getNovo()
+        ));
+    }
 
-        return ResponseEntity.ok(
-                resposta
-        );
+    // =========================
+    // ATUALIZAR
+    // =========================
+
+    public ResponseEntity<?> atualizar(Long id, Doacao doacaoAtualizada) {
+
+        Doacao doacao = repository.findById(id).orElse(null);
+
+        if (doacao == null) {
+
+            Map<String, String> erro = new HashMap<>();
+            erro.put("erro", "Doação não encontrada");
+
+            return ResponseEntity.status(404).body(erro);
+        }
+
+        if (doacaoAtualizada.getNome() == null || doacaoAtualizada.getNome().isBlank()) {
+
+            Map<String, String> erro = new HashMap<>();
+            erro.put("erro", "Nome da doação é obrigatório");
+
+            return ResponseEntity.badRequest().body(erro);
+        }
+
+        if (doacaoAtualizada.getQuantidade() == null || doacaoAtualizada.getQuantidade() <= 0) {
+
+            Map<String, String> erro = new HashMap<>();
+            erro.put("erro", "Quantidade inválida");
+
+            return ResponseEntity.badRequest().body(erro);
+        }
+
+        doacao.setNome(doacaoAtualizada.getNome());
+        doacao.setDescricao(doacaoAtualizada.getDescricao());
+        doacao.setQuantidade(doacaoAtualizada.getQuantidade());
+        doacao.setCategoria(doacaoAtualizada.getCategoria());
+        doacao.setTipo(doacaoAtualizada.getTipo());
+        doacao.setUrgente(doacaoAtualizada.getUrgente());
+        doacao.setNovo(doacaoAtualizada.getNovo());
+
+        Doacao atualizada = repository.save(doacao);
+
+        return ResponseEntity.ok(new DoacaoResponseDTO(
+                atualizada.getId(),
+                atualizada.getNome(),
+                atualizada.getDescricao(),
+                atualizada.getQuantidade(),
+                atualizada.getCategoria(),
+                atualizada.getTipo(),
+                atualizada.getUrgente(),
+                atualizada.getNovo()
+        ));
+    }
+
+    // =========================
+    // DELETAR
+    // =========================
+
+    public ResponseEntity<?> deletar(Long id) {
+
+        Doacao doacao = repository.findById(id).orElse(null);
+
+        if (doacao == null) {
+
+            Map<String, String> erro = new HashMap<>();
+            erro.put("erro", "Doação não encontrada");
+
+            return ResponseEntity.status(404).body(erro);
+        }
+
+        repository.delete(doacao);
+
+        return ResponseEntity.noContent().build();
     }
 }

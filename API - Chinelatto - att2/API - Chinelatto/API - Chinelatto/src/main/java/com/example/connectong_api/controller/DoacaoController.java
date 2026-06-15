@@ -36,4 +36,27 @@ public class DoacaoController {
 
         return service.criar(doacao);
     }
+
+    // =========================
+    // ATUALIZAR
+    // =========================
+    @PutMapping("/{id}")
+    public ResponseEntity<?> atualizar(
+            @PathVariable Long id,
+            @RequestBody Doacao doacao
+    ) {
+
+        return service.atualizar(id, doacao);
+    }
+
+    // =========================
+    // DELETAR
+    // =========================
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> deletar(
+            @PathVariable Long id
+    ) {
+
+        return service.deletar(id);
+    }
 }
