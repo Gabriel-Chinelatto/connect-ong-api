@@ -1,0 +1,11 @@
+# MODELO de configuracao local.
+# 1. Copie este arquivo para "application-local.properties" (mesma pasta).
+# 2. Preencha a senha real do banco.
+# O arquivo "application-local.properties" NAO vai para o Git (esta no .gitignore),
+# entao a senha nunca mais fica exposta no repositorio.
+
+DB_PASSWORD=coloque_a_senha_aqui
+
+# Opcional: tambem da para sobrescrever a URL e o usuario, se precisar.
+# DB_URL=jdbc:mysql://143.106.241.3:3306/cl203161
+# DB_USERNAME=cl203161
