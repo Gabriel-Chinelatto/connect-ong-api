@@ -1,0 +1,135 @@
+package com.example.connectong_api.service;
+
+import com.example.connectong_api.dto.AlterarSenhaDTO;
+import com.example.connectong_api.dto.PerfilDTO;
+import com.example.connectong_api.model.Preferencia;
+import com.example.connectong_api.model.Usuario;
+import com.example.connectong_api.repository.PreferenciaRepository;
+import com.example.connectong_api.repository.UsuarioRepository;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.stereotype.Service;
+
+import java.util.HashMap;
+import java.util.Map;
+
+@Service
+public class PerfilService {
+
+    @Autowired
+    private UsuarioRepository usuarioRepository;
+
+    @Autowired
+    private PreferenciaRepository preferenciaRepository;
+
+    @Autowired
+    private BCryptPasswordEncoder passwordEncoder;
+
+    // ===================== PERFIL =====================
+    public ResponseEntity<?> obterPerfil(Long usuarioId) {
+        Usuario u = usuarioRepository.findById(usuarioId).orElse(null);
+        if (u == null) return naoEncontrado();
+        return ResponseEntity.ok(toPerfilDTO(u));
+    }
+
+    public ResponseEntity<?> atualizarPerfil(Long usuarioId, PerfilDTO dto) {
+        Usuario u = usuarioRepository.findById(usuarioId).orElse(null);
+        if (u == null) return naoEncontrado();
+
+        if (dto.getNome() != null && !dto.getNome().isBlank()) {
+            u.setNome(dto.getNome());
+        }
+        u.setTelefone(dto.getTelefone());
+        u.setCidade(dto.getCidade());
+        u.setEstado(dto.getEstado());
+        u.setBio(dto.getBio());
+        u.setFotoUrl(dto.getFotoUrl());
+
+        return ResponseEntity.ok(toPerfilDTO(usuarioRepository.save(u)));
+    }
+
+    // ===================== SENHA =====================
+    public ResponseEntity<?> alterarSenha(Long usuarioId, AlterarSenhaDTO dto) {
+        Usuario u = usuarioRepository.findById(usuarioId).orElse(null);
+        if (u == null) return naoEncontrado();
+
+        if (dto.getNovaSenha() == null || dto.getNovaSenha().length() < 4) {
+            return erro("A nova senha deve ter ao menos 4 caracteres");
+        }
+        if (!passwordEncoder.matches(dto.getSenhaAtual(), u.getSenha())) {
+            return erro("Senha atual incorreta");
+        }
+
+        u.setSenha(passwordEncoder.encode(dto.getNovaSenha()));
+        usuarioRepository.save(u);
+
+        Map<String, String> ok = new HashMap<>();
+        ok.put("mensagem", "Senha alterada com sucesso");
+        return ResponseEntity.ok(ok);
+    }
+
+    // ===================== PREFERENCIAS =====================
+    public ResponseEntity<?> obterPreferencias(Long usuarioId) {
+        if (usuarioRepository.findById(usuarioId).isEmpty()) return naoEncontrado();
+        Preferencia p = preferenciaRepository.findByUsuarioId(usuarioId)
+                .orElseGet(() -> preferenciaRepository.save(Preferencia.padrao(usuarioId)));
+        return ResponseEntity.ok(p);
+    }
+
+    public ResponseEntity<?> atualizarPreferencias(Long usuarioId, Preferencia dados) {
+        if (usuarioRepository.findById(usuarioId).isEmpty()) return naoEncontrado();
+
+        Preferencia p = preferenciaRepository.findByUsuarioId(usuarioId)
+                .orElseGet(() -> Preferencia.padrao(usuarioId));
+
+        p.setUsuarioId(usuarioId);
+        p.setTema(dados.getTema());
+        p.setTamanhoFonte(dados.getTamanhoFonte());
+        p.setAltoContraste(dados.getAltoContraste());
+        p.setFonteDislexia(dados.getFonteDislexia());
+        p.setNavegacaoSimplificada(dados.getNavegacaoSimplificada());
+        p.setNotifMensagens(dados.getNotifMensagens());
+        p.setNotifMatch(dados.getNotifMatch());
+        p.setNotifCampanhas(dados.getNotifCampanhas());
+        p.setNotifNecessidades(dados.getNotifNecessidades());
+        p.setNotifNoticias(dados.getNotifNoticias());
+        p.setMostrarTelefone(dados.getMostrarTelefone());
+        p.setMostrarEmail(dados.getMostrarEmail());
+        p.setPerfilPublico(dados.getPerfilPublico());
+        p.setReceberContatos(dados.getReceberContatos());
+        p.setReceberSugestoes(dados.getReceberSugestoes());
+
+        return ResponseEntity.ok(preferenciaRepository.save(p));
+    }
+
+    // ===================== HELPERS =====================
+    private PerfilDTO toPerfilDTO(Usuario u) {
+        PerfilDTO dto = new PerfilDTO();
+        dto.setId(u.getId());
+        dto.setNome(u.getNome());
+        dto.setEmail(u.getEmail());
+        dto.setTelefone(u.getTelefone());
+        dto.setCidade(u.getCidade());
+        dto.setEstado(u.getEstado());
+        dto.setBio(u.getBio());
+        dto.setFotoUrl(u.getFotoUrl());
+        dto.setTipo(u.getTipo());
+        dto.setOngId(u.getOngId());
+        return dto;
+    }
+
+    private ResponseEntity<?> erro(String mensagem) {
+        Map<String, String> erro = new HashMap<>();
+        erro.put("erro", mensagem);
+        return ResponseEntity.badRequest().body(erro);
+    }
+
+    private ResponseEntity<?> naoEncontrado() {
+        Map<String, String> erro = new HashMap<>();
+        erro.put("erro", "Usuário não encontrado");
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(erro);
+    }
+}

@@ -18,6 +18,15 @@ public class Usuario {
     // Fica null para doadores.
     private Long ongId;
 
+    // ----- Dados de perfil -----
+    private String telefone;
+    private String cidade;
+    private String estado;
+    @Column(length = 300)
+    private String bio;
+    @Column(length = 500)
+    private String fotoUrl;
+
     // GETTERS E SETTERS
 
     public Long getId() {
@@ -67,4 +76,19 @@ public class Usuario {
     public void setOngId(Long ongId) {
         this.ongId = ongId;
     }
+
+    public String getTelefone() { return telefone; }
+    public void setTelefone(String telefone) { this.telefone = telefone; }
+
+    public String getCidade() { return cidade; }
+    public void setCidade(String cidade) { this.cidade = cidade; }
+
+    public String getEstado() { return estado; }
+    public void setEstado(String estado) { this.estado = estado; }
+
+    public String getBio() { return bio; }
+    public void setBio(String bio) { this.bio = bio; }
+
+    public String getFotoUrl() { return fotoUrl; }
+    public void setFotoUrl(String fotoUrl) { this.fotoUrl = fotoUrl; }
 }
