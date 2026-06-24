@@ -11,6 +11,7 @@ public class OngRegistroDTO {
     private String telefone;
     private String cidade;
     private String descricao;
+    private String cnpj;
     private String senha;
 
     public String getNome() { return nome; }
@@ -27,6 +28,9 @@ public class OngRegistroDTO {
 
     public String getDescricao() { return descricao; }
     public void setDescricao(String descricao) { this.descricao = descricao; }
+
+    public String getCnpj() { return cnpj; }
+    public void setCnpj(String cnpj) { this.cnpj = cnpj; }
 
     public String getSenha() { return senha; }
     public void setSenha(String senha) { this.senha = senha; }

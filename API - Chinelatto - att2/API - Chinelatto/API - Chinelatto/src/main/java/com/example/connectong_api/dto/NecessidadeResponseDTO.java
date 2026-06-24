@@ -16,6 +16,7 @@ public class NecessidadeResponseDTO {
     private LocalDateTime dataCriacao;
     private Long ongId;
     private String ongNome;
+    private Boolean ongVerificada;
 
     public NecessidadeResponseDTO(
             Long id,
@@ -26,7 +27,8 @@ public class NecessidadeResponseDTO {
             String status,
             LocalDateTime dataCriacao,
             Long ongId,
-            String ongNome
+            String ongNome,
+            Boolean ongVerificada
     ) {
         this.id = id;
         this.titulo = titulo;
@@ -37,6 +39,7 @@ public class NecessidadeResponseDTO {
         this.dataCriacao = dataCriacao;
         this.ongId = ongId;
         this.ongNome = ongNome;
+        this.ongVerificada = ongVerificada;
     }
 
     public Long getId() { return id; }
@@ -48,4 +51,5 @@ public class NecessidadeResponseDTO {
     public LocalDateTime getDataCriacao() { return dataCriacao; }
     public Long getOngId() { return ongId; }
     public String getOngNome() { return ongNome; }
+    public Boolean getOngVerificada() { return ongVerificada; }
 }

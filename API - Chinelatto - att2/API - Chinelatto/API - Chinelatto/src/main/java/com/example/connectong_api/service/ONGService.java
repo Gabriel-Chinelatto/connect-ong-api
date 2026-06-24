@@ -58,6 +58,7 @@ public class ONGService {
                 dto.getCidade(),
                 dto.getDescricao()
         );
+        ong.setCnpj(dto.getCnpj());
         Ong ongSalva = repository.save(ong);
 
         // 2) cria a conta de login (Usuario tipo ONG) vinculada ao perfil
@@ -102,14 +103,7 @@ public class ONGService {
         }
 
         return lista.stream()
-                .map(ong -> new OngResponseDTO(
-                        ong.getId(),
-                        ong.getNome(),
-                        ong.getEmail(),
-                        ong.getTelefone(),
-                        ong.getCidade(),
-                        ong.getDescricao()
-                ))
+                .map(this::toDTO)
                 .collect(Collectors.toList());
     }
 
@@ -141,19 +135,7 @@ public class ONGService {
         Ong nova =
                 repository.save(ong);
 
-        OngResponseDTO resposta =
-                new OngResponseDTO(
-                        nova.getId(),
-                        nova.getNome(),
-                        nova.getEmail(),
-                        nova.getTelefone(),
-                        nova.getCidade(),
-                        nova.getDescricao()
-                );
-
-        return ResponseEntity.ok(
-                resposta
-        );
+        return ResponseEntity.ok(toDTO(nova));
     }
 
     // =========================
@@ -190,19 +172,7 @@ public class ONGService {
                     Ong atualizada =
                             repository.save(ong);
 
-                    OngResponseDTO resposta =
-                            new OngResponseDTO(
-                                    atualizada.getId(),
-                                    atualizada.getNome(),
-                                    atualizada.getEmail(),
-                                    atualizada.getTelefone(),
-                                    atualizada.getCidade(),
-                                    atualizada.getDescricao()
-                            );
-
-                    return ResponseEntity.ok(
-                            resposta
-                    );
+                    return ResponseEntity.ok(toDTO(atualizada));
 
                 }).orElse(
                         ResponseEntity.notFound().build()
@@ -233,6 +203,31 @@ public class ONGService {
     // =========================
     // ERRO PADRÃO
     // =========================
+    // =========================
+    // VERIFICAR (admin marca a ONG como verificada)
+    // =========================
+    public ResponseEntity<?> verificar(Long id) {
+        return repository.findById(id)
+                .map(ong -> {
+                    ong.setVerificada(true);
+                    return ResponseEntity.ok(toDTO(repository.save(ong)));
+                })
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    private OngResponseDTO toDTO(Ong o) {
+        return new OngResponseDTO(
+                o.getId(),
+                o.getNome(),
+                o.getEmail(),
+                o.getTelefone(),
+                o.getCidade(),
+                o.getDescricao(),
+                o.getCnpj(),
+                o.getVerificada()
+        );
+    }
+
     private ResponseEntity<?> erro(
             String mensagem
     ) {

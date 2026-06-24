@@ -31,6 +31,12 @@ public class Ong {
     @Size(max = 255)
     private String descricao;
 
+    // Verificacao (selo de confianca)
+    @Size(max = 20)
+    private String cnpj;
+
+    private Boolean verificada = false;
+
     @OneToMany(mappedBy = "ong")
     private List<Projeto> projetos;
 
@@ -51,6 +57,12 @@ public class Ong {
 
     public String getEmail() { return email; }
     public void setEmail(String email) { this.email = email; }
+
+    public String getCnpj() { return cnpj; }
+    public void setCnpj(String cnpj) { this.cnpj = cnpj; }
+
+    public Boolean getVerificada() { return verificada != null && verificada; }
+    public void setVerificada(Boolean verificada) { this.verificada = verificada; }
 
     public String getTelefone() { return telefone; }
     public void setTelefone(String telefone) { this.telefone = telefone; }

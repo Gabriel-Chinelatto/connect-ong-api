@@ -27,6 +27,12 @@ public class ONGController {
         return service.registrar(dto);
     }
 
+    @PutMapping("/{id}/verificar")
+    @Operation(summary = "Marcar uma ONG como verificada (selo de confiança)")
+    public ResponseEntity<?> verificar(@PathVariable Long id) {
+        return service.verificar(id);
+    }
+
     @GetMapping
     @Operation(summary = "Listar ONGs (filtra por nome com o parametro 'nome')")
     public ResponseEntity<?> listar(
