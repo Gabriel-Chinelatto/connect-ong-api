@@ -16,6 +16,7 @@ public class NecessidadeResponseDTO {
     private LocalDateTime dataCriacao;
     private Long ongId;
     private String ongNome;
+    private String ongCidade;
     private Boolean ongVerificada;
     private Double ongNotaMedia;
     private Integer ongTotalAvaliacoes;
@@ -30,6 +31,7 @@ public class NecessidadeResponseDTO {
             LocalDateTime dataCriacao,
             Long ongId,
             String ongNome,
+            String ongCidade,
             Boolean ongVerificada,
             Double ongNotaMedia,
             Integer ongTotalAvaliacoes
@@ -43,6 +45,7 @@ public class NecessidadeResponseDTO {
         this.dataCriacao = dataCriacao;
         this.ongId = ongId;
         this.ongNome = ongNome;
+        this.ongCidade = ongCidade;
         this.ongVerificada = ongVerificada;
         this.ongNotaMedia = ongNotaMedia;
         this.ongTotalAvaliacoes = ongTotalAvaliacoes;
@@ -57,6 +60,7 @@ public class NecessidadeResponseDTO {
     public LocalDateTime getDataCriacao() { return dataCriacao; }
     public Long getOngId() { return ongId; }
     public String getOngNome() { return ongNome; }
+    public String getOngCidade() { return ongCidade; }
     public Boolean getOngVerificada() { return ongVerificada; }
     public Double getOngNotaMedia() { return ongNotaMedia; }
     public Integer getOngTotalAvaliacoes() { return ongTotalAvaliacoes; }
