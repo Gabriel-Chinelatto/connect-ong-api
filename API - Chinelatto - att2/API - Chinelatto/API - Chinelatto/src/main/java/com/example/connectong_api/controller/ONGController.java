@@ -1,5 +1,6 @@
 package com.example.connectong_api.controller;
 
+import com.example.connectong_api.dto.OngRegistroDTO;
 import com.example.connectong_api.model.Ong;
 import com.example.connectong_api.service.ONGService;
 
@@ -17,6 +18,14 @@ public class ONGController {
 
     @Autowired
     private ONGService service;
+
+    @PostMapping("/registro")
+    @Operation(summary = "Cadastrar uma ONG (cria o perfil + a conta de login juntos)")
+    public ResponseEntity<?> registrar(
+            @RequestBody OngRegistroDTO dto
+    ) {
+        return service.registrar(dto);
+    }
 
     @GetMapping
     @Operation(summary = "Listar ONGs (filtra por nome com o parametro 'nome')")

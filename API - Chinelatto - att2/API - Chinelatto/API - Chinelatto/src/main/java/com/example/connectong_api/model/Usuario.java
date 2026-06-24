@@ -14,6 +14,10 @@ public class Usuario {
     private String senha;
     private String tipo;
 
+    // Quando o usuario e uma ONG, aponta para o perfil da ONG (tabela ong).
+    // Fica null para doadores.
+    private Long ongId;
+
     // GETTERS E SETTERS
 
     public Long getId() {
@@ -54,5 +58,13 @@ public class Usuario {
 
     public void setTipo(String tipo) {
         this.tipo = tipo;
+    }
+
+    public Long getOngId() {
+        return ongId;
+    }
+
+    public void setOngId(Long ongId) {
+        this.ongId = ongId;
     }
 }

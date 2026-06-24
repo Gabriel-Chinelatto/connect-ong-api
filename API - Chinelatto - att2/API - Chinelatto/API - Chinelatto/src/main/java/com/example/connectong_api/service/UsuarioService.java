@@ -66,7 +66,8 @@ public class UsuarioService {
                         novo.getId(),
                         novo.getNome(),
                         novo.getEmail(),
-                        novo.getTipo()
+                        novo.getTipo(),
+                        novo.getOngId()
                 );
 
         return ResponseEntity
@@ -111,7 +112,8 @@ public class UsuarioService {
                                 usuarioEncontrado.getId(),
                                 usuarioEncontrado.getNome(),
                                 usuarioEncontrado.getEmail(),
-                                usuarioEncontrado.getTipo()
+                                usuarioEncontrado.getTipo(),
+                                usuarioEncontrado.getOngId()
                         );
 
                 return ResponseEntity.ok(resposta);

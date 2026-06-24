@@ -6,15 +6,17 @@ public class UsuarioResponseDTO {
     private String nome;
     private String email;
     private String tipo;
+    private Long ongId; // preenchido quando o usuario e uma ONG
 
     public UsuarioResponseDTO() {
     }
 
-    public UsuarioResponseDTO(Long id, String nome, String email, String tipo) {
+    public UsuarioResponseDTO(Long id, String nome, String email, String tipo, Long ongId) {
         this.id = id;
         this.nome = nome;
         this.email = email;
         this.tipo = tipo;
+        this.ongId = ongId;
     }
 
     public Long getId() {
@@ -47,5 +49,13 @@ public class UsuarioResponseDTO {
 
     public void setTipo(String tipo) {
         this.tipo = tipo;
+    }
+
+    public Long getOngId() {
+        return ongId;
+    }
+
+    public void setOngId(Long ongId) {
+        this.ongId = ongId;
     }
 }
