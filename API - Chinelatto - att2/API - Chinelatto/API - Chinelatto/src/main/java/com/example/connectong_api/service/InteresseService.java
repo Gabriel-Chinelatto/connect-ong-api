@@ -31,6 +31,9 @@ public class InteresseService {
     @Autowired
     private UsuarioRepository usuarioRepository;
 
+    @Autowired
+    private NotificacaoService notificacaoService;
+
     // =========================
     // DEMONSTRAR INTERESSE (um doador numa necessidade)
     // =========================
@@ -65,6 +68,17 @@ public class InteresseService {
         interesse.setDoador(doador);
 
         Interesse salvo = repository.save(interesse);
+
+        // notifica a ONG dona da necessidade
+        if (necessidade.getOng() != null) {
+            usuarioRepository.findByOngId(necessidade.getOng().getId())
+                    .ifPresent(ongUser -> notificacaoService.criar(
+                            ongUser.getId(),
+                            "Novo interesse!",
+                            doador.getNome() + " demonstrou interesse em \""
+                                    + necessidade.getTitulo() + "\"",
+                            "MATCH"));
+        }
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)
@@ -111,6 +125,20 @@ public class InteresseService {
         }
         interesse.setStatus(novoStatus);
         Interesse salvo = repository.save(interesse);
+
+        // notifica o doador quando o match e aceito
+        if ("ACEITO".equals(novoStatus) && interesse.getDoador() != null) {
+            String tituloNec = interesse.getNecessidade() != null
+                    ? interesse.getNecessidade().getTitulo()
+                    : "uma necessidade";
+            notificacaoService.criar(
+                    interesse.getDoador().getId(),
+                    "Interesse aceito!",
+                    "A ONG aceitou seu interesse em \"" + tituloNec
+                            + "\". Agora vocês podem conversar!",
+                    "MATCH");
+        }
+
         return ResponseEntity.ok(toDTO(salvo));
     }
 

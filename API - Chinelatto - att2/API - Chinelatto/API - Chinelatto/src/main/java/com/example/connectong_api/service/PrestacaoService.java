@@ -26,6 +26,9 @@ public class PrestacaoService {
     @Autowired
     private InteresseRepository interesseRepository;
 
+    @Autowired
+    private NotificacaoService notificacaoService;
+
     public List<PrestacaoResponseDTO> listar(Long interesseId) {
         return repository.findByInteresseIdOrderByDataCriacaoDesc(interesseId)
                 .stream()
@@ -56,9 +59,20 @@ public class PrestacaoService {
         p.setDescricao(dto.getDescricao());
         p.setFotoUrl(dto.getFotoUrl());
 
+        Prestacao salva = repository.save(p);
+
+        // notifica o doador
+        if (interesse.getDoador() != null) {
+            notificacaoService.criar(
+                    interesse.getDoador().getId(),
+                    "Prestação de contas",
+                    "A ONG publicou: \"" + dto.getTitulo() + "\"",
+                    "PRESTACAO");
+        }
+
         return ResponseEntity
                 .status(HttpStatus.CREATED)
-                .body(toDTO(repository.save(p)));
+                .body(toDTO(salva));
     }
 
     private PrestacaoResponseDTO toDTO(Prestacao p) {

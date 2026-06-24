@@ -6,6 +6,7 @@ import com.example.connectong_api.model.Interesse;
 import com.example.connectong_api.model.Mensagem;
 import com.example.connectong_api.repository.InteresseRepository;
 import com.example.connectong_api.repository.MensagemRepository;
+import com.example.connectong_api.repository.UsuarioRepository;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -25,6 +26,12 @@ public class MensagemService {
 
     @Autowired
     private InteresseRepository interesseRepository;
+
+    @Autowired
+    private UsuarioRepository usuarioRepository;
+
+    @Autowired
+    private NotificacaoService notificacaoService;
 
     // Lista as mensagens de um match, em ordem cronologica.
     public List<MensagemResponseDTO> listar(Long interesseId) {
@@ -67,6 +74,30 @@ public class MensagemService {
         mensagem.setConteudo(dto.getConteudo());
 
         Mensagem salva = repository.save(mensagem);
+
+        // notifica o outro lado da conversa
+        if (remetente.equals("DOADOR")) {
+            // notifica a ONG
+            if (interesse.getNecessidade() != null
+                    && interesse.getNecessidade().getOng() != null) {
+                usuarioRepository
+                        .findByOngId(interesse.getNecessidade().getOng().getId())
+                        .ifPresent(ongUser -> notificacaoService.criar(
+                                ongUser.getId(),
+                                "Nova mensagem",
+                                "Você recebeu uma nova mensagem de um doador.",
+                                "MENSAGEM"));
+            }
+        } else {
+            // remetente ONG -> notifica o doador
+            if (interesse.getDoador() != null) {
+                notificacaoService.criar(
+                        interesse.getDoador().getId(),
+                        "Nova mensagem",
+                        "A ONG enviou uma nova mensagem.",
+                        "MENSAGEM");
+            }
+        }
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)
