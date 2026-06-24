@@ -92,7 +92,9 @@ public class NecessidadeService {
                 n.getDataCriacao(),
                 n.getOng() != null ? n.getOng().getId() : null,
                 n.getOng() != null ? n.getOng().getNome() : null,
-                n.getOng() != null ? n.getOng().getVerificada() : false
+                n.getOng() != null ? n.getOng().getVerificada() : false,
+                n.getOng() != null ? n.getOng().getNotaMedia() : 0.0,
+                n.getOng() != null ? n.getOng().getTotalAvaliacoes() : 0
         );
     }
 

@@ -18,6 +18,10 @@ public class OngResponseDTO {
 
     private Boolean verificada;
 
+    private Double notaMedia;
+
+    private Integer totalAvaliacoes;
+
     public OngResponseDTO(
             Long id,
             String nome,
@@ -26,7 +30,9 @@ public class OngResponseDTO {
             String cidade,
             String descricao,
             String cnpj,
-            Boolean verificada
+            Boolean verificada,
+            Double notaMedia,
+            Integer totalAvaliacoes
     ) {
 
         this.id = id;
@@ -37,6 +43,8 @@ public class OngResponseDTO {
         this.descricao = descricao;
         this.cnpj = cnpj;
         this.verificada = verificada;
+        this.notaMedia = notaMedia;
+        this.totalAvaliacoes = totalAvaliacoes;
     }
 
     public Long getId() {
@@ -69,5 +77,13 @@ public class OngResponseDTO {
 
     public Boolean getVerificada() {
         return verificada;
+    }
+
+    public Double getNotaMedia() {
+        return notaMedia;
+    }
+
+    public Integer getTotalAvaliacoes() {
+        return totalAvaliacoes;
     }
 }

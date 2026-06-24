@@ -37,6 +37,10 @@ public class Ong {
 
     private Boolean verificada = false;
 
+    // Avaliacoes (media denormalizada para exibir rapido)
+    private Double notaMedia = 0.0;
+    private Integer totalAvaliacoes = 0;
+
     @OneToMany(mappedBy = "ong")
     private List<Projeto> projetos;
 
@@ -63,6 +67,12 @@ public class Ong {
 
     public Boolean getVerificada() { return verificada != null && verificada; }
     public void setVerificada(Boolean verificada) { this.verificada = verificada; }
+
+    public Double getNotaMedia() { return notaMedia != null ? notaMedia : 0.0; }
+    public void setNotaMedia(Double notaMedia) { this.notaMedia = notaMedia; }
+
+    public Integer getTotalAvaliacoes() { return totalAvaliacoes != null ? totalAvaliacoes : 0; }
+    public void setTotalAvaliacoes(Integer totalAvaliacoes) { this.totalAvaliacoes = totalAvaliacoes; }
 
     public String getTelefone() { return telefone; }
     public void setTelefone(String telefone) { this.telefone = telefone; }

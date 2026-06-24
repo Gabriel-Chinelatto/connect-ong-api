@@ -224,7 +224,9 @@ public class ONGService {
                 o.getCidade(),
                 o.getDescricao(),
                 o.getCnpj(),
-                o.getVerificada()
+                o.getVerificada(),
+                o.getNotaMedia(),
+                o.getTotalAvaliacoes()
         );
     }
 
