@@ -7,6 +7,7 @@ import com.example.connectong_api.model.Mensagem;
 import com.example.connectong_api.repository.InteresseRepository;
 import com.example.connectong_api.repository.MensagemRepository;
 import com.example.connectong_api.repository.UsuarioRepository;
+import com.example.connectong_api.security.SecurityUtils;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -34,12 +35,33 @@ public class MensagemService {
     @Autowired
     private NotificacaoService notificacaoService;
 
+    @Autowired
+    private SecurityUtils security;
+
     // Lista as mensagens de um match, em ordem cronologica.
+    // So os participantes do match (o doador ou a ONG) podem ler.
     public List<MensagemResponseDTO> listar(Long interesseId) {
+        Interesse interesse =
+                interesseRepository.findById(interesseId).orElse(null);
+        if (interesse == null) {
+            return List.of(); // match inexistente: nada a listar
+        }
+        exigirParticipante(interesse);
+
         return repository.findByInteresseIdOrderByDataEnvioAsc(interesseId)
                 .stream()
                 .map(this::toDTO)
                 .collect(Collectors.toList());
+    }
+
+    // Garante que o usuario autenticado e o doador do match OU a ONG do match.
+    private void exigirParticipante(Interesse interesse) {
+        Long doadorId = interesse.getDoador() != null
+                ? interesse.getDoador().getId() : null;
+        Long ongId = (interesse.getNecessidade() != null
+                && interesse.getNecessidade().getOng() != null)
+                ? interesse.getNecessidade().getOng().getId() : null;
+        security.exigirUsuarioOuOng(doadorId, ongId);
     }
 
     // Envia uma mensagem (so apos o match ser aceito).
@@ -67,6 +89,9 @@ public class MensagemService {
         if (interesse == null) {
             return erro("Match não encontrado");
         }
+
+        // So os participantes do match podem enviar mensagem.
+        exigirParticipante(interesse);
 
         if (!"ACEITO".equals(interesse.getStatus())) {
             return erro("O chat só fica disponível após o match ser aceito");

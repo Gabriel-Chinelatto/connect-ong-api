@@ -1,5 +1,6 @@
 package com.example.connectong_api.config;
 
+import com.example.connectong_api.security.UsuarioAutenticado;
 import com.example.connectong_api.service.JwtService;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
@@ -55,9 +56,19 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                             ? List.of(new SimpleGrantedAuthority("ROLE_" + tipo))
                             : List.of();
 
+                    // Principal rico: id + tipo + ongId, para checagens de ownership.
+                    Long id = Long.valueOf(claims.getSubject());
+                    Long ongId = null;
+                    Object ongClaim = claims.get("ongId");
+                    if (ongClaim instanceof Number numero) {
+                        ongId = numero.longValue();
+                    }
+                    UsuarioAutenticado principal =
+                            new UsuarioAutenticado(id, tipo, ongId);
+
                     UsernamePasswordAuthenticationToken auth =
                             new UsernamePasswordAuthenticationToken(
-                                    claims.getSubject(), null, authorities);
+                                    principal, null, authorities);
 
                     SecurityContextHolder.getContext().setAuthentication(auth);
                 }

@@ -1,6 +1,7 @@
 package com.example.connectong_api.controller;
 
 import com.example.connectong_api.dto.InteresseRequestDTO;
+import com.example.connectong_api.security.SecurityUtils;
 import com.example.connectong_api.service.InteresseService;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -19,12 +20,21 @@ public class InteresseController {
     @Autowired
     private InteresseService service;
 
+    @Autowired
+    private SecurityUtils security;
+
     @GetMapping
     @Operation(summary = "Listar interesses (filtra por doadorId ou ongId)")
     public ResponseEntity<?> listar(
             @RequestParam(required = false) Long doadorId,
             @RequestParam(required = false) Long ongId
     ) {
+        // O doador so lista os proprios interesses; a ONG so os da propria ONG.
+        if (doadorId != null) {
+            security.exigirUsuario(doadorId);
+        } else if (ongId != null) {
+            security.exigirOng(ongId);
+        }
         return ResponseEntity.ok(service.listar(doadorId, ongId));
     }
 
@@ -33,12 +43,15 @@ public class InteresseController {
     public ResponseEntity<?> demonstrar(
             @Valid @RequestBody InteresseRequestDTO dto
     ) {
+        // O interesse e do proprio doador autenticado.
+        security.exigirUsuario(dto.getDoadorId());
         return service.demonstrarInteresse(dto);
     }
 
     @PutMapping("/{id}/aceitar")
     @Operation(summary = "ONG aceita o interesse (vira um match)")
     public ResponseEntity<?> aceitar(@PathVariable Long id) {
+        // A checagem de dono (a ONG do interesse) e feita no service.
         return service.aceitar(id);
     }
 

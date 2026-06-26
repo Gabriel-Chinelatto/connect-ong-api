@@ -1,5 +1,6 @@
 package com.example.connectong_api.controller;
 
+import com.example.connectong_api.security.SecurityUtils;
 import com.example.connectong_api.service.FavoritoService;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -18,9 +19,13 @@ public class FavoritoController {
     @Autowired
     private FavoritoService service;
 
+    @Autowired
+    private SecurityUtils security;
+
     @GetMapping
     @Operation(summary = "Listar favoritos de um doador (com nome do alvo resolvido)")
     public ResponseEntity<?> listar(@RequestParam Long usuarioId) {
+        security.exigirUsuario(usuarioId);
         return ResponseEntity.ok(service.listar(usuarioId));
     }
 
@@ -28,6 +33,7 @@ public class FavoritoController {
     @Operation(summary = "Ids dos alvos favoritados de um tipo (para marcar o coracao no app)")
     public ResponseEntity<?> ids(@RequestParam Long usuarioId,
                                  @RequestParam(defaultValue = "ONG") String tipo) {
+        security.exigirUsuario(usuarioId);
         return ResponseEntity.ok(service.ids(usuarioId, tipo));
     }
 
@@ -39,6 +45,7 @@ public class FavoritoController {
         Long alvoId = body.get("alvoId") != null
                 ? Long.valueOf(body.get("alvoId").toString()) : null;
         String tipo = body.get("tipo") != null ? body.get("tipo").toString() : null;
+        security.exigirUsuario(usuarioId);
         return service.adicionar(usuarioId, tipo, alvoId);
     }
 
@@ -47,6 +54,7 @@ public class FavoritoController {
     public ResponseEntity<?> remover(@RequestParam Long usuarioId,
                                      @RequestParam String tipo,
                                      @RequestParam Long alvoId) {
+        security.exigirUsuario(usuarioId);
         return service.remover(usuarioId, tipo, alvoId);
     }
 }

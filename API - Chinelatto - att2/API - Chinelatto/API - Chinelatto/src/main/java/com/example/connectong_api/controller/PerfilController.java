@@ -3,6 +3,7 @@ package com.example.connectong_api.controller;
 import com.example.connectong_api.dto.AlterarSenhaDTO;
 import com.example.connectong_api.dto.PerfilDTO;
 import com.example.connectong_api.model.Preferencia;
+import com.example.connectong_api.security.SecurityUtils;
 import com.example.connectong_api.service.PerfilService;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -20,9 +21,13 @@ public class PerfilController {
     @Autowired
     private PerfilService service;
 
+    @Autowired
+    private SecurityUtils security;
+
     @GetMapping("/perfil")
     @Operation(summary = "Obter o perfil do usuário")
     public ResponseEntity<?> obterPerfil(@PathVariable Long id) {
+        security.exigirUsuario(id);
         return service.obterPerfil(id);
     }
 
@@ -32,6 +37,7 @@ public class PerfilController {
             @PathVariable Long id,
             @RequestBody PerfilDTO dto
     ) {
+        security.exigirUsuario(id);
         return service.atualizarPerfil(id, dto);
     }
 
@@ -41,12 +47,14 @@ public class PerfilController {
             @PathVariable Long id,
             @RequestBody AlterarSenhaDTO dto
     ) {
+        security.exigirUsuario(id);
         return service.alterarSenha(id, dto);
     }
 
     @GetMapping("/preferencias")
     @Operation(summary = "Obter as preferências/configurações do usuário")
     public ResponseEntity<?> obterPreferencias(@PathVariable Long id) {
+        security.exigirUsuario(id);
         return service.obterPreferencias(id);
     }
 
@@ -56,6 +64,7 @@ public class PerfilController {
             @PathVariable Long id,
             @RequestBody Preferencia dados
     ) {
+        security.exigirUsuario(id);
         return service.atualizarPreferencias(id, dados);
     }
 }

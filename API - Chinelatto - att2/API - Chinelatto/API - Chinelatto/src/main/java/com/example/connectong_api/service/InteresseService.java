@@ -8,6 +8,7 @@ import com.example.connectong_api.model.Usuario;
 import com.example.connectong_api.repository.InteresseRepository;
 import com.example.connectong_api.repository.NecessidadeRepository;
 import com.example.connectong_api.repository.UsuarioRepository;
+import com.example.connectong_api.security.SecurityUtils;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -36,6 +37,9 @@ public class InteresseService {
 
     @Autowired
     private AtividadeService atividadeService;
+
+    @Autowired
+    private SecurityUtils security;
 
     // =========================
     // DEMONSTRAR INTERESSE (um doador numa necessidade)
@@ -135,6 +139,14 @@ public class InteresseService {
             erro.put("erro", "Interesse não encontrado");
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(erro);
         }
+
+        // Só a ONG DONA da necessidade pode aceitar/recusar este interesse.
+        Long ongDonaId = (interesse.getNecessidade() != null
+                && interesse.getNecessidade().getOng() != null)
+                ? interesse.getNecessidade().getOng().getId()
+                : null;
+        security.exigirOng(ongDonaId);
+
         interesse.setStatus(novoStatus);
         Interesse salvo = repository.save(interesse);
 

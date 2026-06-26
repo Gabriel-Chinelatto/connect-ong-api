@@ -76,4 +76,30 @@ class SecurityEnforcementTest {
                         .content("{\"email\":\"naoexiste@x.com\",\"senha\":\"errada\"}"))
                 .andExpect(status().isUnauthorized());
     }
+
+    // ===================== Ownership (autorizacao) =====================
+
+    @Test
+    void ownership_notificacoesDeOutroUsuario_retorna403() throws Exception {
+        // Token do usuario 999 tentando ler as notificacoes do usuario 1000
+        mockMvc.perform(get("/notificacoes?usuarioId=1000")
+                        .header("Authorization", "Bearer " + tokenDoador()))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void ownership_notificacoesProprias_retorna200() throws Exception {
+        // Token do usuario 999 lendo as PROPRIAS notificacoes (999) -> liberado
+        mockMvc.perform(get("/notificacoes?usuarioId=999")
+                        .header("Authorization", "Bearer " + tokenDoador()))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void ownership_perfilDeOutroUsuario_retorna403() throws Exception {
+        // Token do usuario 999 tentando ver o perfil do usuario 1000
+        mockMvc.perform(get("/usuarios/1000/perfil")
+                        .header("Authorization", "Bearer " + tokenDoador()))
+                .andExpect(status().isForbidden());
+    }
 }

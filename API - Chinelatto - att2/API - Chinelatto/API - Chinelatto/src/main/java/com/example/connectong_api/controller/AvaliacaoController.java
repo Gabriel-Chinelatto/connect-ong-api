@@ -1,6 +1,7 @@
 package com.example.connectong_api.controller;
 
 import com.example.connectong_api.dto.AvaliacaoRequestDTO;
+import com.example.connectong_api.security.SecurityUtils;
 import com.example.connectong_api.service.AvaliacaoService;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -18,6 +19,11 @@ public class AvaliacaoController {
     @Autowired
     private AvaliacaoService service;
 
+    @Autowired
+    private SecurityUtils security;
+
+    // Listar avaliacoes de uma ONG e publico (reputacao exibida no app);
+    // basta estar autenticado. Nao ha checagem de dono aqui.
     @GetMapping
     @Operation(summary = "Listar avaliações de uma ONG (ongId)")
     public ResponseEntity<?> listar(@RequestParam Long ongId) {
@@ -27,6 +33,8 @@ public class AvaliacaoController {
     @PostMapping
     @Operation(summary = "Avaliar uma ONG (cria ou atualiza a avaliação do doador)")
     public ResponseEntity<?> avaliar(@Valid @RequestBody AvaliacaoRequestDTO dto) {
+        // Avalia em nome do proprio doador autenticado, nunca de outro.
+        security.exigirUsuario(dto.getDoadorId());
         return service.avaliar(dto);
     }
 }

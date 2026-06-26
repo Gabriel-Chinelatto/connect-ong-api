@@ -5,6 +5,7 @@ import com.example.connectong_api.model.Notificacao;
 import com.example.connectong_api.model.Preferencia;
 import com.example.connectong_api.repository.NotificacaoRepository;
 import com.example.connectong_api.repository.PreferenciaRepository;
+import com.example.connectong_api.security.SecurityUtils;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -23,6 +24,9 @@ public class NotificacaoService {
 
     @Autowired
     private PreferenciaRepository preferenciaRepository;
+
+    @Autowired
+    private SecurityUtils security;
 
     // Cria uma notificacao, respeitando as preferencias do destinatario.
     public void criar(Long usuarioId, String titulo, String mensagem, String tipo) {
@@ -65,6 +69,8 @@ public class NotificacaoService {
     public ResponseEntity<?> marcarLida(Long id) {
         return repository.findById(id)
                 .map(n -> {
+                    // So o dono da notificacao pode marca-la como lida.
+                    security.exigirUsuario(n.getUsuarioId());
                     n.setLida(true);
                     repository.save(n);
                     return ResponseEntity.ok(toDTO(n));

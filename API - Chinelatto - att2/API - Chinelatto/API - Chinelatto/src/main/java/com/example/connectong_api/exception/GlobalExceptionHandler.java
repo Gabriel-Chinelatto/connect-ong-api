@@ -63,6 +63,15 @@ public class GlobalExceptionHandler {
         return badRequest("Parametro '" + ex.getName() + "' com valor invalido.");
     }
 
+    // Falha de autorizacao/ownership (usuario mexendo em dado de outro) -> 403
+    @ExceptionHandler(AcessoNegadoException.class)
+    public ResponseEntity<Map<String, String>> tratarAcessoNegado(
+            AcessoNegadoException ex) {
+        Map<String, String> corpo = new HashMap<>();
+        corpo.put("erro", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(corpo);
+    }
+
     // Qualquer outra excecao nao prevista -> 500 com mensagem generica (sem vazar detalhes)
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, String>> tratarGenerico(Exception ex) {
