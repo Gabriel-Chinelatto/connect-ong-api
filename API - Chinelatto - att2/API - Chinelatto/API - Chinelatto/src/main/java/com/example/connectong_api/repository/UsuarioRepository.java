@@ -11,4 +11,6 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
 
     Optional<Usuario> findByOngId(Long ongId);
 
+    long countByTipo(String tipo);
+
 }

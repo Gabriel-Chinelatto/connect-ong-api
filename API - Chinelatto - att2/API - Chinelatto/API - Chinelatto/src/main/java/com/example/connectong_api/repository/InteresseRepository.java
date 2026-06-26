@@ -15,4 +15,7 @@ public interface InteresseRepository extends JpaRepository<Interesse, Long> {
 
     // Interesses de uma necessidade especifica
     List<Interesse> findByNecessidadeId(Long necessidadeId);
+
+    // Total de matches num determinado status (ex.: "ACEITO")
+    long countByStatus(String status);
 }
