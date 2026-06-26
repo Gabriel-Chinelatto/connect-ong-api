@@ -10,7 +10,6 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/notificacoes")
-@CrossOrigin(origins = "*")
 @Tag(name = "Notificações", description = "Notificações dos usuários")
 public class NotificacaoController {
 

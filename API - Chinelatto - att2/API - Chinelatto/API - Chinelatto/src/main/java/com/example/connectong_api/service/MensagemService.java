@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashMap;
 import java.util.List;
@@ -42,6 +43,9 @@ public class MensagemService {
     }
 
     // Envia uma mensagem (so apos o match ser aceito).
+    // @Transactional: o save da mensagem e a notificacao ao outro lado ficam
+    // numa unica transacao (ou os dois acontecem, ou nenhum).
+    @Transactional
     public ResponseEntity<?> enviar(MensagemRequestDTO dto) {
 
         if (dto.getInteresseId() == null) {

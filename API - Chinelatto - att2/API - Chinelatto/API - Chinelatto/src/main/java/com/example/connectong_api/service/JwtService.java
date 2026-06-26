@@ -4,6 +4,7 @@ import com.example.connectong_api.model.Usuario;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
@@ -12,20 +13,28 @@ import java.util.Date;
 
 /**
  * Geracao e validacao de tokens JWT (access + refresh).
- * A infraestrutura esta pronta; a exigencia do token nos endpoints
- * fica DESLIGADA por enquanto (para nao quebrar a aplicacao no dev).
+ * A validacao do token agora E exigida nos endpoints protegidos
+ * (ver SecurityConfig / JwtAuthFilter).
+ *
+ * A chave secreta vem da propriedade "app.jwt.secret" (idealmente da variavel
+ * de ambiente APP_JWT_SECRET em producao). O default abaixo existe so para o
+ * ambiente de desenvolvimento NAO quebrar; em producao DEFINA um segredo novo
+ * por variavel de ambiente (o valor antigo ja vazou no historico do Git).
  */
 @Service
 public class JwtService {
 
-    // Chave secreta (>= 256 bits para HS256). Em producao iria para variavel de ambiente.
-    private static final String SECRET =
-            "connect-ong-chave-secreta-jwt-super-segura-2026-256-bits-minimo!!";
+    private final SecretKey key;
 
-    private final SecretKey key =
-            Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8));
+    public JwtService(
+            @Value("${app.jwt.secret:connect-ong-chave-secreta-jwt-super-segura-2026-256-bits-minimo!!}")
+            String secret) {
+        this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
+    }
 
-    private static final long ACCESS_MS = 1000L * 60 * 60;            // 1 hora
+    // 12h: cobre uma sessao longa (ex.: dia de feira) sem exigir refresh
+    // automatico no cliente. O refresh token (7 dias) continua disponivel.
+    private static final long ACCESS_MS = 1000L * 60 * 60 * 12;       // 12 horas
     private static final long REFRESH_MS = 1000L * 60 * 60 * 24 * 7;  // 7 dias
 
     public String gerarAccessToken(Usuario u) {

@@ -15,7 +15,6 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/audit-logs")
-@CrossOrigin(origins = "*")
 @Tag(name = "Auditoria",
         description = "Registro de eventos de seguranca (logins, cadastros, doacoes)")
 public class AuditController {

@@ -9,9 +9,12 @@ import com.example.connectong_api.repository.PrestacaoRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -62,12 +65,37 @@ public class TransparenciaService {
     }
 
     // Ranking publico: ONGs ordenadas por score desc.
+    //
+    // Antes: findAll() + 2 counts POR ONG (1 + 2N queries, sendo uma um join de
+    // 3 niveis). Agora: 3 queries no total (ONGs + prestacoes agrupadas +
+    // campanhas agrupadas), com as contagens resolvidas em memoria por um Map.
+    @Transactional(readOnly = true)
     public List<TransparenciaDTO> ranking(int limite) {
         int lim = limite <= 0 ? 20 : Math.min(limite, 100);
+
+        Map<Long, Long> prestacoesPorOng = paraMapa(prestacaoRepository.contarPrestacoesPorOng());
+        Map<Long, Long> campanhasPorOng = paraMapa(campanhaRepository.contarConcluidasPorOng());
+
         return ongRepository.findAll().stream()
-                .map(this::calcular)
+                .map(ong -> {
+                    long prestacoes = prestacoesPorOng.getOrDefault(ong.getId(), 0L);
+                    long campanhas = campanhasPorOng.getOrDefault(ong.getId(), 0L);
+                    int score = score(ong, prestacoes, campanhas);
+                    return new TransparenciaDTO(ong, score, nivel(score),
+                            prestacoes, campanhas);
+                })
                 .sorted(Comparator.comparingInt(TransparenciaDTO::getScore).reversed())
                 .limit(lim)
                 .collect(Collectors.toList());
+    }
+
+    // Converte os pares [ongId, total] das queries agregadas em um Map.
+    private Map<Long, Long> paraMapa(List<Object[]> linhas) {
+        Map<Long, Long> mapa = new HashMap<>();
+        for (Object[] linha : linhas) {
+            if (linha[0] == null) continue; // ignora ONG nula (dados orfaos)
+            mapa.put(((Number) linha[0]).longValue(), ((Number) linha[1]).longValue());
+        }
+        return mapa;
     }
 }

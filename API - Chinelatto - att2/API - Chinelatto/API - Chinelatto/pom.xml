@@ -72,10 +72,13 @@
 			<version>0.12.6</version>
 			<scope>runtime</scope>
 		</dependency>
-        <dependency>
-            <groupId>org.springframework.security</groupId>
-            <artifactId>spring-security-crypto</artifactId>
-        </dependency>
+		<!-- Spring Security: agora a API valida o JWT e exige autenticacao nos
+		     endpoints protegidos (antes so o BCrypt era usado). Inclui o
+		     spring-security-crypto, entao a dependencia avulsa foi substituida. -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-security</artifactId>
+		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-devtools</artifactId>

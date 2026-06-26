@@ -15,7 +15,10 @@ public class Mensagem {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne
+    // LAZY: o chat lista muitas mensagens; carregar o Interesse (e toda a
+    // cadeia Necessidade->Ong e Doador->Usuario) em cada uma seria desnecessario
+    // e ainda arrastaria o hash de senha do doador. O toDTO usa so o id.
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "interesse_id")
     private Interesse interesse;
 

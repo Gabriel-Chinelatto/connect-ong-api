@@ -16,7 +16,6 @@ import org.springframework.web.bind.annotation.*;
  */
 @RestController
 @RequestMapping("/publico")
-@CrossOrigin(origins = "*")
 @Tag(name = "Publico", description = "Dados publicos para o portal institucional (transparencia)")
 public class PublicoController {
 

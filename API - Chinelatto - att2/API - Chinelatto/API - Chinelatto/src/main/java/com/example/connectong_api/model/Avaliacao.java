@@ -27,9 +27,10 @@ public class Avaliacao {
 
     public Avaliacao() {}
 
+    // So no INSERT: a data de criacao nao deve ser sobrescrita a cada update.
+    // (Antes havia @PreUpdate aqui, que regravava dataCriacao em toda alteracao.)
     @PrePersist
-    @PreUpdate
-    public void aoSalvar() {
+    public void aoCriar() {
         this.dataCriacao = LocalDateTime.now();
     }
 

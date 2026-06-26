@@ -1,5 +1,7 @@
 package com.example.connectong_api.service;
 
+import com.example.connectong_api.dto.CadastroUsuarioDTO;
+import com.example.connectong_api.dto.LoginRequestDTO;
 import com.example.connectong_api.dto.UsuarioResponseDTO;
 import com.example.connectong_api.model.Usuario;
 import com.example.connectong_api.repository.UsuarioRepository;
@@ -9,6 +11,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -32,24 +35,11 @@ public class UsuarioService {
     // =========================
     // CADASTRO
     // =========================
-    public ResponseEntity<?> cadastrar(Usuario usuario) {
-
-        // valida campos obrigatórios
-        if (usuario.getNome() == null || usuario.getNome().isEmpty() ||
-                usuario.getEmail() == null || usuario.getEmail().isEmpty() ||
-                usuario.getSenha() == null || usuario.getSenha().isEmpty() ||
-                usuario.getTipo() == null || usuario.getTipo().isEmpty()) {
-
-            Map<String, String> erro = new HashMap<>();
-            erro.put("erro", "Preencha todos os campos");
-
-            return ResponseEntity
-                    .badRequest()
-                    .body(erro);
-        }
+    @Transactional
+    public ResponseEntity<?> cadastrar(CadastroUsuarioDTO dados) {
 
         // valida email duplicado
-        if (usuarioRepository.findByEmail(usuario.getEmail()).isPresent()) {
+        if (usuarioRepository.findByEmail(dados.getEmail()).isPresent()) {
 
             Map<String, String> erro = new HashMap<>();
             erro.put("erro", "Email já cadastrado");
@@ -59,10 +49,13 @@ public class UsuarioService {
                     .body(erro);
         }
 
-        // criptografa senha
-        usuario.setSenha(
-                passwordEncoder.encode(usuario.getSenha())
-        );
+        // Monta a entidade SO com os campos permitidos. id e ongId nunca vêm do
+        // cliente (evita mass assignment / escalonamento de privilegio).
+        Usuario usuario = new Usuario();
+        usuario.setNome(dados.getNome());
+        usuario.setEmail(dados.getEmail());
+        usuario.setTipo(dados.getTipo());
+        usuario.setSenha(passwordEncoder.encode(dados.getSenha()));
 
         Usuario novo =
                 usuarioRepository.save(usuario);
@@ -90,72 +83,48 @@ public class UsuarioService {
     // =========================
     // LOGIN
     // =========================
-    public ResponseEntity<?> login(Usuario usuario) {
-
-        // valida email e senha
-        if (usuario.getEmail() == null || usuario.getEmail().isEmpty() ||
-                usuario.getSenha() == null || usuario.getSenha().isEmpty()) {
-
-            Map<String, String> erro = new HashMap<>();
-            erro.put("erro", "Informe email e senha");
-
-            return ResponseEntity
-                    .badRequest()
-                    .body(erro);
-        }
+    public ResponseEntity<?> login(LoginRequestDTO credenciais) {
 
         Optional<Usuario> usuarioBanco =
-                usuarioRepository.findByEmail(usuario.getEmail());
+                usuarioRepository.findByEmail(credenciais.getEmail());
 
-        // usuário encontrado
-        if (usuarioBanco.isPresent()) {
+        // usuário encontrado E senha confere -> sucesso
+        if (usuarioBanco.isPresent()
+                && passwordEncoder.matches(
+                        credenciais.getSenha(),
+                        usuarioBanco.get().getSenha())) {
 
-            Usuario usuarioEncontrado =
-                    usuarioBanco.get();
+            Usuario usuarioEncontrado = usuarioBanco.get();
 
-            // valida senha criptografada
-            if (passwordEncoder.matches(
-                    usuario.getSenha(),
-                    usuarioEncontrado.getSenha()
-            )) {
+            UsuarioResponseDTO resposta =
+                    new UsuarioResponseDTO(
+                            usuarioEncontrado.getId(),
+                            usuarioEncontrado.getNome(),
+                            usuarioEncontrado.getEmail(),
+                            usuarioEncontrado.getTipo(),
+                            usuarioEncontrado.getOngId()
+                    );
 
-                UsuarioResponseDTO resposta =
-                        new UsuarioResponseDTO(
-                                usuarioEncontrado.getId(),
-                                usuarioEncontrado.getNome(),
-                                usuarioEncontrado.getEmail(),
-                                usuarioEncontrado.getTipo(),
-                                usuarioEncontrado.getOngId()
-                        );
+            resposta.setAccessToken(jwtService.gerarAccessToken(usuarioEncontrado));
+            resposta.setRefreshToken(jwtService.gerarRefreshToken(usuarioEncontrado));
 
-                resposta.setAccessToken(jwtService.gerarAccessToken(usuarioEncontrado));
-                resposta.setRefreshToken(jwtService.gerarRefreshToken(usuarioEncontrado));
+            auditService.registrar("LOGIN_SUCESSO", usuarioEncontrado.getId(),
+                    "Login bem-sucedido: " + usuarioEncontrado.getEmail());
 
-                auditService.registrar("LOGIN_SUCESSO", usuarioEncontrado.getId(),
-                        "Login bem-sucedido: " + usuarioEncontrado.getEmail());
-
-                return ResponseEntity.ok(resposta);
-            }
-
-            auditService.registrar("LOGIN_FALHA", usuarioEncontrado.getId(),
-                    "Senha incorreta para: " + usuarioEncontrado.getEmail());
-
-            Map<String, String> erro = new HashMap<>();
-            erro.put("erro", "Senha incorreta");
-
-            return ResponseEntity
-                    .status(HttpStatus.UNAUTHORIZED)
-                    .body(erro);
+            return ResponseEntity.ok(resposta);
         }
 
-        auditService.registrar("LOGIN_FALHA", null,
-                "Tentativa de login com email nao cadastrado: " + usuario.getEmail());
+        // Falha: NAO distinguir "email inexistente" de "senha errada" (evita
+        // enumeracao de usuarios). Sempre 401 com mensagem generica.
+        Long idAuditado = usuarioBanco.map(Usuario::getId).orElse(null);
+        auditService.registrar("LOGIN_FALHA", idAuditado,
+                "Tentativa de login invalida para: " + credenciais.getEmail());
 
         Map<String, String> erro = new HashMap<>();
-        erro.put("erro", "Usuário não encontrado");
+        erro.put("erro", "Credenciais inválidas");
 
         return ResponseEntity
-                .status(HttpStatus.NOT_FOUND)
+                .status(HttpStatus.UNAUTHORIZED)
                 .body(erro);
     }
 }

@@ -12,7 +12,6 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/doacoes-financeiras")
-@CrossOrigin(origins = "*")
 @Tag(name = "Doações Financeiras (PIX)",
         description = "Doação financeira simulada via PIX (sem gateway real)")
 public class DoacaoFinanceiraController {

@@ -12,7 +12,9 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class JwtServiceTest {
 
-    private final JwtService jwt = new JwtService();
+    // Secret de teste (>= 256 bits para HS256); em producao vem de app.jwt.secret.
+    private final JwtService jwt =
+            new JwtService("segredo-de-teste-com-pelo-menos-256-bits-para-hs256-ok!!");
 
     private Usuario usuario() {
         Usuario u = new Usuario();

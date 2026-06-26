@@ -12,7 +12,6 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/necessidades")
-@CrossOrigin(origins = "*")
 @Tag(name = "Necessidades", description = "Necessidades publicadas pelas ONGs")
 public class NecessidadeController {
 

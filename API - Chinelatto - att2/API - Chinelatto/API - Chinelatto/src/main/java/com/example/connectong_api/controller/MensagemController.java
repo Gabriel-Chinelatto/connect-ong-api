@@ -12,7 +12,6 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/mensagens")
-@CrossOrigin(origins = "*")
 @Tag(name = "Mensagens (Chat)",
         description = "Chat entre doador e ONG dentro de um match aceito")
 public class MensagemController {

@@ -1,5 +1,6 @@
 package com.example.connectong_api.model;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 
 @Entity
@@ -11,6 +12,9 @@ public class Usuario {
 
     private String nome;
     private String email;
+    // A senha (hash BCrypt) so pode ENTRAR (desserializacao), nunca SAIR no JSON.
+    // Evita vazar o hash caso a entidade seja serializada direta ou via associacao.
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private String senha;
     private String tipo;
 

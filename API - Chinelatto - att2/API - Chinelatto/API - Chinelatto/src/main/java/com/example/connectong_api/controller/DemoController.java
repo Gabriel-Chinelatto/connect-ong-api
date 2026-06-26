@@ -15,7 +15,6 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/demo")
-@CrossOrigin(origins = "*")
 @Tag(name = "Modo Feira", description = "Carrega dados demonstrativos (apresentacao)")
 public class DemoController {
 

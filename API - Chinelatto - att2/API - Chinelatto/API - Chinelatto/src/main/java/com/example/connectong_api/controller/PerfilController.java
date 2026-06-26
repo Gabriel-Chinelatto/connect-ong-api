@@ -13,7 +13,6 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/usuarios/{id}")
-@CrossOrigin(origins = "*")
 @Tag(name = "Perfil e Configurações",
         description = "Perfil do usuário, troca de senha e preferências")
 public class PerfilController {

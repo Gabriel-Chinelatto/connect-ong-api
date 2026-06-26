@@ -11,7 +11,6 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/doacoes")
-@CrossOrigin(origins = "*")
 @Tag(name = "Doações", description = "Cadastro e gerenciamento de doações")
 public class DoacaoController {
 

@@ -10,7 +10,6 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/conquistas")
-@CrossOrigin(origins = "*")
 @Tag(name = "Conquistas", description = "Conquistas (gamificacao) de doadores e ONGs")
 public class ConquistaController {
 

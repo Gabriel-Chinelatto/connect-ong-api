@@ -12,7 +12,6 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/favoritos")
-@CrossOrigin(origins = "*")
 @Tag(name = "Favoritos", description = "Doador favorita ONGs e campanhas para acompanhar")
 public class FavoritoController {
 

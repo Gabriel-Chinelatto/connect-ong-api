@@ -1,0 +1,79 @@
+package com.example.connectong_api;
+
+import com.example.connectong_api.model.Usuario;
+import com.example.connectong_api.service.JwtService;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.web.servlet.MockMvc;
+
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+/**
+ * Prova que a camada de seguranca (SecurityFilterChain + JwtAuthFilter) esta
+ * ATIVA e correta. Antes destas mudancas, todos os endpoints respondiam sem
+ * autenticacao; estes testes falhariam.
+ *
+ * Roda contra o H2 em memoria (perfil de teste), com app.security.enforce no
+ * default (true).
+ */
+@SpringBootTest
+@AutoConfigureMockMvc
+class SecurityEnforcementTest {
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @Autowired
+    private JwtService jwtService;
+
+    // Gera um access token valido para um doador ficticio (nao precisa de banco).
+    private String tokenDoador() {
+        Usuario u = new Usuario();
+        u.setId(999L);
+        u.setNome("Doador Teste");
+        u.setTipo("DOADOR");
+        return jwtService.gerarAccessToken(u);
+    }
+
+    @Test
+    void endpointProtegido_semToken_retorna401() throws Exception {
+        // /atividades exige autenticacao -> sem token deve ser barrado
+        mockMvc.perform(get("/atividades"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void endpointProtegido_comTokenValido_naoEhBarrado() throws Exception {
+        // Com Bearer valido, a seguranca deixa passar (200 OK na listagem)
+        mockMvc.perform(get("/atividades")
+                        .header("Authorization", "Bearer " + tokenDoador()))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void endpointProtegido_comTokenInvalido_retorna401() throws Exception {
+        mockMvc.perform(get("/atividades")
+                        .header("Authorization", "Bearer token.invalido.aqui"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void endpointPublico_publicoRanking_liberadoSemToken() throws Exception {
+        // /publico/** e publico (e exercita o ranking otimizado com GROUP BY)
+        mockMvc.perform(get("/publico/ranking"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void login_ehPublico_e_credenciaisInvalidasRetorna401() throws Exception {
+        // O endpoint de login e acessivel sem token; credenciais erradas -> 401
+        mockMvc.perform(post("/usuarios/login")
+                        .contentType("application/json")
+                        .content("{\"email\":\"naoexiste@x.com\",\"senha\":\"errada\"}"))
+                .andExpect(status().isUnauthorized());
+    }
+}

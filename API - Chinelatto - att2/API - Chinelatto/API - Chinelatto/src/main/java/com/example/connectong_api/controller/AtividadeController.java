@@ -10,7 +10,6 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/atividades")
-@CrossOrigin(origins = "*")
 @Tag(name = "Atividades", description = "Feed global de atividades recentes da plataforma (Timeline)")
 public class AtividadeController {
 
