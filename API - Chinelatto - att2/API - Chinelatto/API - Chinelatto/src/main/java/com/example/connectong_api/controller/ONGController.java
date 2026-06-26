@@ -6,6 +6,7 @@ import com.example.connectong_api.service.ONGService;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -22,7 +23,7 @@ public class ONGController {
     @PostMapping("/registro")
     @Operation(summary = "Cadastrar uma ONG (cria o perfil + a conta de login juntos)")
     public ResponseEntity<?> registrar(
-            @RequestBody OngRegistroDTO dto
+            @Valid @RequestBody OngRegistroDTO dto
     ) {
         return service.registrar(dto);
     }

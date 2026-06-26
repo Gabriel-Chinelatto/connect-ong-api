@@ -5,6 +5,7 @@ import com.example.connectong_api.service.PrestacaoService;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -27,7 +28,7 @@ public class PrestacaoController {
 
     @PostMapping
     @Operation(summary = "Publicar uma prestação de contas num match")
-    public ResponseEntity<?> criar(@RequestBody PrestacaoRequestDTO dto) {
+    public ResponseEntity<?> criar(@Valid @RequestBody PrestacaoRequestDTO dto) {
         return service.criar(dto);
     }
 }

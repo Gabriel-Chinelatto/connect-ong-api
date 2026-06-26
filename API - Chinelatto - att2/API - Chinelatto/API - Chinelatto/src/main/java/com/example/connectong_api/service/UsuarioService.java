@@ -26,6 +26,9 @@ public class UsuarioService {
     @Autowired
     private JwtService jwtService;
 
+    @Autowired
+    private AuditService auditService;
+
     // =========================
     // CADASTRO
     // =========================
@@ -76,6 +79,9 @@ public class UsuarioService {
         resposta.setAccessToken(jwtService.gerarAccessToken(novo));
         resposta.setRefreshToken(jwtService.gerarRefreshToken(novo));
 
+        auditService.registrar("CADASTRO_USUARIO", novo.getId(),
+                "Novo usuario cadastrado (" + novo.getTipo() + "): " + novo.getEmail());
+
         return ResponseEntity
                 .status(HttpStatus.CREATED)
                 .body(resposta);
@@ -125,8 +131,14 @@ public class UsuarioService {
                 resposta.setAccessToken(jwtService.gerarAccessToken(usuarioEncontrado));
                 resposta.setRefreshToken(jwtService.gerarRefreshToken(usuarioEncontrado));
 
+                auditService.registrar("LOGIN_SUCESSO", usuarioEncontrado.getId(),
+                        "Login bem-sucedido: " + usuarioEncontrado.getEmail());
+
                 return ResponseEntity.ok(resposta);
             }
+
+            auditService.registrar("LOGIN_FALHA", usuarioEncontrado.getId(),
+                    "Senha incorreta para: " + usuarioEncontrado.getEmail());
 
             Map<String, String> erro = new HashMap<>();
             erro.put("erro", "Senha incorreta");
@@ -135,6 +147,9 @@ public class UsuarioService {
                     .status(HttpStatus.UNAUTHORIZED)
                     .body(erro);
         }
+
+        auditService.registrar("LOGIN_FALHA", null,
+                "Tentativa de login com email nao cadastrado: " + usuario.getEmail());
 
         Map<String, String> erro = new HashMap<>();
         erro.put("erro", "Usuário não encontrado");

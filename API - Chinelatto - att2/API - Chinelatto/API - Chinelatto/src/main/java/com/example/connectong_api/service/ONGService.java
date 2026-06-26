@@ -34,6 +34,9 @@ public class ONGService {
     @Autowired
     private JwtService jwtService;
 
+    @Autowired
+    private AuditService auditService;
+
     // =========================
     // CADASTRO (cria o perfil da ONG + a conta de login, ja vinculados)
     // =========================
@@ -83,6 +86,10 @@ public class ONGService {
 
         resposta.setAccessToken(jwtService.gerarAccessToken(usuarioSalvo));
         resposta.setRefreshToken(jwtService.gerarRefreshToken(usuarioSalvo));
+
+        auditService.registrar("CADASTRO_ONG", usuarioSalvo.getId(),
+                "Nova ONG cadastrada: " + ongSalva.getNome()
+                        + " (ongId=" + ongSalva.getId() + ")");
 
         return ResponseEntity.status(HttpStatus.CREATED).body(resposta);
     }

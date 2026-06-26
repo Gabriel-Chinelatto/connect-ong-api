@@ -5,6 +5,7 @@ import com.example.connectong_api.service.NecessidadeService;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -30,7 +31,7 @@ public class NecessidadeController {
     @PostMapping
     @Operation(summary = "Publicar uma nova necessidade (de uma ONG)")
     public ResponseEntity<?> criar(
-            @RequestBody NecessidadeRequestDTO dto
+            @Valid @RequestBody NecessidadeRequestDTO dto
     ) {
         return service.criar(dto);
     }

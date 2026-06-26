@@ -5,6 +5,7 @@ import com.example.connectong_api.service.DoacaoFinanceiraService;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -21,7 +22,7 @@ public class DoacaoFinanceiraController {
 
     @PostMapping
     @Operation(summary = "Fazer uma doação financeira (PIX simulado) e gerar o comprovante")
-    public ResponseEntity<?> doar(@RequestBody DoacaoFinanceiraRequestDTO dto) {
+    public ResponseEntity<?> doar(@Valid @RequestBody DoacaoFinanceiraRequestDTO dto) {
         return service.doar(dto);
     }
 

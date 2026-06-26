@@ -5,6 +5,7 @@ import com.example.connectong_api.service.MensagemService;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -27,7 +28,7 @@ public class MensagemController {
 
     @PostMapping
     @Operation(summary = "Enviar uma mensagem no chat de um match")
-    public ResponseEntity<?> enviar(@RequestBody MensagemRequestDTO dto) {
+    public ResponseEntity<?> enviar(@Valid @RequestBody MensagemRequestDTO dto) {
         return service.enviar(dto);
     }
 }

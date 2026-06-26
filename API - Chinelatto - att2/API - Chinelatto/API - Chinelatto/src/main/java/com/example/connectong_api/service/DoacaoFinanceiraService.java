@@ -35,6 +35,9 @@ public class DoacaoFinanceiraService {
     @Autowired
     private NotificacaoService notificacaoService;
 
+    @Autowired
+    private AuditService auditService;
+
     public List<DoacaoFinanceiraResponseDTO> listarPorDoador(Long doadorId) {
         return repository.findByDoadorIdOrderByDataCriacaoDesc(doadorId)
                 .stream().map(this::toDTO).collect(Collectors.toList());
@@ -69,6 +72,10 @@ public class DoacaoFinanceiraService {
         doacao.setCodigoPix(gerarCodigoPix(dto.getValor()));
 
         DoacaoFinanceira salva = repository.save(doacao);
+
+        auditService.registrar("DOACAO_FINANCEIRA", doador.getId(),
+                "Doacao PIX de R$ " + String.format("%.2f", dto.getValor())
+                        + " para " + ong.getNome() + " (ongId=" + ong.getId() + ")");
 
         // notifica a ONG (conta de login vinculada, se houver)
         usuarioRepository.findByOngId(ong.getId()).ifPresent(ongUser ->
