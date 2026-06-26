@@ -1,0 +1,14 @@
+# Sobe a API em container, apontando para o MySQL remoto da escola.
+# A senha NAO fica aqui: vem do ambiente (ex.: arquivo .env ao lado, com
+# DB_PASSWORD=...). Uso:  DB_PASSWORD=... docker compose up --build
+services:
+  api:
+    build: .
+    container_name: connectong-api
+    ports:
+      - "8080:8080"
+    environment:
+      DB_URL: ${DB_URL:-jdbc:mysql://143.106.241.3:3306/cl203161}
+      DB_USERNAME: ${DB_USERNAME:-cl203161}
+      DB_PASSWORD: ${DB_PASSWORD}
+    restart: unless-stopped
