@@ -46,6 +46,12 @@ public class ONGController {
         );
     }
 
+    @GetMapping("/{id}/perfil-publico")
+    @Operation(summary = "Perfil publico da ONG (dados + selo + avaliacoes + campanhas + necessidades + prestacoes)")
+    public ResponseEntity<?> perfilPublico(@PathVariable Long id) {
+        return service.perfilPublico(id);
+    }
+
     @PostMapping
     @Operation(summary = "Cadastrar uma nova ONG")
     public ResponseEntity<?> criar(

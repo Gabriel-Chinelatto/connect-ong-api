@@ -8,4 +8,7 @@ import java.util.List;
 public interface PrestacaoRepository extends JpaRepository<Prestacao, Long> {
 
     List<Prestacao> findByInteresseIdOrderByDataCriacaoDesc(Long interesseId);
+
+    // Prestacoes de uma ONG: prestacao -> interesse -> necessidade -> ong
+    List<Prestacao> findByInteresseNecessidadeOngIdOrderByDataCriacaoDesc(Long ongId);
 }

@@ -2,10 +2,13 @@ package com.example.connectong_api.service;
 
 import com.example.connectong_api.dto.OngRegistroDTO;
 import com.example.connectong_api.dto.OngResponseDTO;
+import com.example.connectong_api.dto.PerfilPublicoOngDTO;
+import com.example.connectong_api.dto.PrestacaoResponseDTO;
 import com.example.connectong_api.dto.UsuarioResponseDTO;
 import com.example.connectong_api.model.Ong;
 import com.example.connectong_api.model.Usuario;
 import com.example.connectong_api.repository.ONGRepository;
+import com.example.connectong_api.repository.PrestacaoRepository;
 import com.example.connectong_api.repository.UsuarioRepository;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -36,6 +39,49 @@ public class ONGService {
 
     @Autowired
     private AuditService auditService;
+
+    @Autowired
+    private NecessidadeService necessidadeService;
+
+    @Autowired
+    private CampanhaService campanhaService;
+
+    @Autowired
+    private AvaliacaoService avaliacaoService;
+
+    @Autowired
+    private PrestacaoRepository prestacaoRepository;
+
+    // =========================
+    // PERFIL PUBLICO (agrega tudo que o doador ve na pagina da ONG)
+    // =========================
+    public ResponseEntity<?> perfilPublico(Long id) {
+        Ong ong = repository.findById(id).orElse(null);
+        if (ong == null) {
+            return ResponseEntity.notFound().build();
+        }
+
+        List<PrestacaoResponseDTO> prestacoes = prestacaoRepository
+                .findByInteresseNecessidadeOngIdOrderByDataCriacaoDesc(id)
+                .stream()
+                .map(p -> new PrestacaoResponseDTO(
+                        p.getId(),
+                        p.getInteresse() != null ? p.getInteresse().getId() : null,
+                        p.getTitulo(),
+                        p.getDescricao(),
+                        p.getFotoUrl(),
+                        p.getDataCriacao()))
+                .collect(Collectors.toList());
+
+        PerfilPublicoOngDTO dto = new PerfilPublicoOngDTO(
+                ong,
+                necessidadeService.listar(id, null),
+                campanhaService.listar(id, false),
+                avaliacaoService.listar(id),
+                prestacoes);
+
+        return ResponseEntity.ok(dto);
+    }
 
     // =========================
     // CADASTRO (cria o perfil da ONG + a conta de login, ja vinculados)
