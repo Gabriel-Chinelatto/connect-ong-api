@@ -7,6 +7,8 @@ public class UsuarioResponseDTO {
     private String email;
     private String tipo;
     private Long ongId; // preenchido quando o usuario e uma ONG
+    private String accessToken;  // JWT
+    private String refreshToken; // JWT
 
     public UsuarioResponseDTO() {
     }
@@ -57,5 +59,21 @@ public class UsuarioResponseDTO {
 
     public void setOngId(Long ongId) {
         this.ongId = ongId;
+    }
+
+    public String getAccessToken() {
+        return accessToken;
+    }
+
+    public void setAccessToken(String accessToken) {
+        this.accessToken = accessToken;
+    }
+
+    public String getRefreshToken() {
+        return refreshToken;
+    }
+
+    public void setRefreshToken(String refreshToken) {
+        this.refreshToken = refreshToken;
     }
 }

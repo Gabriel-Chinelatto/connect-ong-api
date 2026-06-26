@@ -31,6 +31,9 @@ public class ONGService {
     @Autowired
     private BCryptPasswordEncoder passwordEncoder;
 
+    @Autowired
+    private JwtService jwtService;
+
     // =========================
     // CADASTRO (cria o perfil da ONG + a conta de login, ja vinculados)
     // =========================
@@ -77,6 +80,9 @@ public class ONGService {
                 usuarioSalvo.getTipo(),
                 usuarioSalvo.getOngId()
         );
+
+        resposta.setAccessToken(jwtService.gerarAccessToken(usuarioSalvo));
+        resposta.setRefreshToken(jwtService.gerarRefreshToken(usuarioSalvo));
 
         return ResponseEntity.status(HttpStatus.CREATED).body(resposta);
     }

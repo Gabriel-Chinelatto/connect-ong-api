@@ -23,6 +23,9 @@ public class UsuarioService {
     @Autowired
     private BCryptPasswordEncoder passwordEncoder;
 
+    @Autowired
+    private JwtService jwtService;
+
     // =========================
     // CADASTRO
     // =========================
@@ -70,6 +73,9 @@ public class UsuarioService {
                         novo.getOngId()
                 );
 
+        resposta.setAccessToken(jwtService.gerarAccessToken(novo));
+        resposta.setRefreshToken(jwtService.gerarRefreshToken(novo));
+
         return ResponseEntity
                 .status(HttpStatus.CREATED)
                 .body(resposta);
@@ -115,6 +121,9 @@ public class UsuarioService {
                                 usuarioEncontrado.getTipo(),
                                 usuarioEncontrado.getOngId()
                         );
+
+                resposta.setAccessToken(jwtService.gerarAccessToken(usuarioEncontrado));
+                resposta.setRefreshToken(jwtService.gerarRefreshToken(usuarioEncontrado));
 
                 return ResponseEntity.ok(resposta);
             }
