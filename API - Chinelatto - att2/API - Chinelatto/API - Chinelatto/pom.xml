@@ -48,6 +48,12 @@
 			<artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
 			<version>2.8.5</version>
 		</dependency>
+		<!-- Migrations de banco (Liquibase: gratuito e compativel com MySQL 5.6,
+		     diferente do Flyway Community que exige a edicao paga para o 5.6). -->
+		<dependency>
+			<groupId>org.liquibase</groupId>
+			<artifactId>liquibase-core</artifactId>
+		</dependency>
 		<!-- JWT (geracao e validacao de tokens) -->
 		<dependency>
 			<groupId>io.jsonwebtoken</groupId>

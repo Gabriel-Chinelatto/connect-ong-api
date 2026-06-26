@@ -1,0 +1,179 @@
+databaseChangeLog:
+
+  # =====================================================================
+  # Bloco 17 - Indices de performance.
+  #
+  # Observacao sobre baseline: as tabelas da aplicacao ja existiam antes do
+  # Liquibase (criadas pelo antigo ddl-auto=update). Por isso elas NAO entram
+  # neste changelog - o Liquibase so gerencia o que esta descrito aqui, e as
+  # tabelas existentes ficam intactas. As mudancas versionadas comecam nos
+  # indices abaixo. Um baseline completo da schema pode ser gerado depois com
+  # 'liquibase generateChangeLog', se necessario.
+  #
+  # Cada changeset tem preCondition 'not indexExists' (onFail/onError MARK_RAN)
+  # para ser idempotente e seguro no MySQL 5.6 (que nao tem CREATE INDEX IF NOT
+  # EXISTS). Indices de FK ja criados pelo Hibernate e o unique de usuario.email
+  # foram deixados de fora de proposito.
+  # =====================================================================
+
+  - changeSet:
+      id: bloco17-idx-necessidade-status
+      author: connect-ong
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: MARK_RAN
+        - not:
+            - indexExists:
+                tableName: necessidade
+                indexName: idx_necessidade_status
+      changes:
+        - createIndex:
+            tableName: necessidade
+            indexName: idx_necessidade_status
+            columns:
+              - column:
+                  name: status
+
+  - changeSet:
+      id: bloco17-idx-notificacao-usuario
+      author: connect-ong
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: MARK_RAN
+        - not:
+            - indexExists:
+                tableName: notificacao
+                indexName: idx_notificacao_usuario
+      changes:
+        - createIndex:
+            tableName: notificacao
+            indexName: idx_notificacao_usuario
+            columns:
+              - column:
+                  name: usuario_id
+
+  - changeSet:
+      id: bloco17-idx-doacao-fin-doador
+      author: connect-ong
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: MARK_RAN
+        - not:
+            - indexExists:
+                tableName: doacao_financeira
+                indexName: idx_doacao_fin_doador
+      changes:
+        - createIndex:
+            tableName: doacao_financeira
+            indexName: idx_doacao_fin_doador
+            columns:
+              - column:
+                  name: doador_id
+
+  - changeSet:
+      id: bloco17-idx-doacao-fin-ong
+      author: connect-ong
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: MARK_RAN
+        - not:
+            - indexExists:
+                tableName: doacao_financeira
+                indexName: idx_doacao_fin_ong
+      changes:
+        - createIndex:
+            tableName: doacao_financeira
+            indexName: idx_doacao_fin_ong
+            columns:
+              - column:
+                  name: ong_id
+
+  - changeSet:
+      id: bloco17-idx-avaliacao-ong
+      author: connect-ong
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: MARK_RAN
+        - not:
+            - indexExists:
+                tableName: avaliacao
+                indexName: idx_avaliacao_ong
+      changes:
+        - createIndex:
+            tableName: avaliacao
+            indexName: idx_avaliacao_ong
+            columns:
+              - column:
+                  name: ong_id
+
+  - changeSet:
+      id: bloco17-idx-avaliacao-doador
+      author: connect-ong
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: MARK_RAN
+        - not:
+            - indexExists:
+                tableName: avaliacao
+                indexName: idx_avaliacao_doador
+      changes:
+        - createIndex:
+            tableName: avaliacao
+            indexName: idx_avaliacao_doador
+            columns:
+              - column:
+                  name: doador_id
+
+  - changeSet:
+      id: bloco17-idx-audit-usuario
+      author: connect-ong
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: MARK_RAN
+        - not:
+            - indexExists:
+                tableName: audit_log
+                indexName: idx_audit_usuario
+      changes:
+        - createIndex:
+            tableName: audit_log
+            indexName: idx_audit_usuario
+            columns:
+              - column:
+                  name: usuario_id
+
+  - changeSet:
+      id: bloco17-idx-audit-acao
+      author: connect-ong
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: MARK_RAN
+        - not:
+            - indexExists:
+                tableName: audit_log
+                indexName: idx_audit_acao
+      changes:
+        - createIndex:
+            tableName: audit_log
+            indexName: idx_audit_acao
+            columns:
+              - column:
+                  name: acao
+
+  - changeSet:
+      id: bloco17-idx-usuario-ong
+      author: connect-ong
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: MARK_RAN
+        - not:
+            - indexExists:
+                tableName: usuario
+                indexName: idx_usuario_ong
+      changes:
+        - createIndex:
+            tableName: usuario
+            indexName: idx_usuario_ong
+            columns:
+              - column:
+                  name: ong_id
