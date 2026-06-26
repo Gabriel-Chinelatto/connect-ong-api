@@ -29,6 +29,7 @@ public class DemoService {
     @Autowired private AvaliacaoRepository avaliacaoRepository;
     @Autowired private PrestacaoRepository prestacaoRepository;
     @Autowired private DoacaoFinanceiraRepository doacaoFinanceiraRepository;
+    @Autowired private CampanhaRepository campanhaRepository;
     @Autowired private BCryptPasswordEncoder encoder;
 
     private static final String SENHA_DEMO = "demo123";
@@ -36,11 +37,37 @@ public class DemoService {
 
     @Transactional
     public Map<String, Object> carregar() {
-        // Idempotencia: se o marcador ja existe, nao recria nada.
-        if (usuarioRepository.findByEmail(MARCADOR).isPresent()) {
-            return resumo("ja_carregado");
+        boolean baseExiste = usuarioRepository.findByEmail(MARCADOR).isPresent();
+
+        Ong larViva, criancaFeliz, patinhas;
+
+        if (baseExiste) {
+            // Dados base ja existem: recupera as ONGs para (re)garantir campanhas.
+            larViva = ongDaConta(MARCADOR);
+            criancaFeliz = ongDaConta("demo.criancafeliz@connectong.com");
+            patinhas = ongDaConta("demo.patinhas@connectong.com");
+        } else {
+            criarBase();
+            larViva = ongDaConta(MARCADOR);
+            criancaFeliz = ongDaConta("demo.criancafeliz@connectong.com");
+            patinhas = ongDaConta("demo.patinhas@connectong.com");
         }
 
+        // ----- Campanhas (idempotentes por titulo) -----
+        ensureCampanha(larViva, "Inverno Solidario",
+                "Arrecadacao de cobertores e agasalhos para os idosos.",
+                1000.0, 350.0, "Roupas", true);
+        ensureCampanha(criancaFeliz, "Volta as Aulas",
+                "Kits escolares completos para 50 criancas.",
+                2000.0, 1200.0, "Educacao", true);
+        ensureCampanha(patinhas, "Castracao Solidaria",
+                "Castracao de 30 animais resgatados.",
+                1500.0, 400.0, "Saude", false);
+
+        return resumo(baseExiste ? "campanhas_garantidas" : "carregado");
+    }
+
+    private void criarBase() {
         // ----- ONGs (perfil + conta de login) -----
         Ong larViva = criarOng("Lar Viva", MARCADOR, "(19) 3441-1000",
                 "Limeira", "Acolhe idosos em situacao de vulnerabilidade.", true);
@@ -104,11 +131,36 @@ public class DemoService {
         // ----- Doacoes financeiras (PIX) -----
         criarDoacao(criancaFeliz, empresa, 250.0);
         criarDoacao(larViva, joao, 100.0);
-
-        return resumo("carregado");
     }
 
     // ----------------------------------------------------------- helpers
+
+    private Ong ongDaConta(String email) {
+        return usuarioRepository.findByEmail(email)
+                .map(u -> u.getOngId())
+                .flatMap(ongRepository::findById)
+                .orElse(null);
+    }
+
+    private void ensureCampanha(Ong ong, String titulo, String descricao,
+                                double meta, double arrecadado,
+                                String categoria, boolean destaque) {
+        if (ong == null) return;
+        boolean jaExiste = campanhaRepository.findByOngIdOrderByIdDesc(ong.getId())
+                .stream().anyMatch(c -> titulo.equals(c.getTitulo()));
+        if (jaExiste) return;
+
+        Campanha c = new Campanha();
+        c.setTitulo(titulo);
+        c.setDescricao(descricao);
+        c.setMetaValor(meta);
+        c.setValorArrecadado(arrecadado);
+        c.setCategoria(categoria);
+        c.setDestaque(destaque);
+        c.setEncerrada(false);
+        c.setOng(ong);
+        campanhaRepository.save(c);
+    }
 
     private Ong criarOng(String nome, String email, String tel, String cidade,
                          String descricao, boolean verificada) {

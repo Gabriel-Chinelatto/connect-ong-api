@@ -177,3 +177,79 @@ databaseChangeLog:
             columns:
               - column:
                   name: ong_id
+
+  # =====================================================================
+  # Bloco 22 - Campanhas: reaproveita a tabela `projeto` (renomeada para
+  # `campanha`) e adiciona as colunas de meta/progresso/datas.
+  # =====================================================================
+
+  - changeSet:
+      id: bloco22-rename-projeto-para-campanha
+      author: connect-ong
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: MARK_RAN
+        - tableExists:
+            tableName: projeto
+        - not:
+            - tableExists:
+                tableName: campanha
+      changes:
+        - renameTable:
+            oldTableName: projeto
+            newTableName: campanha
+
+  - changeSet:
+      id: bloco22-campanha-add-colunas
+      author: connect-ong
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: MARK_RAN
+        - tableExists:
+            tableName: campanha
+        - not:
+            - columnExists:
+                tableName: campanha
+                columnName: valor_arrecadado
+      changes:
+        - addColumn:
+            tableName: campanha
+            columns:
+              - column:
+                  name: valor_arrecadado
+                  type: double
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+              - column:
+                  name: categoria
+                  type: varchar(255)
+              - column:
+                  name: data_inicio
+                  type: date
+              - column:
+                  name: data_fim
+                  type: date
+              - column:
+                  name: encerrada
+                  type: boolean
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+              - column:
+                  name: destaque
+                  type: boolean
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+
+  # O Liquibase cria 'boolean' como TINYINT no MySQL, mas o Hibernate (validate)
+  # espera BIT (como nas demais tabelas). Converte as duas colunas para BIT.
+  - changeSet:
+      id: bloco22-campanha-bool-para-bit
+      author: connect-ong
+      changes:
+        - sql:
+            sql: ALTER TABLE campanha MODIFY encerrada BIT NOT NULL DEFAULT b'0'
+        - sql:
+            sql: ALTER TABLE campanha MODIFY destaque BIT NOT NULL DEFAULT b'0'

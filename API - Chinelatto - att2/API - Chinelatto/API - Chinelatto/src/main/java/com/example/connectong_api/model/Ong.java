@@ -42,7 +42,7 @@ public class Ong {
     private Integer totalAvaliacoes = 0;
 
     @OneToMany(mappedBy = "ong")
-    private List<Projeto> projetos;
+    private List<Campanha> campanhas;
 
     public Ong() {}
 
