@@ -2,6 +2,11 @@ package com.example.connectong_api.model;
 
 import jakarta.persistence.*;
 
+/**
+ * Item de doacao do catalogo (o que se oferece/precisa), com categoria, quantidade
+ * e marcadores de {@code urgente} e {@code novo}. Entidade simples de catalogo, sem
+ * vinculo direto com doador/ONG (o vinculo doador-necessidade vive em {@link Interesse}).
+ */
 @Entity
 @Table(name = "doacao")
 public class Doacao {

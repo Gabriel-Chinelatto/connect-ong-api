@@ -3,6 +3,14 @@ package com.example.connectong_api.model;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 
+/**
+ * Conta de acesso da plataforma. Representa tanto o DOADOR quanto o usuario
+ * administrador de uma ONG, diferenciados pelo campo {@code tipo}.
+ * Quando o usuario e de uma ONG, {@code ongId} aponta para o perfil em {@link Ong}
+ * (fica null para doadores).
+ * Dado sensivel: {@code senha} guarda o hash BCrypt e e WRITE_ONLY no JSON
+ * (entra na desserializacao, nunca sai na resposta) para nao vazar o hash.
+ */
 @Entity
 public class Usuario {
 

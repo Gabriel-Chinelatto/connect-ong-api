@@ -10,6 +10,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+/**
+ * Recurso REST /mensagens: chat entre doador e ONG dentro de um match.
+ * O chat so existe apos o interesse virar match ACEITO; mensagens sao listadas/enviadas
+ * pelo interesseId. Exige autenticacao (token JWT); o vinculo ao match e validado no service.
+ */
 @RestController
 @RequestMapping("/mensagens")
 @Tag(name = "Mensagens (Chat)",

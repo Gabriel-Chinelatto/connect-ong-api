@@ -10,6 +10,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+/**
+ * Recurso REST /denuncias: reportar ONG/usuario/conteudo (moderacao/credibilidade).
+ * Permite registrar uma denuncia e, para moderacao, listar por status e marcar como resolvida.
+ * Exige autenticacao (token JWT); a listagem/resolucao sao operacoes administrativas.
+ */
 @RestController
 @RequestMapping("/denuncias")
 @Tag(name = "Denuncias", description = "Reportar ONG/usuario/conteudo (moderacao/credibilidade)")

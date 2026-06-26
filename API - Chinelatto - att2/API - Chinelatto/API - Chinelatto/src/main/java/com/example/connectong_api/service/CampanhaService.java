@@ -18,6 +18,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+/**
+ * Gerencia as campanhas de arrecadacao das ONGs (criar, listar, destaques).
+ * Regra de negocio central: cada contribuicao incrementa o valorArrecadado e,
+ * ao atingir a metaValor, a campanha e automaticamente encerrada. Notifica a
+ * conta da ONG dona a cada contribuicao; campanhas orfas (sem ONG) sao ignoradas.
+ */
 @Service
 public class CampanhaService {
 

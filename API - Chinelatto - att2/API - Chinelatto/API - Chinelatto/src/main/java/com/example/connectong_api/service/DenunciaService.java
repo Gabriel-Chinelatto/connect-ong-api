@@ -13,6 +13,11 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.stream.Collectors;
 
+/**
+ * Registra e gerencia denuncias (reports) feitas pelos usuarios contra alvos da
+ * plataforma. O tipoAlvo e normalizado para maiusculas; toda denuncia criada e
+ * resolvida e registrada na auditoria. Resolver muda o status para RESOLVIDA.
+ */
 @Service
 public class DenunciaService {
 

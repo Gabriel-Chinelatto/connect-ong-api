@@ -4,6 +4,13 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import java.util.List;
 
+/**
+ * Perfil publico de uma ONG: dados de contato, descricao e sinais de confianca.
+ * {@code verificada} (selo) e {@code cnpj} sustentam a verificacao; {@code notaMedia}
+ * e {@code totalAvaliacoes} sao agregados denormalizados das avaliacoes, mantidos
+ * aqui para exibir rapido sem recalcular (alimentam tambem o score de transparencia).
+ * Os dados desta entidade sao publicos por natureza (a ONG quer ser encontrada).
+ */
 @Entity
 @Table(name = "ong")
 public class Ong {

@@ -20,6 +20,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+/**
+ * Gerencia o chat de um match (mensagens vinculadas a um Interesse).
+ * Regra de negocio: so e possivel enviar mensagem apos o match estar ACEITO, e
+ * apenas os dois participantes (o doador e a ONG dona da necessidade) podem ler
+ * ou enviar, senao lanca AcessoNegadoException (403). Cada envio notifica o outro lado.
+ */
 @Service
 public class MensagemService {
 

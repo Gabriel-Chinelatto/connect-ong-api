@@ -16,6 +16,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+/**
+ * Centraliza a criacao e a leitura das notificacoes do usuario. Ao criar,
+ * respeita as preferencias do destinatario: cada tipo (MATCH, MENSAGEM,
+ * PRESTACAO, NECESSIDADE) so e gerado se o usuario nao desativou aquele aviso
+ * (sem preferencia salva, permite por padrao). So o dono pode marcar como lida.
+ */
 @Service
 public class NotificacaoService {
 

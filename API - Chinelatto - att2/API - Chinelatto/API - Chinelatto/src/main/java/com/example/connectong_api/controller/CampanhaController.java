@@ -12,6 +12,11 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 
+/**
+ * Recurso REST /campanhas: campanhas de arrecadacao das ONGs (meta + progresso).
+ * Permite listar/destacar campanhas, criar, contribuir com um valor e encerrar.
+ * Exige autenticacao (token JWT), salvo o que estiver na whitelist publica.
+ */
 @RestController
 @RequestMapping("/campanhas")
 @Tag(name = "Campanhas", description = "Campanhas de arrecadacao das ONGs (meta + progresso)")

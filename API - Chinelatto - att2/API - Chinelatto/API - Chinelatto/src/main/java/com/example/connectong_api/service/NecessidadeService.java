@@ -17,6 +17,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+/**
+ * Gerencia as necessidades publicadas pelas ONGs (o que cada ONG precisa
+ * receber), com listagem filtravel por ONG ou status. Ao criar, registra no
+ * feed global e notifica os doadores que favoritaram aquela ONG; essa
+ * notificacao de seguidores e best-effort (falha nela nao impede a publicacao).
+ */
 @Service
 public class NecessidadeService {
 

@@ -10,6 +10,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+/**
+ * Recurso REST /necessidades: necessidades publicadas pelas ONGs (alvo do interesse do doador).
+ * Permite listar (filtrando por ongId ou status) e publicar uma nova necessidade de uma ONG.
+ * Exige autenticacao (token JWT), salvo o que estiver na whitelist publica.
+ */
 @RestController
 @RequestMapping("/necessidades")
 @Tag(name = "Necessidades", description = "Necessidades publicadas pelas ONGs")

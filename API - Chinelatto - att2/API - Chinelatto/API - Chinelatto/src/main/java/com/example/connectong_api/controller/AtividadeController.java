@@ -8,6 +8,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+/**
+ * Recurso REST /atividades: feed global (timeline) de atividades recentes da plataforma.
+ * Apenas leitura, podendo filtrar por ongId e limitar a quantidade.
+ * Exige autenticacao (token JWT), salvo o que estiver na whitelist publica.
+ */
 @RestController
 @RequestMapping("/atividades")
 @Tag(name = "Atividades", description = "Feed global de atividades recentes da plataforma (Timeline)")

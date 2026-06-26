@@ -11,6 +11,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+/**
+ * Recurso REST /interesses: hero feature do match. O doador demonstra interesse numa
+ * necessidade e a ONG aceita (vira match) ou recusa; o match aceito e o que habilita o chat.
+ * Exige autenticacao (token JWT) e ownership: doador so ve/cria os proprios interesses e a ONG
+ * so os da propria ONG -> violacao retorna 403.
+ */
 @RestController
 @RequestMapping("/interesses")
 @Tag(name = "Interesses (Match)",

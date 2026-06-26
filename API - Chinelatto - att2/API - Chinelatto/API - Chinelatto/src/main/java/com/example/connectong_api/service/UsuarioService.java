@@ -17,6 +17,12 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
+/**
+ * Responsavel pelo cadastro e login dos usuarios. A senha e sempre armazenada em
+ * hash BCrypt (nunca em texto puro) e id/ongId nunca vem do cliente, evitando
+ * mass assignment. O login emite tokens JWT (access + refresh); por seguranca
+ * nao distingue email inexistente de senha errada (401 generico) e tudo e auditado.
+ */
 @Service
 public class UsuarioService {
 

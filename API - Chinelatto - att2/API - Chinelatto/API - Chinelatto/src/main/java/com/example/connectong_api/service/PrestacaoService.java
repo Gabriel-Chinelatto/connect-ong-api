@@ -17,6 +17,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+/**
+ * Gerencia a prestacao de contas que a ONG publica dentro de um match.
+ * Regra de negocio: so e permitida para um Interesse com status ACEITO. Ao
+ * publicar, notifica o doador daquele match e registra o item no feed global.
+ */
 @Service
 public class PrestacaoService {
 

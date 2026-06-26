@@ -10,6 +10,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+/**
+ * Recurso REST /prestacoes: prestacao de contas em que a ONG mostra ao doador o resultado da doacao.
+ * Vinculada a um match (interesseId): permite listar e publicar prestacoes dentro do match.
+ * Exige autenticacao (token JWT); o vinculo ao match e validado no service.
+ */
 @RestController
 @RequestMapping("/prestacoes")
 @Tag(name = "Prestação de Contas",

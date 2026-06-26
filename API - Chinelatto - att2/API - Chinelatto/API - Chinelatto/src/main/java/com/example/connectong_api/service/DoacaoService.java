@@ -13,6 +13,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+/**
+ * CRUD basico de itens de doacao (nome, quantidade, categoria, tipo, urgencia).
+ * Valida que nome nao seja vazio e que a quantidade seja positiva tanto na
+ * criacao quanto na atualizacao; retorna 404 quando o item nao existe.
+ */
 @Service
 public class DoacaoService {
 

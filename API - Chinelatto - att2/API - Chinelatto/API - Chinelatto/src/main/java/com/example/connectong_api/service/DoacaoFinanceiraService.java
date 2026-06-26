@@ -20,6 +20,12 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+/**
+ * Processa doacoes em dinheiro (PIX simulado) de um doador para uma ONG.
+ * Ao doar, gera um codigo PIX "copia e cola" fake como comprovante, registra a
+ * operacao na auditoria e notifica a conta da ONG. O feed publico omite valor e
+ * doador por privacidade; o comprovante completo so volta para quem doou.
+ */
 @Service
 public class DoacaoFinanceiraService {
 

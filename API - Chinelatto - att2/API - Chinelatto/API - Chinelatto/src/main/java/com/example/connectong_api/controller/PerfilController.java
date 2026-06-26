@@ -12,6 +12,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+/**
+ * Recurso REST /usuarios/{id}: perfil do usuario, troca de senha e preferencias/configuracoes.
+ * Exige autenticacao (token JWT) e ownership: cada usuario so le/altera o proprio perfil,
+ * senha e preferencias -> violacao retorna 403.
+ */
 @RestController
 @RequestMapping("/usuarios/{id}")
 @Tag(name = "Perfil e Configurações",

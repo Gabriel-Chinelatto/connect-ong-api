@@ -9,6 +9,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+/**
+ * Recurso REST /notificacoes: notificacoes do usuario (listar, contar nao lidas, marcar lidas).
+ * Exige autenticacao (token JWT) e ownership: cada usuario so acessa as proprias notificacoes -> 403
+ * (a checagem de dono ao marcar uma notificacao especifica como lida e feita no service).
+ */
 @RestController
 @RequestMapping("/notificacoes")
 @Tag(name = "Notificações", description = "Notificações dos usuários")

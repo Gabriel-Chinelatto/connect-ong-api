@@ -12,6 +12,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+/**
+ * Recurso REST /ongs: cadastro, busca e gerenciamento de ONGs (perfil + conta de login).
+ * O registro e a leitura (listagem, perfil publico, indice de transparencia) tendem a ser publicos;
+ * verificar/editar/excluir exigem autenticacao e ownership da propria ONG -> violacao retorna 403.
+ */
 @RestController
 @RequestMapping("/ongs")
 @Tag(name = "ONGs", description = "Cadastro, busca e gerenciamento de ONGs")

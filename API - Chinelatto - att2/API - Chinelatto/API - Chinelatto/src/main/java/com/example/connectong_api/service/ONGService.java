@@ -22,6 +22,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+/**
+ * Gerencia as ONGs: CRUD, verificacao (selo) e o perfil publico agregado que o
+ * doador ve (necessidades, campanhas, avaliacoes, prestacoes e score de
+ * transparencia). No cadastro cria, de forma atomica, o perfil da ONG e a conta
+ * de login (Usuario tipo ONG) ja vinculados, com a senha em hash BCrypt e tokens JWT.
+ */
 @Service
 public class ONGService {
 

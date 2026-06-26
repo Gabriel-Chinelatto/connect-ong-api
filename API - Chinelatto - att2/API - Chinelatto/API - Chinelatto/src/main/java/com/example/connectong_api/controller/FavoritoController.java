@@ -11,6 +11,11 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 
+/**
+ * Recurso REST /favoritos: o doador favorita ONGs e campanhas para acompanhar.
+ * Permite listar, consultar ids favoritados, favoritar (idempotente) e desfavoritar.
+ * Exige autenticacao (token JWT) e ownership: so o proprio usuario manipula seus favoritos -> 403.
+ */
 @RestController
 @RequestMapping("/favoritos")
 @Tag(name = "Favoritos", description = "Doador favorita ONGs e campanhas para acompanhar")

@@ -8,6 +8,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+/**
+ * Recurso REST /conquistas: conquistas (gamificacao) de doadores e ONGs.
+ * Apenas leitura da lista completa com o estado de cada conquista, por doador ou por ONG.
+ * Exige autenticacao (token JWT), salvo o que estiver na whitelist publica.
+ */
 @RestController
 @RequestMapping("/conquistas")
 @Tag(name = "Conquistas", description = "Conquistas (gamificacao) de doadores e ONGs")

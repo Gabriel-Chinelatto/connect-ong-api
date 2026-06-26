@@ -19,6 +19,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+/**
+ * Gerencia as avaliacoes (nota 1-5 + comentario) que os doadores dao as ONGs.
+ * Regra de negocio: uma unica avaliacao por par doador/ONG (cria ou atualiza a
+ * existente, nunca duplica). A cada avaliacao recalcula e persiste de forma
+ * denormalizada a notaMedia e o totalAvaliacoes na propria Ong.
+ */
 @Service
 public class AvaliacaoService {
 

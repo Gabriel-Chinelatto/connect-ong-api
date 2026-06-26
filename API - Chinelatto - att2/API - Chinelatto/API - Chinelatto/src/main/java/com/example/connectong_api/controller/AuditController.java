@@ -13,6 +13,11 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.stream.Collectors;
 
+/**
+ * Recurso REST /audit-logs: consulta do registro de auditoria (logins, cadastros, doacoes).
+ * Apenas leitura, podendo filtrar por usuarioId e limitar o numero de registros.
+ * Recurso restrito: exige autenticacao (token JWT); destinado a inspecao administrativa.
+ */
 @RestController
 @RequestMapping("/audit-logs")
 @Tag(name = "Auditoria",

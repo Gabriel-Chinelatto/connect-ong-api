@@ -16,6 +16,12 @@ import org.springframework.stereotype.Service;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * Gerencia o perfil do usuario, a troca de senha e as preferencias (aparencia,
+ * acessibilidade, notificacoes, privacidade). Ao alterar a senha exige a senha
+ * atual correta (conferida via BCrypt) antes de gravar o novo hash. Preferencias
+ * inexistentes sao criadas com os valores padrao sob demanda.
+ */
 @Service
 public class PerfilService {
 

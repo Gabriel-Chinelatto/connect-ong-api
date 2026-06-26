@@ -11,6 +11,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+/**
+ * Recurso REST /doacoes-financeiras: doacao em dinheiro via PIX simulado (sem gateway real).
+ * Exige autenticacao (token JWT) e ownership: doar e listar o proprio historico exige ser o
+ * doador autenticado; listar por ongId exige ser a propria ONG -> violacao retorna 403.
+ */
 @RestController
 @RequestMapping("/doacoes-financeiras")
 @Tag(name = "Doações Financeiras (PIX)",

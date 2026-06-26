@@ -11,6 +11,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+/**
+ * Recurso REST /avaliacoes: doadores avaliam ONGs (nota de 1 a 5).
+ * Exige autenticacao (token JWT). A listagem por ongId reflete a reputacao publica da ONG;
+ * ao avaliar, o ownership e exigido (so o proprio doador autenticado pode criar/atualizar a nota -> 403).
+ */
 @RestController
 @RequestMapping("/avaliacoes")
 @Tag(name = "Avaliações", description = "Doadores avaliam ONGs (nota de 1 a 5)")

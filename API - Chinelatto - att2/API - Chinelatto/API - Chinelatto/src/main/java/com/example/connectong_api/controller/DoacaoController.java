@@ -9,6 +9,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+/**
+ * Recurso REST /doacoes: catalogo de doacoes (CRUD de itens disponiveis).
+ * Permite listar, cadastrar, atualizar e excluir doacoes.
+ * Exige autenticacao (token JWT), salvo o que estiver na whitelist publica.
+ */
 @RestController
 @RequestMapping("/doacoes")
 @Tag(name = "Doações", description = "Cadastro e gerenciamento de doações")

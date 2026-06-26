@@ -20,6 +20,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+/**
+ * Coracao do "match": registra o interesse de um doador numa necessidade e
+ * gerencia seu ciclo PENDENTE -> ACEITO/RECUSADO. Impede interesse duplicado do
+ * mesmo doador na mesma necessidade; quando a ONG aceita (status ACEITO) forma-se
+ * o match que habilita o chat. So a ONG dona da necessidade pode aceitar/recusar.
+ */
 @Service
 public class InteresseService {
 

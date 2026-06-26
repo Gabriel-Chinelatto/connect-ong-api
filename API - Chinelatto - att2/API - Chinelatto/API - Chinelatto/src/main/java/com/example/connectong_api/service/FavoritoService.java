@@ -16,6 +16,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+/**
+ * Gerencia os favoritos do doador, que podem apontar para uma ONG ou uma
+ * CAMPANHA (tipo normalizado para maiusculas e validado). Adicionar e
+ * idempotente: nao duplica um favorito ja existente. Ao listar, resolve o nome
+ * atual do alvo, exibindo "removida" quando o alvo nao existe mais.
+ */
 @Service
 public class FavoritoService {
 
