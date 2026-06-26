@@ -409,3 +409,69 @@ databaseChangeLog:
                   name: tipo
               - column:
                   name: alvo_id
+
+  # =====================================================================
+  # Bloco 29 - Denuncias: reportar ONG/usuario/conteudo (moderacao).
+  # data_criacao = datetime; sem boolean = sem gotcha BIT.
+  # =====================================================================
+
+  - changeSet:
+      id: bloco29-denuncia-create-table
+      author: connect-ong
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: denuncia
+      changes:
+        - createTable:
+            tableName: denuncia
+            columns:
+              - column:
+                  name: id
+                  type: bigint
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: denunciante_id
+                  type: bigint
+              - column:
+                  name: tipo_alvo
+                  type: varchar(20)
+              - column:
+                  name: alvo_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: motivo
+                  type: varchar(60)
+              - column:
+                  name: descricao
+                  type: varchar(1000)
+              - column:
+                  name: status
+                  type: varchar(20)
+              - column:
+                  name: data_criacao
+                  type: datetime
+
+  - changeSet:
+      id: bloco29-denuncia-idx-status
+      author: connect-ong
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: MARK_RAN
+        - not:
+            - indexExists:
+                indexName: idx_denuncia_status
+      changes:
+        - createIndex:
+            indexName: idx_denuncia_status
+            tableName: denuncia
+            columns:
+              - column:
+                  name: status
