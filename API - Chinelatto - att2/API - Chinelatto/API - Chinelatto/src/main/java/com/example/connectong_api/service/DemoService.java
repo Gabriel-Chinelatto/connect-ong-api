@@ -30,6 +30,8 @@ public class DemoService {
     @Autowired private PrestacaoRepository prestacaoRepository;
     @Autowired private DoacaoFinanceiraRepository doacaoFinanceiraRepository;
     @Autowired private CampanhaRepository campanhaRepository;
+    @Autowired private AtividadeRepository atividadeRepository;
+    @Autowired private AtividadeService atividadeService;
     @Autowired private BCryptPasswordEncoder encoder;
 
     private static final String SENHA_DEMO = "demo123";
@@ -63,6 +65,9 @@ public class DemoService {
         ensureCampanha(patinhas, "Castracao Solidaria",
                 "Castracao de 30 animais resgatados.",
                 1500.0, 400.0, "Saude", false);
+
+        // ----- Timeline (feed global) — so popula se estiver vazia -----
+        ensureAtividadesDemo(larViva, criancaFeliz, patinhas);
 
         return resumo(baseExiste ? "campanhas_garantidas" : "carregado");
     }
@@ -134,6 +139,42 @@ public class DemoService {
     }
 
     // ----------------------------------------------------------- helpers
+
+    // Popula a timeline com eventos representativos (um por tipo) apenas se o
+    // feed estiver vazio — idempotente e nao conflita com atividades reais.
+    private void ensureAtividadesDemo(Ong larViva, Ong criancaFeliz, Ong patinhas) {
+        if (atividadeRepository.count() > 0) return;
+
+        if (criancaFeliz != null) {
+            atividadeService.registrar("NECESSIDADE",
+                    criancaFeliz.getNome() + " publicou uma nova necessidade: \"Material escolar\"",
+                    criancaFeliz.getId(), criancaFeliz.getNome());
+        }
+        if (patinhas != null) {
+            atividadeService.registrar("INTERESSE",
+                    "Alguem demonstrou interesse em \"Racao para caes\"",
+                    patinhas.getId(), patinhas.getNome());
+        }
+        if (larViva != null) {
+            atividadeService.registrar("INTERESSE",
+                    "Novo match formado em \"Fraldas geriatricas\"",
+                    larViva.getId(), larViva.getNome());
+            atividadeService.registrar("PRESTACAO",
+                    "Nova prestacao de contas: \"Fraldas entregues\"",
+                    larViva.getId(), larViva.getNome());
+            atividadeService.registrar("DOACAO",
+                    larViva.getNome() + " recebeu uma nova doacao via PIX",
+                    larViva.getId(), larViva.getNome());
+            atividadeService.registrar("AVALIACAO",
+                    larViva.getNome() + " recebeu uma nova avaliacao",
+                    larViva.getId(), larViva.getNome());
+        }
+        if (criancaFeliz != null) {
+            atividadeService.registrar("CAMPANHA",
+                    criancaFeliz.getNome() + " lancou a campanha \"Volta as Aulas\"",
+                    criancaFeliz.getId(), criancaFeliz.getNome());
+        }
+    }
 
     private Ong ongDaConta(String email) {
         return usuarioRepository.findByEmail(email)

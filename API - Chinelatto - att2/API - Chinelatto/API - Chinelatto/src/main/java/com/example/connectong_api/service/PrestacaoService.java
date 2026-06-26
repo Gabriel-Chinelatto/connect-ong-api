@@ -29,6 +29,9 @@ public class PrestacaoService {
     @Autowired
     private NotificacaoService notificacaoService;
 
+    @Autowired
+    private AtividadeService atividadeService;
+
     public List<PrestacaoResponseDTO> listar(Long interesseId) {
         return repository.findByInteresseIdOrderByDataCriacaoDesc(interesseId)
                 .stream()
@@ -69,6 +72,20 @@ public class PrestacaoService {
                     "A ONG publicou: \"" + dto.getTitulo() + "\"",
                     "PRESTACAO");
         }
+
+        // feed global
+        Long ongId = null;
+        String ongNome = null;
+        if (interesse.getNecessidade() != null
+                && interesse.getNecessidade().getOng() != null) {
+            ongId = interesse.getNecessidade().getOng().getId();
+            ongNome = interesse.getNecessidade().getOng().getNome();
+        }
+        atividadeService.registrar(
+                "PRESTACAO",
+                "Nova prestacao de contas: \"" + dto.getTitulo() + "\"",
+                ongId,
+                ongNome);
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)

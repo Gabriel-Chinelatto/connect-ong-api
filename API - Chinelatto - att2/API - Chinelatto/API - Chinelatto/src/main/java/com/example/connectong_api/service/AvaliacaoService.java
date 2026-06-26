@@ -31,6 +31,9 @@ public class AvaliacaoService {
     @Autowired
     private UsuarioRepository usuarioRepository;
 
+    @Autowired
+    private AtividadeService atividadeService;
+
     public List<AvaliacaoResponseDTO> listar(Long ongId) {
         return repository.findByOngIdOrderByDataCriacaoDesc(ongId)
                 .stream()
@@ -69,6 +72,13 @@ public class AvaliacaoService {
         Avaliacao salva = repository.save(avaliacao);
 
         recalcularMedia(ong);
+
+        // feed global
+        atividadeService.registrar(
+                "AVALIACAO",
+                ong.getNome() + " recebeu uma nova avaliacao",
+                ong.getId(),
+                ong.getNome());
 
         return ResponseEntity.status(HttpStatus.CREATED).body(toDTO(salva));
     }

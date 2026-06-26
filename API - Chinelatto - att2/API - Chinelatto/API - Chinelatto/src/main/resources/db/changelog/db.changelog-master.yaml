@@ -253,3 +253,81 @@ databaseChangeLog:
             sql: ALTER TABLE campanha MODIFY encerrada BIT NOT NULL DEFAULT b'0'
         - sql:
             sql: ALTER TABLE campanha MODIFY destaque BIT NOT NULL DEFAULT b'0'
+
+  # =====================================================================
+  # Bloco 23 - Timeline de Atividades: tabela do feed global de eventos
+  # recentes da plataforma (reaproveita os hooks de notificacao).
+  # data_criacao = datetime para casar com o mapeamento LocalDateTime do
+  # Hibernate (mesmo tipo das demais tabelas; sem booleans = sem o gotcha
+  # BIT/TINYINT do Bloco 22).
+  # =====================================================================
+
+  - changeSet:
+      id: bloco23-atividade-create-table
+      author: connect-ong
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: atividade
+      changes:
+        - createTable:
+            tableName: atividade
+            columns:
+              - column:
+                  name: id
+                  type: bigint
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: tipo
+                  type: varchar(40)
+              - column:
+                  name: descricao
+                  type: varchar(500)
+              - column:
+                  name: ong_id
+                  type: bigint
+              - column:
+                  name: ong_nome
+                  type: varchar(255)
+              - column:
+                  name: data_criacao
+                  type: datetime
+
+  - changeSet:
+      id: bloco23-atividade-idx-data
+      author: connect-ong
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: MARK_RAN
+        - not:
+            - indexExists:
+                indexName: idx_atividade_data
+      changes:
+        - createIndex:
+            indexName: idx_atividade_data
+            tableName: atividade
+            columns:
+              - column:
+                  name: data_criacao
+
+  - changeSet:
+      id: bloco23-atividade-idx-ong
+      author: connect-ong
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: MARK_RAN
+        - not:
+            - indexExists:
+                indexName: idx_atividade_ong
+      changes:
+        - createIndex:
+            indexName: idx_atividade_ong
+            tableName: atividade
+            columns:
+              - column:
+                  name: ong_id

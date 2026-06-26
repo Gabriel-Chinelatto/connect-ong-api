@@ -25,6 +25,7 @@ public class CampanhaService {
     @Autowired private ONGRepository ongRepository;
     @Autowired private UsuarioRepository usuarioRepository;
     @Autowired private NotificacaoService notificacaoService;
+    @Autowired private AtividadeService atividadeService;
 
     // =========================
     // LISTAR
@@ -70,6 +71,13 @@ public class CampanhaService {
         c.setOng(ong);
 
         Campanha salva = repository.save(c);
+
+        atividadeService.registrar(
+                "CAMPANHA",
+                ong.getNome() + " lancou a campanha \"" + salva.getTitulo() + "\"",
+                ong.getId(),
+                ong.getNome());
+
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(new CampanhaResponseDTO(salva));
     }
@@ -102,6 +110,15 @@ public class CampanhaService {
                                 + " na campanha \"" + c.getTitulo() + "\".";
                 notificacaoService.criar(ongUser.getId(), "Campanha", msg, "CAMPANHA");
             });
+        }
+
+        // feed global: so registra o marco de meta atingida (evita ruido)
+        if (atingiuMeta && c.getOng() != null) {
+            atividadeService.registrar(
+                    "CAMPANHA",
+                    "A campanha \"" + c.getTitulo() + "\" atingiu a meta!",
+                    c.getOng().getId(),
+                    c.getOng().getNome());
         }
 
         return ResponseEntity.ok(new CampanhaResponseDTO(salva));

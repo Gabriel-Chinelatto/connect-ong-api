@@ -38,6 +38,9 @@ public class DoacaoFinanceiraService {
     @Autowired
     private AuditService auditService;
 
+    @Autowired
+    private AtividadeService atividadeService;
+
     public List<DoacaoFinanceiraResponseDTO> listarPorDoador(Long doadorId) {
         return repository.findByDoadorIdOrderByDataCriacaoDesc(doadorId)
                 .stream().map(this::toDTO).collect(Collectors.toList());
@@ -85,6 +88,13 @@ public class DoacaoFinanceiraService {
                         doador.getNome() + " doou R$ "
                                 + String.format("%.2f", dto.getValor()) + " via PIX.",
                         "PRESTACAO"));
+
+        // feed global: sem valor/doador (privacidade num feed publico)
+        atividadeService.registrar(
+                "DOACAO",
+                ong.getNome() + " recebeu uma nova doacao via PIX",
+                ong.getId(),
+                ong.getNome());
 
         return ResponseEntity.status(HttpStatus.CREATED).body(toDTO(salva));
     }

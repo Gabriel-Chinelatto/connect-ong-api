@@ -34,6 +34,9 @@ public class InteresseService {
     @Autowired
     private NotificacaoService notificacaoService;
 
+    @Autowired
+    private AtividadeService atividadeService;
+
     // =========================
     // DEMONSTRAR INTERESSE (um doador numa necessidade)
     // =========================
@@ -79,6 +82,15 @@ public class InteresseService {
                                     + necessidade.getTitulo() + "\"",
                             "MATCH"));
         }
+
+        // feed global (doador anonimo: feed e publico)
+        Long ongId = necessidade.getOng() != null ? necessidade.getOng().getId() : null;
+        String ongNome = necessidade.getOng() != null ? necessidade.getOng().getNome() : null;
+        atividadeService.registrar(
+                "INTERESSE",
+                "Alguem demonstrou interesse em \"" + necessidade.getTitulo() + "\"",
+                ongId,
+                ongNome);
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)
@@ -137,6 +149,16 @@ public class InteresseService {
                     "A ONG aceitou seu interesse em \"" + tituloNec
                             + "\". Agora vocês podem conversar!",
                     "MATCH");
+
+            // feed global: novo match formado
+            Necessidade nec = interesse.getNecessidade();
+            Long ongId = (nec != null && nec.getOng() != null) ? nec.getOng().getId() : null;
+            String ongNome = (nec != null && nec.getOng() != null) ? nec.getOng().getNome() : null;
+            atividadeService.registrar(
+                    "INTERESSE",
+                    "Novo match formado em \"" + tituloNec + "\"",
+                    ongId,
+                    ongNome);
         }
 
         return ResponseEntity.ok(toDTO(salvo));

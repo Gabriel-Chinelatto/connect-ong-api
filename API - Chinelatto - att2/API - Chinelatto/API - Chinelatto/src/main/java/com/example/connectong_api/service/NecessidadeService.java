@@ -26,6 +26,9 @@ public class NecessidadeService {
     @Autowired
     private ONGRepository ongRepository;
 
+    @Autowired
+    private AtividadeService atividadeService;
+
     // =========================
     // LISTAR (filtra por ong ou status, se informados)
     // =========================
@@ -72,6 +75,13 @@ public class NecessidadeService {
         necessidade.setUrgente(dto.getUrgente());
 
         Necessidade salva = repository.save(necessidade);
+
+        atividadeService.registrar(
+                "NECESSIDADE",
+                ong.getNome() + " publicou uma nova necessidade: \""
+                        + salva.getTitulo() + "\"",
+                ong.getId(),
+                ong.getNome());
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)
