@@ -331,3 +331,81 @@ databaseChangeLog:
             columns:
               - column:
                   name: ong_id
+
+  # =====================================================================
+  # Bloco 28 - Favoritos: doador marca ONG/campanha como favorita.
+  # data_criacao = datetime (LocalDateTime); sem boolean = sem gotcha BIT.
+  # =====================================================================
+
+  - changeSet:
+      id: bloco28-favorito-create-table
+      author: connect-ong
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: favorito
+      changes:
+        - createTable:
+            tableName: favorito
+            columns:
+              - column:
+                  name: id
+                  type: bigint
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: usuario_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: tipo
+                  type: varchar(20)
+              - column:
+                  name: alvo_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: data_criacao
+                  type: datetime
+
+  - changeSet:
+      id: bloco28-favorito-idx-usuario
+      author: connect-ong
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: MARK_RAN
+        - not:
+            - indexExists:
+                indexName: idx_favorito_usuario
+      changes:
+        - createIndex:
+            indexName: idx_favorito_usuario
+            tableName: favorito
+            columns:
+              - column:
+                  name: usuario_id
+
+  - changeSet:
+      id: bloco28-favorito-idx-alvo
+      author: connect-ong
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: MARK_RAN
+        - not:
+            - indexExists:
+                indexName: idx_favorito_alvo
+      changes:
+        - createIndex:
+            indexName: idx_favorito_alvo
+            tableName: favorito
+            columns:
+              - column:
+                  name: tipo
+              - column:
+                  name: alvo_id

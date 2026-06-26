@@ -29,6 +29,12 @@ public class NecessidadeService {
     @Autowired
     private AtividadeService atividadeService;
 
+    @Autowired
+    private com.example.connectong_api.repository.FavoritoRepository favoritoRepository;
+
+    @Autowired
+    private NotificacaoService notificacaoService;
+
     // =========================
     // LISTAR (filtra por ong ou status, se informados)
     // =========================
@@ -82,6 +88,18 @@ public class NecessidadeService {
                         + salva.getTitulo() + "\"",
                 ong.getId(),
                 ong.getNome());
+
+        // notifica os doadores que favoritaram esta ONG (best-effort)
+        try {
+            favoritoRepository.findByTipoAndAlvoId("ONG", ong.getId())
+                    .forEach(fav -> notificacaoService.criar(
+                            fav.getUsuarioId(),
+                            "ONG que voce segue",
+                            ong.getNome() + " publicou: \"" + salva.getTitulo() + "\"",
+                            "FAVORITO"));
+        } catch (Exception ignorado) {
+            // notificacao de seguidores e best-effort
+        }
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)
