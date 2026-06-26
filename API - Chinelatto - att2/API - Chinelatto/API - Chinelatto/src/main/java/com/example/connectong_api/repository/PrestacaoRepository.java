@@ -11,4 +11,6 @@ public interface PrestacaoRepository extends JpaRepository<Prestacao, Long> {
 
     // Prestacoes de uma ONG: prestacao -> interesse -> necessidade -> ong
     List<Prestacao> findByInteresseNecessidadeOngIdOrderByDataCriacaoDesc(Long ongId);
+
+    long countByInteresseNecessidadeOngId(Long ongId);
 }

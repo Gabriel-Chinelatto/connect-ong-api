@@ -52,6 +52,9 @@ public class ONGService {
     @Autowired
     private PrestacaoRepository prestacaoRepository;
 
+    @Autowired
+    private TransparenciaService transparenciaService;
+
     // =========================
     // PERFIL PUBLICO (agrega tudo que o doador ve na pagina da ONG)
     // =========================
@@ -73,12 +76,16 @@ public class ONGService {
                         p.getDataCriacao()))
                 .collect(Collectors.toList());
 
+        var transp = transparenciaService.calcular(ong);
+
         PerfilPublicoOngDTO dto = new PerfilPublicoOngDTO(
                 ong,
                 necessidadeService.listar(id, null),
                 campanhaService.listar(id, false),
                 avaliacaoService.listar(id),
-                prestacoes);
+                prestacoes,
+                transp.getScore(),
+                transp.getNivel());
 
         return ResponseEntity.ok(dto);
     }

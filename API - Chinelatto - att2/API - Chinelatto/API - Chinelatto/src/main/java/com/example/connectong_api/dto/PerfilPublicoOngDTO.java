@@ -26,6 +26,9 @@ public class PerfilPublicoOngDTO {
     private int totalCampanhas;
     private int totalPrestacoes;
 
+    private int transparenciaScore;     // 0-100 (Bloco 26)
+    private String nivelTransparencia;  // BRONZE | PRATA | OURO
+
     private List<NecessidadeResponseDTO> necessidades;
     private List<CampanhaResponseDTO> campanhas;
     private List<AvaliacaoResponseDTO> avaliacoes;
@@ -35,7 +38,11 @@ public class PerfilPublicoOngDTO {
                                List<NecessidadeResponseDTO> necessidades,
                                List<CampanhaResponseDTO> campanhas,
                                List<AvaliacaoResponseDTO> avaliacoes,
-                               List<PrestacaoResponseDTO> prestacoes) {
+                               List<PrestacaoResponseDTO> prestacoes,
+                               int transparenciaScore,
+                               String nivelTransparencia) {
+        this.transparenciaScore = transparenciaScore;
+        this.nivelTransparencia = nivelTransparencia;
         this.id = o.getId();
         this.nome = o.getNome();
         this.cidade = o.getCidade();
@@ -70,6 +77,8 @@ public class PerfilPublicoOngDTO {
     public int getTotalNecessidades() { return totalNecessidades; }
     public int getTotalCampanhas() { return totalCampanhas; }
     public int getTotalPrestacoes() { return totalPrestacoes; }
+    public int getTransparenciaScore() { return transparenciaScore; }
+    public String getNivelTransparencia() { return nivelTransparencia; }
     public List<NecessidadeResponseDTO> getNecessidades() { return necessidades; }
     public List<CampanhaResponseDTO> getCampanhas() { return campanhas; }
     public List<AvaliacaoResponseDTO> getAvaliacoes() { return avaliacoes; }

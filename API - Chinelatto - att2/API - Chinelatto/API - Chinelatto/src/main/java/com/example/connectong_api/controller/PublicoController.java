@@ -2,10 +2,12 @@ package com.example.connectong_api.controller;
 
 import com.example.connectong_api.dto.EstatisticasPublicasDTO;
 import com.example.connectong_api.repository.*;
+import com.example.connectong_api.service.TransparenciaService;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 /**
@@ -24,6 +26,7 @@ public class PublicoController {
     @Autowired private InteresseRepository interesseRepository;
     @Autowired private DoacaoFinanceiraRepository doacaoFinanceiraRepository;
     @Autowired private PrestacaoRepository prestacaoRepository;
+    @Autowired private TransparenciaService transparenciaService;
 
     @GetMapping("/estatisticas")
     @Operation(summary = "Numeros publicos da plataforma (transparencia / impacto)")
@@ -37,5 +40,11 @@ public class PublicoController {
         dto.setValorTotalDoado(doacaoFinanceiraRepository.somarValores());
         dto.setTotalPrestacoes(prestacaoRepository.count());
         return dto;
+    }
+
+    @GetMapping("/ranking")
+    @Operation(summary = "Ranking de transparencia das ONGs (score + nivel bronze/prata/ouro)")
+    public ResponseEntity<?> ranking(@RequestParam(defaultValue = "20") int limite) {
+        return ResponseEntity.ok(transparenciaService.ranking(limite));
     }
 }

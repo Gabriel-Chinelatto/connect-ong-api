@@ -12,4 +12,6 @@ public interface CampanhaRepository extends JpaRepository<Campanha, Long> {
     List<Campanha> findByEncerradaFalseOrderByIdDesc();
 
     List<Campanha> findByDestaqueTrueAndEncerradaFalseOrderByIdDesc();
+
+    long countByOngIdAndEncerradaTrue(Long ongId);
 }

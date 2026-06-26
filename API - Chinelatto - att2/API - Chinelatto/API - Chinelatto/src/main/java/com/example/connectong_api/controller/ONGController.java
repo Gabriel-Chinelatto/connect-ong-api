@@ -3,6 +3,7 @@ package com.example.connectong_api.controller;
 import com.example.connectong_api.dto.OngRegistroDTO;
 import com.example.connectong_api.model.Ong;
 import com.example.connectong_api.service.ONGService;
+import com.example.connectong_api.service.TransparenciaService;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -19,6 +20,9 @@ public class ONGController {
 
     @Autowired
     private ONGService service;
+
+    @Autowired
+    private TransparenciaService transparenciaService;
 
     @PostMapping("/registro")
     @Operation(summary = "Cadastrar uma ONG (cria o perfil + a conta de login juntos)")
@@ -50,6 +54,12 @@ public class ONGController {
     @Operation(summary = "Perfil publico da ONG (dados + selo + avaliacoes + campanhas + necessidades + prestacoes)")
     public ResponseEntity<?> perfilPublico(@PathVariable Long id) {
         return service.perfilPublico(id);
+    }
+
+    @GetMapping("/{id}/transparencia")
+    @Operation(summary = "Indice de transparencia da ONG (score 0-100 + nivel bronze/prata/ouro)")
+    public ResponseEntity<?> transparencia(@PathVariable Long id) {
+        return transparenciaService.transparencia(id);
     }
 
     @PostMapping
