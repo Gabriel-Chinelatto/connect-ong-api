@@ -2,6 +2,7 @@ package com.example.connectong_api.controller;
 
 import com.example.connectong_api.dto.CadastroUsuarioDTO;
 import com.example.connectong_api.dto.LoginRequestDTO;
+import com.example.connectong_api.dto.RegistroDoadorDTO;
 import com.example.connectong_api.service.UsuarioService;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -31,6 +32,15 @@ public class UsuarioController {
     ) {
 
         return usuarioService.cadastrar(dados);
+    }
+
+    @PostMapping("/registro")
+    @Operation(summary = "Cadastro público de doador (app mobile) — tipo fixo DOADOR")
+    public ResponseEntity<?> registrarDoador(
+            @Valid @RequestBody RegistroDoadorDTO dados
+    ) {
+
+        return usuarioService.registrarDoador(dados);
     }
 
     @PostMapping("/login")

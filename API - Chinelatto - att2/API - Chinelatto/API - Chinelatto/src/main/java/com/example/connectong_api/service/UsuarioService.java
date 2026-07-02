@@ -2,6 +2,7 @@ package com.example.connectong_api.service;
 
 import com.example.connectong_api.dto.CadastroUsuarioDTO;
 import com.example.connectong_api.dto.LoginRequestDTO;
+import com.example.connectong_api.dto.RegistroDoadorDTO;
 import com.example.connectong_api.dto.UsuarioResponseDTO;
 import com.example.connectong_api.model.Usuario;
 import com.example.connectong_api.repository.UsuarioRepository;
@@ -14,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 
@@ -80,6 +82,53 @@ public class UsuarioService {
 
         auditService.registrar("CADASTRO_USUARIO", novo.getId(),
                 "Novo usuario cadastrado (" + novo.getTipo() + "): " + novo.getEmail());
+
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .body(resposta);
+    }
+
+    // =========================
+    // REGISTRO PUBLICO DE DOADOR (app mobile)
+    // =========================
+    @Transactional
+    public ResponseEntity<?> registrarDoador(RegistroDoadorDTO dados) {
+
+        // email duplicado -> 409 Conflict (o mobile exibe body['erro'])
+        if (usuarioRepository.findByEmail(dados.getEmail()).isPresent()) {
+
+            Map<String, String> erro = new HashMap<>();
+            erro.put("erro", "Email já cadastrado");
+
+            return ResponseEntity
+                    .status(HttpStatus.CONFLICT)
+                    .body(erro);
+        }
+
+        // Monta a entidade SO com os campos permitidos; o tipo e SEMPRE DOADOR
+        // (nunca vem do cliente) e a senha e gravada como hash BCrypt, o mesmo
+        // formato que o login valida com passwordEncoder.matches().
+        Usuario usuario = new Usuario();
+        usuario.setNome(dados.getNome());
+        usuario.setEmail(dados.getEmail());
+        usuario.setTipo("DOADOR");
+        usuario.setSenha(passwordEncoder.encode(dados.getSenha()));
+        usuario.setTelefone(dados.getTelefone());
+        usuario.setCidade(dados.getCidade());
+        usuario.setEstado(dados.getEstado());
+
+        Usuario novo =
+                usuarioRepository.save(usuario);
+
+        auditService.registrar("CADASTRO_DOADOR", novo.getId(),
+                "Novo doador registrado pelo app: " + novo.getEmail());
+
+        // Corpo de sucesso EXATAMENTE como o mobile espera (sem senha, sem tokens)
+        Map<String, Object> resposta = new LinkedHashMap<>();
+        resposta.put("id", novo.getId());
+        resposta.put("nome", novo.getNome());
+        resposta.put("email", novo.getEmail());
+        resposta.put("tipo", novo.getTipo());
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)

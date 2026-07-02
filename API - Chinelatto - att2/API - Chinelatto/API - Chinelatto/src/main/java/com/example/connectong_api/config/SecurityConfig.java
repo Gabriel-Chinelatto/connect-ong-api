@@ -84,7 +84,7 @@ public class SecurityConfig {
                                     "/swagger-ui.html",
                                     "/error"
                             ).permitAll()
-                            .requestMatchers(HttpMethod.POST, "/usuarios", "/usuarios/login").permitAll()
+                            .requestMatchers(HttpMethod.POST, "/usuarios", "/usuarios/login", "/usuarios/registro").permitAll()
                             .requestMatchers(HttpMethod.POST, "/ongs/registro").permitAll()
                             // Todo o resto exige autenticacao via JWT
                             .anyRequest().authenticated();

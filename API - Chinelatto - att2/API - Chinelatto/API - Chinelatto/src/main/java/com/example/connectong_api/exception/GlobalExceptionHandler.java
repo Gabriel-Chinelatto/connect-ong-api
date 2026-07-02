@@ -31,12 +31,18 @@ public class GlobalExceptionHandler {
             MethodArgumentNotValidException ex) {
 
         Map<String, String> camposInvalidos = new HashMap<>();
+        String primeiraMensagem = null;
         for (FieldError erro : ex.getBindingResult().getFieldErrors()) {
             camposInvalidos.put(erro.getField(), erro.getDefaultMessage());
+            if (primeiraMensagem == null) {
+                primeiraMensagem = erro.getDefaultMessage();
+            }
         }
 
         Map<String, Object> corpo = new HashMap<>();
-        corpo.put("erro", "Dados invalidos");
+        // "erro" traz uma mensagem legivel (a do primeiro campo invalido), pois os
+        // apps exibem body['erro'] direto ao usuario; "campos" detalha o restante.
+        corpo.put("erro", primeiraMensagem != null ? primeiraMensagem : "Dados invalidos");
         corpo.put("campos", camposInvalidos);
 
         return ResponseEntity.badRequest().body(corpo);
