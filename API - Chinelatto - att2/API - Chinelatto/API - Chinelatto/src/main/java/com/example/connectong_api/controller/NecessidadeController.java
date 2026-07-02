@@ -24,12 +24,13 @@ public class NecessidadeController {
     private NecessidadeService service;
 
     @GetMapping
-    @Operation(summary = "Listar necessidades (filtra por ongId ou status)")
+    @Operation(summary = "Listar necessidades (filtra por ongId, status ou categoria)")
     public ResponseEntity<?> listar(
             @RequestParam(required = false) Long ongId,
-            @RequestParam(required = false) String status
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String categoria
     ) {
-        return ResponseEntity.ok(service.listar(ongId, status));
+        return ResponseEntity.ok(service.listar(ongId, status, categoria));
     }
 
     @PostMapping

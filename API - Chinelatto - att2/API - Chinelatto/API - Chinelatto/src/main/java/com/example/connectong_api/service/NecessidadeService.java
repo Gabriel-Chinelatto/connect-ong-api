@@ -6,6 +6,7 @@ import com.example.connectong_api.model.Necessidade;
 import com.example.connectong_api.model.Ong;
 import com.example.connectong_api.repository.NecessidadeRepository;
 import com.example.connectong_api.repository.ONGRepository;
+import com.example.connectong_api.util.Categorias;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -42,9 +43,9 @@ public class NecessidadeService {
     private NotificacaoService notificacaoService;
 
     // =========================
-    // LISTAR (filtra por ong ou status, se informados)
+    // LISTAR (filtra por ong, status ou categoria, se informados)
     // =========================
-    public List<NecessidadeResponseDTO> listar(Long ongId, String status) {
+    public List<NecessidadeResponseDTO> listar(Long ongId, String status, String categoria) {
 
         List<Necessidade> lista;
 
@@ -57,6 +58,9 @@ public class NecessidadeService {
         }
 
         return lista.stream()
+                // filtro por categoria em memoria (compara valores normalizados)
+                .filter(n -> categoria == null || categoria.isBlank()
+                        || Categorias.iguais(n.getCategoria(), categoria))
                 .map(this::toDTO)
                 .collect(Collectors.toList());
     }
@@ -83,7 +87,7 @@ public class NecessidadeService {
         necessidade.setOng(ong);
         necessidade.setTitulo(dto.getTitulo());
         necessidade.setDescricao(dto.getDescricao());
-        necessidade.setCategoria(dto.getCategoria());
+        necessidade.setCategoria(Categorias.normalizar(dto.getCategoria()));
         necessidade.setUrgente(dto.getUrgente());
 
         Necessidade salva = repository.save(necessidade);

@@ -26,12 +26,13 @@ public class CampanhaController {
     private CampanhaService service;
 
     @GetMapping
-    @Operation(summary = "Listar campanhas (filtra por ongId; abertas=true esconde as encerradas)")
+    @Operation(summary = "Listar campanhas (filtra por ongId ou categoria; abertas=true esconde as encerradas)")
     public ResponseEntity<?> listar(
             @RequestParam(required = false) Long ongId,
-            @RequestParam(defaultValue = "false") boolean abertas
+            @RequestParam(defaultValue = "false") boolean abertas,
+            @RequestParam(required = false) String categoria
     ) {
-        return ResponseEntity.ok(service.listar(ongId, abertas));
+        return ResponseEntity.ok(service.listar(ongId, abertas, categoria));
     }
 
     @GetMapping("/destaques")

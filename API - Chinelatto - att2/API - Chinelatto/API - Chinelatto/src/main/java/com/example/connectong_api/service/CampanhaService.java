@@ -7,6 +7,7 @@ import com.example.connectong_api.model.Ong;
 import com.example.connectong_api.repository.CampanhaRepository;
 import com.example.connectong_api.repository.ONGRepository;
 import com.example.connectong_api.repository.UsuarioRepository;
+import com.example.connectong_api.util.Categorias;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -36,7 +37,7 @@ public class CampanhaService {
     // =========================
     // LISTAR
     // =========================
-    public List<CampanhaResponseDTO> listar(Long ongId, boolean somenteAbertas) {
+    public List<CampanhaResponseDTO> listar(Long ongId, boolean somenteAbertas, String categoria) {
         List<Campanha> lista;
         if (ongId != null) {
             lista = repository.findByOngIdOrderByIdDesc(ongId);
@@ -47,6 +48,9 @@ public class CampanhaService {
         }
         return lista.stream()
                 .filter(c -> c.getOng() != null) // ignora campanhas orfas (dados legados)
+                // filtro por categoria em memoria (compara valores normalizados)
+                .filter(c -> categoria == null || categoria.isBlank()
+                        || Categorias.iguais(c.getCategoria(), categoria))
                 .map(CampanhaResponseDTO::new)
                 .collect(Collectors.toList());
     }
@@ -70,7 +74,7 @@ public class CampanhaService {
         c.setTitulo(dto.getTitulo());
         c.setDescricao(dto.getDescricao());
         c.setMetaValor(dto.getMetaValor());
-        c.setCategoria(dto.getCategoria());
+        c.setCategoria(Categorias.normalizar(dto.getCategoria()));
         c.setDataInicio(dto.getDataInicio());
         c.setDataFim(dto.getDataFim());
         c.setDestaque(dto.getDestaque() != null && dto.getDestaque());

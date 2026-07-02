@@ -4,6 +4,7 @@ import com.example.connectong_api.dto.DoacaoResponseDTO;
 import com.example.connectong_api.exception.AcessoNegadoException;
 import com.example.connectong_api.model.Doacao;
 import com.example.connectong_api.repository.DoacaoRepository;
+import com.example.connectong_api.util.Categorias;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -80,6 +81,7 @@ public class DoacaoService {
         }
 
         doacao.setDoadorId(doadorId);
+        doacao.setCategoria(Categorias.normalizar(doacao.getCategoria()));
         Doacao nova = repository.save(doacao);
 
         return ResponseEntity.ok(toDTO(nova));
@@ -127,7 +129,7 @@ public class DoacaoService {
         doacao.setNome(doacaoAtualizada.getNome());
         doacao.setDescricao(doacaoAtualizada.getDescricao());
         doacao.setQuantidade(doacaoAtualizada.getQuantidade());
-        doacao.setCategoria(doacaoAtualizada.getCategoria());
+        doacao.setCategoria(Categorias.normalizar(doacaoAtualizada.getCategoria()));
         doacao.setTipo(doacaoAtualizada.getTipo());
         doacao.setUrgente(doacaoAtualizada.getUrgente());
         doacao.setNovo(doacaoAtualizada.getNovo());

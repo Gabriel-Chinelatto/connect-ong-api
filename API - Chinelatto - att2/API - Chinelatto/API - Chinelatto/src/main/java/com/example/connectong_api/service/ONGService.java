@@ -86,8 +86,8 @@ public class ONGService {
 
         PerfilPublicoOngDTO dto = new PerfilPublicoOngDTO(
                 ong,
-                necessidadeService.listar(id, null),
-                campanhaService.listar(id, false),
+                necessidadeService.listar(id, null, null),
+                campanhaService.listar(id, false, null),
                 avaliacaoService.listar(id),
                 prestacoes,
                 transp.getScore(),
