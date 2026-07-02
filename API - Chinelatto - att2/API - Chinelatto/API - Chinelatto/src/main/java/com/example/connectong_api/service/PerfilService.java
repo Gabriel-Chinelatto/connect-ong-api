@@ -53,6 +53,11 @@ public class PerfilService {
         u.setEstado(dto.getEstado());
         u.setBio(dto.getBio());
         u.setFotoUrl(dto.getFotoUrl());
+        // Foto da galeria (base64). So sobrescreve quando enviada, para nao
+        // apagar a foto existente numa atualizacao que nao mexeu nela.
+        if (dto.getFotoBase64() != null) {
+            u.setFotoBase64(dto.getFotoBase64());
+        }
 
         return ResponseEntity.ok(toPerfilDTO(usuarioRepository.save(u)));
     }
@@ -122,6 +127,7 @@ public class PerfilService {
         dto.setEstado(u.getEstado());
         dto.setBio(u.getBio());
         dto.setFotoUrl(u.getFotoUrl());
+        dto.setFotoBase64(u.getFotoBase64());
         dto.setTipo(u.getTipo());
         dto.setOngId(u.getOngId());
         return dto;

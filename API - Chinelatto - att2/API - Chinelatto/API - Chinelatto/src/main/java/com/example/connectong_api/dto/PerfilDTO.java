@@ -13,6 +13,7 @@ public class PerfilDTO {
     private String estado;
     private String bio;
     private String fotoUrl;
+    private String fotoBase64;
     private String tipo;
     private Long ongId;
 
@@ -41,6 +42,9 @@ public class PerfilDTO {
 
     public String getFotoUrl() { return fotoUrl; }
     public void setFotoUrl(String fotoUrl) { this.fotoUrl = fotoUrl; }
+
+    public String getFotoBase64() { return fotoBase64; }
+    public void setFotoBase64(String fotoBase64) { this.fotoBase64 = fotoBase64; }
 
     public String getTipo() { return tipo; }
     public void setTipo(String tipo) { this.tipo = tipo; }

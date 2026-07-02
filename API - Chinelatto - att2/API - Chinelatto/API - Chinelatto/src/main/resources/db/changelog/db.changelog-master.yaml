@@ -501,3 +501,26 @@ databaseChangeLog:
               - column:
                   name: doador_id
                   type: bigint
+
+  # =====================================================================
+  # Bloco 21 (Fase 5) - foto de perfil enviada da galeria (armazenada como
+  # base64 num campo LONGTEXT, sem servidor de arquivos). fotoUrl continua
+  # existindo como fallback.
+  # =====================================================================
+  - changeSet:
+      id: fase5-usuario-foto-base64
+      author: connect-ong
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: usuario
+                columnName: foto_base64
+      changes:
+        - addColumn:
+            tableName: usuario
+            columns:
+              - column:
+                  name: foto_base64
+                  type: longtext

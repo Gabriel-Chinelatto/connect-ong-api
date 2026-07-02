@@ -39,6 +39,11 @@ public class Usuario {
     @Column(length = 500)
     private String fotoUrl;
 
+    // Foto enviada da galeria, guardada como base64 (LONGTEXT). Alternativa ao
+    // fotoUrl para quem escolhe uma imagem em vez de colar uma URL.
+    @Column(name = "foto_base64", columnDefinition = "LONGTEXT")
+    private String fotoBase64;
+
     // GETTERS E SETTERS
 
     public Long getId() {
@@ -103,4 +108,7 @@ public class Usuario {
 
     public String getFotoUrl() { return fotoUrl; }
     public void setFotoUrl(String fotoUrl) { this.fotoUrl = fotoUrl; }
+
+    public String getFotoBase64() { return fotoBase64; }
+    public void setFotoBase64(String fotoBase64) { this.fotoBase64 = fotoBase64; }
 }
