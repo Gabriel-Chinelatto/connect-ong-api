@@ -29,6 +29,12 @@ public class Mensagem {
 
     private LocalDateTime dataEnvio;
 
+    // Recibo de leitura ("visto"). null = ainda nao lida; preenchida com o momento
+    // em que o outro participante abriu o chat. Usamos datetime (e nao um boolean)
+    // para evitar o gotcha BIT/TINYINT com ddl-auto=validate no MySQL 5.6 e ja
+    // guardar QUANDO foi lida. O cliente mostra 1 check (enviada) ou 2 (lida).
+    private LocalDateTime dataLeitura;
+
     public Mensagem() {}
 
     @PrePersist
@@ -48,4 +54,7 @@ public class Mensagem {
     public void setConteudo(String conteudo) { this.conteudo = conteudo; }
 
     public LocalDateTime getDataEnvio() { return dataEnvio; }
+
+    public LocalDateTime getDataLeitura() { return dataLeitura; }
+    public void setDataLeitura(LocalDateTime dataLeitura) { this.dataLeitura = dataLeitura; }
 }

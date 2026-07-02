@@ -1,9 +1,11 @@
 package com.example.connectong_api.service;
 
+import com.example.connectong_api.dto.ChatStatusDTO;
 import com.example.connectong_api.dto.MensagemRequestDTO;
 import com.example.connectong_api.dto.MensagemResponseDTO;
 import com.example.connectong_api.model.Interesse;
 import com.example.connectong_api.model.Mensagem;
+import com.example.connectong_api.model.Usuario;
 import com.example.connectong_api.repository.InteresseRepository;
 import com.example.connectong_api.repository.MensagemRepository;
 import com.example.connectong_api.repository.UsuarioRepository;
@@ -15,6 +17,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -44,8 +48,19 @@ public class MensagemService {
     @Autowired
     private SecurityUtils security;
 
-    // Lista as mensagens de um match, em ordem cronologica.
-    // So os participantes do match (o doador ou a ONG) podem ler.
+    @Autowired
+    private DigitandoRegistry digitando;
+
+    // "Online" = teve atividade no chat nos ultimos 45s (o poll e de ~2s, entao
+    // isso cobre folgadamente uma perda de batimento). "Digitando" = heartbeat nos
+    // ultimos 5s.
+    private static final Duration JANELA_ONLINE = Duration.ofSeconds(45);
+    private static final Duration JANELA_DIGITANDO = Duration.ofSeconds(5);
+
+    // Lista as mensagens de um match, em ordem cronologica, e marca como lidas as
+    // mensagens que o OUTRO lado enviou (o participante abriu/atualizou o chat ->
+    // "visto"). So os participantes do match (o doador ou a ONG) podem ler.
+    @Transactional
     public List<MensagemResponseDTO> listar(Long interesseId) {
         Interesse interesse =
                 interesseRepository.findById(interesseId).orElse(null);
@@ -54,10 +69,57 @@ public class MensagemService {
         }
         exigirParticipante(interesse);
 
+        // Marca "visto" nas mensagens do outro lado (as minhas nao mudam aqui).
+        String outroLado = ladoOposto(ladoDoChamador(interesse));
+        repository.marcarLidas(interesseId, outroLado, LocalDateTime.now());
+
         return repository.findByInteresseIdOrderByDataEnvioAsc(interesseId)
                 .stream()
                 .map(this::toDTO)
                 .collect(Collectors.toList());
+    }
+
+    // Situacao do OUTRO participante (online / visto por ultimo / digitando) e,
+    // de quebra, registra o batimento de presenca de quem chamou (o poll do chat).
+    @Transactional
+    public ChatStatusDTO status(Long interesseId) {
+        Interesse interesse =
+                interesseRepository.findById(interesseId).orElse(null);
+        if (interesse == null) {
+            return new ChatStatusDTO(false, null, false);
+        }
+        exigirParticipante(interesse);
+
+        // Batimento: marca a MINHA ultima atividade (presenca).
+        Long meuId = security.usuarioId();
+        if (meuId != null) {
+            usuarioRepository.marcarVisto(meuId, LocalDateTime.now());
+        }
+
+        String meuLado = ladoDoChamador(interesse);
+        String outroLado = ladoOposto(meuLado);
+
+        // ultimo_visto do OUTRO participante.
+        Usuario outro = participante(interesse, outroLado);
+        LocalDateTime ultimoVisto = outro != null ? outro.getUltimoVisto() : null;
+        boolean online = ultimoVisto != null
+                && ultimoVisto.isAfter(LocalDateTime.now().minus(JANELA_ONLINE));
+
+        boolean estaDigitando =
+                digitando.estaDigitando(interesseId, outroLado, JANELA_DIGITANDO);
+
+        return new ChatStatusDTO(online, ultimoVisto, estaDigitando);
+    }
+
+    // Registra que quem chamou esta digitando agora (heartbeat efemero em memoria).
+    public void registrarDigitando(Long interesseId) {
+        Interesse interesse =
+                interesseRepository.findById(interesseId).orElse(null);
+        if (interesse == null) {
+            return;
+        }
+        exigirParticipante(interesse);
+        digitando.marcar(interesseId, ladoDoChamador(interesse));
     }
 
     // Garante que o usuario autenticado e o doador do match OU a ONG do match.
@@ -68,6 +130,34 @@ public class MensagemService {
                 && interesse.getNecessidade().getOng() != null)
                 ? interesse.getNecessidade().getOng().getId() : null;
         security.exigirUsuarioOuOng(doadorId, ongId);
+    }
+
+    // Qual lado (DOADOR/ONG) e o usuario autenticado. So faz sentido apos
+    // exigirParticipante ter garantido que ele participa do match.
+    private String ladoDoChamador(Interesse interesse) {
+        Long doadorId = interesse.getDoador() != null
+                ? interesse.getDoador().getId() : null;
+        return (doadorId != null && doadorId.equals(security.usuarioId()))
+                ? "DOADOR" : "ONG";
+    }
+
+    private String ladoOposto(String lado) {
+        return "DOADOR".equals(lado) ? "ONG" : "DOADOR";
+    }
+
+    // A conta de Usuario de um dos lados do match (para ler o ultimo_visto).
+    private Usuario participante(Interesse interesse, String lado) {
+        if ("DOADOR".equals(lado)) {
+            return interesse.getDoador() != null
+                    ? usuarioRepository.findById(interesse.getDoador().getId()).orElse(null)
+                    : null;
+        }
+        Long ongId = (interesse.getNecessidade() != null
+                && interesse.getNecessidade().getOng() != null)
+                ? interesse.getNecessidade().getOng().getId() : null;
+        return ongId != null
+                ? usuarioRepository.findByOngId(ongId).orElse(null)
+                : null;
     }
 
     // Envia uma mensagem (so apos o match ser aceito).
@@ -149,7 +239,8 @@ public class MensagemService {
                 m.getInteresse() != null ? m.getInteresse().getId() : null,
                 m.getRemetente(),
                 m.getConteudo(),
-                m.getDataEnvio()
+                m.getDataEnvio(),
+                m.getDataLeitura() != null // lida = ja tem recibo de leitura
         );
     }
 

@@ -226,4 +226,20 @@ class SecurityEnforcementTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.tipo").value("ADMIN"));
     }
+
+    // ===================== Chat: presenca (status/digitando) =====================
+    // Os novos endpoints de presenca ficam sob autenticacao (a posse do match e
+    // validada no service). Sem token -> 401.
+
+    @Test
+    void chatStatus_semToken_retorna401() throws Exception {
+        mockMvc.perform(get("/mensagens/status?interesseId=1"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void chatDigitando_semToken_retorna401() throws Exception {
+        mockMvc.perform(post("/mensagens/digitando?interesseId=1"))
+                .andExpect(status().isUnauthorized());
+    }
 }

@@ -524,3 +524,45 @@ databaseChangeLog:
               - column:
                   name: foto_base64
                   type: longtext
+
+  # =====================================================================
+  # Chat estilo WhatsApp - presenca e recibo de leitura.
+  # data_leitura (mensagem) = "visto" (null = nao lida). ultimo_visto (usuario)
+  # = presenca "online"/"visto por ultimo". Datetime (nao boolean) para evitar o
+  # gotcha BIT/TINYINT com ddl-auto=validate no MySQL 5.6.
+  # =====================================================================
+  - changeSet:
+      id: chat-mensagem-data-leitura
+      author: connect-ong
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: mensagem
+                columnName: data_leitura
+      changes:
+        - addColumn:
+            tableName: mensagem
+            columns:
+              - column:
+                  name: data_leitura
+                  type: datetime
+
+  - changeSet:
+      id: chat-usuario-ultimo-visto
+      author: connect-ong
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: usuario
+                columnName: ultimo_visto
+      changes:
+        - addColumn:
+            tableName: usuario
+            columns:
+              - column:
+                  name: ultimo_visto
+                  type: datetime

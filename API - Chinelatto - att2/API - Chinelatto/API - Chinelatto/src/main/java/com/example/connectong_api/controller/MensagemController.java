@@ -25,7 +25,7 @@ public class MensagemController {
     private MensagemService service;
 
     @GetMapping
-    @Operation(summary = "Listar as mensagens de um match (interesseId)")
+    @Operation(summary = "Listar as mensagens de um match (interesseId); marca as recebidas como lidas")
     public ResponseEntity<?> listar(@RequestParam Long interesseId) {
         return ResponseEntity.ok(service.listar(interesseId));
     }
@@ -34,5 +34,18 @@ public class MensagemController {
     @Operation(summary = "Enviar uma mensagem no chat de um match")
     public ResponseEntity<?> enviar(@Valid @RequestBody MensagemRequestDTO dto) {
         return service.enviar(dto);
+    }
+
+    @GetMapping("/status")
+    @Operation(summary = "Situacao do outro participante (online / visto por ultimo / digitando); tambem registra presenca de quem consulta")
+    public ResponseEntity<?> status(@RequestParam Long interesseId) {
+        return ResponseEntity.ok(service.status(interesseId));
+    }
+
+    @PostMapping("/digitando")
+    @Operation(summary = "Sinaliza que o usuario esta digitando neste match (heartbeat)")
+    public ResponseEntity<?> digitando(@RequestParam Long interesseId) {
+        service.registrarDigitando(interesseId);
+        return ResponseEntity.noContent().build();
     }
 }

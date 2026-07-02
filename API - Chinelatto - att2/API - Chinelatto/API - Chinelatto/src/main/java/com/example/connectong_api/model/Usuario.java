@@ -2,6 +2,7 @@ package com.example.connectong_api.model;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
+import java.time.LocalDateTime;
 
 /**
  * Conta de acesso da plataforma. Representa tanto o DOADOR quanto o usuario
@@ -43,6 +44,11 @@ public class Usuario {
     // fotoUrl para quem escolhe uma imagem em vez de colar uma URL.
     @Column(name = "foto_base64", columnDefinition = "LONGTEXT")
     private String fotoBase64;
+
+    // Presenca ("online" / "visto por ultimo"): momento da ultima atividade do
+    // usuario no chat. Atualizado a cada batimento (poll do status). "Online" e
+    // derivado no service (visto ha menos de X segundos).
+    private LocalDateTime ultimoVisto;
 
     // GETTERS E SETTERS
 
@@ -111,4 +117,7 @@ public class Usuario {
 
     public String getFotoBase64() { return fotoBase64; }
     public void setFotoBase64(String fotoBase64) { this.fotoBase64 = fotoBase64; }
+
+    public LocalDateTime getUltimoVisto() { return ultimoVisto; }
+    public void setUltimoVisto(LocalDateTime ultimoVisto) { this.ultimoVisto = ultimoVisto; }
 }
