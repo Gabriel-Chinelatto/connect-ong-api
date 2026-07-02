@@ -62,6 +62,8 @@ public class NecessidadeService {
         }
 
         return lista.stream()
+                // esconde necessidades de ONGs excluidas (soft-delete)
+                .filter(n -> n.getOng() == null || n.getOng().getDataExclusao() == null)
                 // filtro por categoria em memoria (compara valores normalizados)
                 .filter(n -> categoria == null || categoria.isBlank()
                         || Categorias.iguais(n.getCategoria(), categoria))

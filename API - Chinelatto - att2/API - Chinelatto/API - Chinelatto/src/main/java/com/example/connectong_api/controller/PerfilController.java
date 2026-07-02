@@ -57,6 +57,13 @@ public class PerfilController {
         return service.alterarSenha(id, dto);
     }
 
+    @DeleteMapping
+    @Operation(summary = "Excluir a própria conta (soft-delete: preserva histórico, some da UI, não loga mais)")
+    public ResponseEntity<?> excluirConta(@PathVariable Long id) {
+        security.exigirUsuario(id);
+        return service.excluirConta(id);
+    }
+
     @GetMapping("/preferencias")
     @Operation(summary = "Obter as preferências/configurações do usuário")
     public ResponseEntity<?> obterPreferencias(@PathVariable Long id) {

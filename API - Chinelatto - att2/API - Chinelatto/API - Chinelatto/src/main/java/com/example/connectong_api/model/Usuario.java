@@ -50,6 +50,10 @@ public class Usuario {
     // derivado no service (visto ha menos de X segundos).
     private LocalDateTime ultimoVisto;
 
+    // Soft-delete: null = conta ativa; preenchida = conta "excluida" (nao loga e
+    // some da UI, mas o historico e preservado, sem orfaos).
+    private LocalDateTime dataExclusao;
+
     // GETTERS E SETTERS
 
     public Long getId() {
@@ -120,4 +124,7 @@ public class Usuario {
 
     public LocalDateTime getUltimoVisto() { return ultimoVisto; }
     public void setUltimoVisto(LocalDateTime ultimoVisto) { this.ultimoVisto = ultimoVisto; }
+
+    public LocalDateTime getDataExclusao() { return dataExclusao; }
+    public void setDataExclusao(LocalDateTime dataExclusao) { this.dataExclusao = dataExclusao; }
 }

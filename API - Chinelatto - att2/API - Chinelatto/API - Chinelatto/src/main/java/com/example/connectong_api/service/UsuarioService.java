@@ -148,8 +148,11 @@ public class UsuarioService {
         Optional<Usuario> usuarioBanco =
                 usuarioRepository.findByEmail(credenciais.getEmail());
 
-        // usuário encontrado E senha confere -> sucesso
+        // usuário encontrado, ATIVO (nao excluido) E senha confere -> sucesso.
+        // Conta com soft-delete (dataExclusao != null) cai no 401 generico abaixo
+        // (mesma resposta de credencial invalida, sem revelar que a conta existiu).
         if (usuarioBanco.isPresent()
+                && usuarioBanco.get().getDataExclusao() == null
                 && passwordEncoder.matches(
                         credenciais.getSenha(),
                         usuarioBanco.get().getSenha())) {

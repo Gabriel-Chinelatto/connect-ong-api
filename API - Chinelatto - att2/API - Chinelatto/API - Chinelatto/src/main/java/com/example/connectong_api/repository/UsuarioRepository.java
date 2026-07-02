@@ -17,6 +17,9 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
 
     long countByTipo(String tipo);
 
+    // Doadores/ONGs ATIVOS (nao excluidos) — para as estatisticas publicas.
+    long countByTipoAndDataExclusaoIsNull(String tipo);
+
     // Batimento de presenca: marca o momento da ultima atividade do usuario no
     // chat (usado para derivar "online"/"visto por ultimo"). Update direto para
     // nao carregar a entidade a cada poll.

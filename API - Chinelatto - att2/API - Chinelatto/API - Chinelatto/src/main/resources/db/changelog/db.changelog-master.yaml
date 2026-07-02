@@ -629,3 +629,45 @@ databaseChangeLog:
             columns:
               - column:
                   name: mensagem_id
+
+  # =====================================================================
+  # Soft-delete: exclusao logica de contas (doador/ONG). data_exclusao NULL =
+  # conta ativa; preenchida = "excluida" (some da UI e do login, mas o historico
+  # - matches, doacoes, avaliacoes - fica intacto, sem orfaos nem erro de FK).
+  # Datetime (nao boolean) evita o gotcha BIT/TINYINT com ddl-auto=validate.
+  # =====================================================================
+  - changeSet:
+      id: softdelete-usuario-data-exclusao
+      author: connect-ong
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: usuario
+                columnName: data_exclusao
+      changes:
+        - addColumn:
+            tableName: usuario
+            columns:
+              - column:
+                  name: data_exclusao
+                  type: datetime
+
+  - changeSet:
+      id: softdelete-ong-data-exclusao
+      author: connect-ong
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: ong
+                columnName: data_exclusao
+      changes:
+        - addColumn:
+            tableName: ong
+            columns:
+              - column:
+                  name: data_exclusao
+                  type: datetime

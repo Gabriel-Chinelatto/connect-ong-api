@@ -31,8 +31,9 @@ public class PublicoController {
     @Operation(summary = "Numeros publicos da plataforma (transparencia / impacto)")
     public EstatisticasPublicasDTO estatisticas() {
         EstatisticasPublicasDTO dto = new EstatisticasPublicasDTO();
-        dto.setTotalOngs(ongRepository.count());
-        dto.setTotalDoadores(usuarioRepository.countByTipo("DOADOR"));
+        // Conta so ONGs/doadores ATIVOS (nao excluidos por soft-delete).
+        dto.setTotalOngs(ongRepository.countByDataExclusaoIsNull());
+        dto.setTotalDoadores(usuarioRepository.countByTipoAndDataExclusaoIsNull("DOADOR"));
         dto.setTotalNecessidades(necessidadeRepository.count());
         dto.setTotalMatches(interesseRepository.countByStatus("ACEITO"));
         dto.setTotalDoacoesFinanceiras(doacaoFinanceiraRepository.count());

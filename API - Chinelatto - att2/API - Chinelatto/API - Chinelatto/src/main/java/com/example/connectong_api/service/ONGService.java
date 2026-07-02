@@ -70,7 +70,8 @@ public class ONGService {
     // =========================
     public ResponseEntity<?> perfilPublico(Long id) {
         Ong ong = repository.findById(id).orElse(null);
-        if (ong == null) {
+        // ONG inexistente OU excluida (soft-delete) -> 404.
+        if (ong == null || ong.getDataExclusao() != null) {
             return ResponseEntity.notFound().build();
         }
 
@@ -181,6 +182,7 @@ public class ONGService {
         }
 
         return lista.stream()
+                .filter(o -> o.getDataExclusao() == null) // esconde ONGs excluidas
                 .map(this::toDTO)
                 .collect(Collectors.toList());
     }
@@ -276,10 +278,20 @@ public class ONGService {
         // So a propria ONG dona pode excluir a sua conta (senao 403).
         security.exigirOng(id);
 
+        // SOFT-DELETE: nao remove fisicamente (evita orfaos/erro de FK e preserva o
+        // historico). Marca a ONG e a conta de login vinculada como excluidas; a
+        // ONG some das listagens/ranking/perfil publico e a conta deixa de logar.
         return repository.findById(id)
                 .map(ong -> {
 
-                    repository.delete(ong);
+                    java.time.LocalDateTime agora = java.time.LocalDateTime.now();
+                    ong.setDataExclusao(agora);
+                    repository.save(ong);
+
+                    usuarioRepository.findByOngId(ong.getId()).ifPresent(conta -> {
+                        conta.setDataExclusao(agora);
+                        usuarioRepository.save(conta);
+                    });
 
                     return ResponseEntity
                             .noContent()

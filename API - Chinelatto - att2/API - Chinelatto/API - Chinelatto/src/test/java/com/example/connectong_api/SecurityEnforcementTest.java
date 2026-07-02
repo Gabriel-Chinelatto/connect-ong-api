@@ -8,6 +8,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.web.servlet.MockMvc;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -249,5 +250,19 @@ class SecurityEnforcementTest {
                         .contentType("application/json")
                         .content("{\"emoji\":\"LIKE\"}"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void excluirConta_semToken_retorna401() throws Exception {
+        mockMvc.perform(delete("/usuarios/1"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void excluirContaDeOutro_retorna403() throws Exception {
+        // O usuario 999 (token) tentando excluir a conta do 1000 -> ownership 403.
+        mockMvc.perform(delete("/usuarios/1000")
+                        .header("Authorization", "Bearer " + tokenDoador()))
+                .andExpect(status().isForbidden());
     }
 }

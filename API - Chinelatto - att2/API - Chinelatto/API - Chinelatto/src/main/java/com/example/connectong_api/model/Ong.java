@@ -2,6 +2,7 @@ package com.example.connectong_api.model;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -53,6 +54,10 @@ public class Ong {
     @OneToMany(mappedBy = "ong")
     private List<Campanha> campanhas;
 
+    // Soft-delete: null = ativa; preenchida = "excluida" (some das listagens,
+    // ranking e perfil publico; historico preservado).
+    private LocalDateTime dataExclusao;
+
     public Ong() {}
 
     public Ong(String nome, String email, String telefone, String cidade, String descricao) {
@@ -91,4 +96,7 @@ public class Ong {
 
     public String getDescricao() { return descricao; }
     public void setDescricao(String descricao) { this.descricao = descricao; }
+
+    public LocalDateTime getDataExclusao() { return dataExclusao; }
+    public void setDataExclusao(LocalDateTime dataExclusao) { this.dataExclusao = dataExclusao; }
 }

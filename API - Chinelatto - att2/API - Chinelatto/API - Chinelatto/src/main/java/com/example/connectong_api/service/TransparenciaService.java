@@ -35,7 +35,10 @@ public class TransparenciaService {
 
     public ResponseEntity<?> transparencia(Long ongId) {
         Ong ong = ongRepository.findById(ongId).orElse(null);
-        if (ong == null) return ResponseEntity.notFound().build();
+        // ONG inexistente OU excluida (soft-delete) -> 404.
+        if (ong == null || ong.getDataExclusao() != null) {
+            return ResponseEntity.notFound().build();
+        }
         return ResponseEntity.ok(calcular(ong));
     }
 
@@ -77,6 +80,7 @@ public class TransparenciaService {
         Map<Long, Long> campanhasPorOng = paraMapa(campanhaRepository.contarConcluidasPorOng());
 
         return ongRepository.findAll().stream()
+                .filter(ong -> ong.getDataExclusao() == null) // fora as ONGs excluidas
                 .map(ong -> {
                     long prestacoes = prestacoesPorOng.getOrDefault(ong.getId(), 0L);
                     long campanhas = campanhasPorOng.getOrDefault(ong.getId(), 0L);

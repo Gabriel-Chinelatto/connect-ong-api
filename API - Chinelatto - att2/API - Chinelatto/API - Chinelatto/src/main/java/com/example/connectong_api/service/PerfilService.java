@@ -4,6 +4,7 @@ import com.example.connectong_api.dto.AlterarSenhaDTO;
 import com.example.connectong_api.dto.PerfilDTO;
 import com.example.connectong_api.model.Preferencia;
 import com.example.connectong_api.model.Usuario;
+import com.example.connectong_api.repository.ONGRepository;
 import com.example.connectong_api.repository.PreferenciaRepository;
 import com.example.connectong_api.repository.UsuarioRepository;
 
@@ -13,6 +14,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -30,6 +32,9 @@ public class PerfilService {
 
     @Autowired
     private PreferenciaRepository preferenciaRepository;
+
+    @Autowired
+    private ONGRepository ongRepository;
 
     @Autowired
     private BCryptPasswordEncoder passwordEncoder;
@@ -114,6 +119,31 @@ public class PerfilService {
         p.setReceberSugestoes(dados.getReceberSugestoes());
 
         return ResponseEntity.ok(preferenciaRepository.save(p));
+    }
+
+    // ===================== EXCLUIR CONTA (soft-delete) =====================
+    // Marca a conta como excluida (dataExclusao) em vez de apagar: preserva o
+    // historico (doacoes, avaliacoes, matches) sem orfaos nem erro de FK, e a
+    // conta deixa de logar. Se for conta de ONG, marca tambem o perfil da ONG
+    // (que some das listagens/ranking/perfil publico).
+    public ResponseEntity<?> excluirConta(Long usuarioId) {
+        Usuario u = usuarioRepository.findById(usuarioId).orElse(null);
+        if (u == null) return naoEncontrado();
+
+        LocalDateTime agora = LocalDateTime.now();
+        u.setDataExclusao(agora);
+        usuarioRepository.save(u);
+
+        if (u.getOngId() != null) {
+            ongRepository.findById(u.getOngId()).ifPresent(ong -> {
+                ong.setDataExclusao(agora);
+                ongRepository.save(ong);
+            });
+        }
+
+        Map<String, String> ok = new HashMap<>();
+        ok.put("mensagem", "Conta excluída.");
+        return ResponseEntity.ok(ok);
     }
 
     // ===================== HELPERS =====================
