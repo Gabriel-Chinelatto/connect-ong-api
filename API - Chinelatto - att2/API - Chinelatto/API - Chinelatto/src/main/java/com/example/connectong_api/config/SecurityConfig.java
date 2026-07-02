@@ -86,15 +86,21 @@ public class SecurityConfig {
                             ).permitAll()
                             .requestMatchers(HttpMethod.POST, "/usuarios", "/usuarios/login", "/usuarios/registro").permitAll()
                             .requestMatchers(HttpMethod.POST, "/ongs/registro").permitAll()
-                            // Recursos administrativos/moderacao: exigem papel ONG.
-                            // (nao ha papel de admin ainda; ROLE_ONG e o papel privilegiado.)
-                            // Auditoria: so leitura administrativa.
-                            .requestMatchers("/audit-logs/**").hasRole("ONG")
+                            // Recursos ADMINISTRATIVOS/MODERACAO: exigem ROLE_ADMIN, um
+                            // papel dedicado e NAO auto-provisionavel (ver AdminBootstrap).
+                            // Antes eram ROLE_ONG, mas ONG e auto-registravel (qualquer um
+                            // faz POST /ongs/registro), entao qualquer pessoa ganhava acesso
+                            // de moderacao/auditoria. Agora isso e privilegio so do admin.
+                            // Auditoria (contem IP/emails): so o admin le.
+                            .requestMatchers("/audit-logs/**").hasRole("ADMIN")
                             // Denuncias: registrar (POST) fica liberado a qualquer logado
                             // (um doador precisa poder reportar); ja listar e resolver
-                            // (moderacao) exigem ROLE_ONG.
-                            .requestMatchers(HttpMethod.GET, "/denuncias/**").hasRole("ONG")
-                            .requestMatchers(HttpMethod.PUT, "/denuncias/**").hasRole("ONG")
+                            // (moderacao) exigem ROLE_ADMIN.
+                            .requestMatchers(HttpMethod.GET, "/denuncias/**").hasRole("ADMIN")
+                            .requestMatchers(HttpMethod.PUT, "/denuncias/**").hasRole("ADMIN")
+                            // Conceder o selo de verificacao de uma ONG e ato administrativo
+                            // (antes a propria ONG se auto-verificava, esvaziando o selo).
+                            .requestMatchers(HttpMethod.PUT, "/ongs/*/verificar").hasRole("ADMIN")
                             // Todo o resto exige autenticacao via JWT
                             .anyRequest().authenticated();
                 })

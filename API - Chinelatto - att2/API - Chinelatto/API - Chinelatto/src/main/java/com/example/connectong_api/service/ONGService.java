@@ -296,13 +296,12 @@ public class ONGService {
     // =========================
     // VERIFICAR (concede o selo de confianca)
     // =========================
-    // DECISAO DE SEGURANCA: idealmente conceder o selo e uma acao ADMINISTRATIVA.
-    // Como o sistema ainda NAO tem um papel de admin (so DOADOR e ONG), fechamos
-    // aqui a IDOR de origem (qualquer logado verificava qualquer ONG) exigindo a
-    // propriedade: so a ONG dona alcanca este endpoint. Quando existir um papel
-    // de admin, mover esta concessao para ele (restringindo no SecurityConfig).
+    // Conceder o selo e uma acao ADMINISTRATIVA: o endpoint PUT /ongs/{id}/verificar
+    // e restrito a ROLE_ADMIN no SecurityConfig (papel dedicado, nao auto-provisionavel).
+    // Por isso NAO ha checagem de dono aqui — o admin nao possui ongId; a autorizacao
+    // ja aconteceu na camada de seguranca. Antes exigia a ONG dona, o que permitia a
+    // auto-verificacao e esvaziava o sentido do selo.
     public ResponseEntity<?> verificar(Long id) {
-        security.exigirOng(id);
         return repository.findById(id)
                 .map(ong -> {
                     ong.setVerificada(true);

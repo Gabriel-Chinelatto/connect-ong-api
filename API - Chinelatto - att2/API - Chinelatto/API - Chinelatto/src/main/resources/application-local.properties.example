@@ -13,6 +13,17 @@ DB_PASSWORD=coloque_a_senha_aqui
 #   (o Spring mapeia APP_JWT_SECRET -> app.jwt.secret automaticamente).
 app.jwt.secret=coloque_um_segredo_forte_e_aleatorio_aqui
 
+# Conta ADMIN (papel de moderacao/auditoria; NAO e auto-provisionavel por rota).
+# Se preenchidas, o AdminBootstrap cria a conta no startup (idempotente). Vazias
+# => nenhum admin. Producao: use as variaveis de ambiente APP_ADMIN_EMAIL /
+# APP_ADMIN_PASSWORD em vez de versionar a senha aqui.
+app.admin.email=admin@seu-dominio.local
+app.admin.password=coloque_uma_senha_forte_de_admin_aqui
+
+# "Modo Feira" (/demo/seed): deixe true na feira; em producao defina como false
+# (ou APP_DEMO_ENABLED=false) para nao expor o seed com senha fixa demo123.
+app.demo.enabled=true
+
 # Opcional: tambem da para sobrescrever a URL e o usuario, se precisar.
 # DB_URL=jdbc:mysql://143.106.241.3:3306/cl203161
 # DB_USERNAME=cl203161

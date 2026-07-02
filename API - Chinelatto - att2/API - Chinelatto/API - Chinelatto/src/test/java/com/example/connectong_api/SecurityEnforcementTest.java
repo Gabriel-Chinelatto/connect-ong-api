@@ -41,6 +41,25 @@ class SecurityEnforcementTest {
         return jwtService.gerarAccessToken(u);
     }
 
+    // Token de um usuario ONG ficticio (tipo ONG + ongId) -> ROLE_ONG.
+    private String tokenOng() {
+        Usuario u = new Usuario();
+        u.setId(500L);
+        u.setNome("ONG Teste");
+        u.setTipo("ONG");
+        u.setOngId(42L);
+        return jwtService.gerarAccessToken(u);
+    }
+
+    // Token de um administrador ficticio (tipo ADMIN) -> ROLE_ADMIN.
+    private String tokenAdmin() {
+        Usuario u = new Usuario();
+        u.setId(1L);
+        u.setNome("Admin Teste");
+        u.setTipo("ADMIN");
+        return jwtService.gerarAccessToken(u);
+    }
+
     @Test
     void endpointProtegido_semToken_retorna401() throws Exception {
         // /atividades exige autenticacao -> sem token deve ser barrado
@@ -145,5 +164,66 @@ class SecurityEnforcementTest {
         mockMvc.perform(get("/interesses")
                         .header("Authorization", "Bearer " + tokenDoador()))
                 .andExpect(status().isBadRequest());
+    }
+
+    // ===================== ROLE_ADMIN (moderacao/auditoria) =====================
+    // Antes estes endpoints eram ROLE_ONG; como ONG e auto-registravel, qualquer um
+    // ganhava acesso administrativo. Agora exigem ROLE_ADMIN (nao auto-provisionavel).
+
+    @Test
+    void auditLogs_comPapelOng_retorna403() throws Exception {
+        mockMvc.perform(get("/audit-logs")
+                        .header("Authorization", "Bearer " + tokenOng()))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void auditLogs_comPapelAdmin_retorna200() throws Exception {
+        mockMvc.perform(get("/audit-logs")
+                        .header("Authorization", "Bearer " + tokenAdmin()))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void listarDenuncias_comPapelOng_retorna403() throws Exception {
+        mockMvc.perform(get("/denuncias")
+                        .header("Authorization", "Bearer " + tokenOng()))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void listarDenuncias_comPapelAdmin_retorna200() throws Exception {
+        mockMvc.perform(get("/denuncias")
+                        .header("Authorization", "Bearer " + tokenAdmin()))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void verificarOng_comPapelOng_retorna403() throws Exception {
+        // Conceder o selo agora e so do admin: nem a propria ONG se auto-verifica.
+        mockMvc.perform(put("/ongs/42/verificar")
+                        .header("Authorization", "Bearer " + tokenOng()))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void verificarOng_comPapelAdmin_passaPelaSeguranca() throws Exception {
+        // Admin nao e barrado pela seguranca; como a ONG 12345 nao existe no H2,
+        // o resultado e 404 (e nao 401/403), provando que o acesso foi liberado.
+        mockMvc.perform(put("/ongs/12345/verificar")
+                        .header("Authorization", "Bearer " + tokenAdmin()))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void adminBootstrap_loginComCredenciaisConfiguradas_retornaTipoAdmin() throws Exception {
+        // Prova a cadeia completa: o AdminBootstrap criou a conta ADMIN (das
+        // credenciais de teste) e o login a autentica devolvendo tipo=ADMIN.
+        mockMvc.perform(post("/usuarios/login")
+                        .contentType("application/json")
+                        .content("{\"email\":\"admin@teste.local\","
+                                + "\"senha\":\"admin-teste-123456\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tipo").value("ADMIN"));
     }
 }
