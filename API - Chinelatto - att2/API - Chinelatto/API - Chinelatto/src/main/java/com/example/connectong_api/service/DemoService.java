@@ -70,7 +70,54 @@ public class DemoService {
         // ----- Timeline (feed global) — so popula se estiver vazia -----
         ensureAtividadesDemo(larViva, criancaFeliz, patinhas);
 
+        // ----- Chat de exemplo com "visto" e reacoes (idempotente) -----
+        ensureChatDemo(larViva);
+
         return resumo(baseExiste ? "campanhas_garantidas" : "carregado");
+    }
+
+    // Enriquece o chat demo (match Joao x Lar Viva) com recibo de leitura ("visto")
+    // e reacoes (emoji) — para demonstrar esses recursos. Idempotente: so roda
+    // enquanto NAO existir nenhuma reacao (a tabela e nova, entao count 0 = ainda
+    // nao enriquecido). Funciona tanto num banco novo quanto num ja semeado antes.
+    private void ensureChatDemo(Ong larViva) {
+        if (larViva == null || reacaoRepository.count() > 0) return;
+
+        Usuario joao =
+                usuarioRepository.findByEmail("demo.joao@connectong.com").orElse(null);
+        Usuario larVivaUser =
+                usuarioRepository.findByOngId(larViva.getId()).orElse(null);
+        if (joao == null || larVivaUser == null) return;
+
+        // Acha o match ACEITO do Joao numa necessidade da Lar Viva.
+        Interesse match = interesseRepository.findByDoadorId(joao.getId()).stream()
+                .filter(i -> "ACEITO".equals(i.getStatus())
+                        && i.getNecessidade() != null
+                        && i.getNecessidade().getOng() != null
+                        && larViva.getId().equals(i.getNecessidade().getOng().getId()))
+                .findFirst().orElse(null);
+        if (match == null) return;
+
+        java.util.List<Mensagem> msgs =
+                mensagemRepository.findByInteresseIdOrderByDataEnvioAsc(match.getId());
+        if (msgs.isEmpty()) return;
+
+        // Continua a conversa (se ainda so tem as 2 mensagens iniciais).
+        if (msgs.size() <= 2) {
+            criarMensagem(match, "DOADOR", "Perfeito, levo umas 5 embalagens entao.");
+            criarMensagem(match, "ONG",
+                    "Combinado! Deixei anotado na recepcao. Ate quinta!");
+            msgs = mensagemRepository.findByInteresseIdOrderByDataEnvioAsc(match.getId());
+        }
+
+        // "Visto" em todas menos a ultima (a ultima fica com 1 check).
+        for (int k = 0; k < msgs.size() - 1; k++) {
+            marcarLida(msgs.get(k));
+        }
+
+        // Reacoes: a ONG amou a oferta; o doador agradeceu com uma "prece".
+        criarReacao(msgs.get(0), larVivaUser.getId(), "ONG", "LOVE");
+        criarReacao(msgs.get(1), joao.getId(), "DOADOR", "PRAY");
     }
 
     private void criarBase() {
@@ -118,31 +165,13 @@ public class DemoService {
         criarInteresse(nMaterial, ana, "ACEITO");
         criarInteresse(nRacao, empresa, "PENDENTE");
 
-        // ----- Chat no match Joao x Lar Viva (com "visto" e reacoes) -----
-        // A conta de login (Usuario) da ONG Lar Viva, para as reacoes do lado ONG.
-        Usuario larVivaUser = usuarioRepository.findByOngId(larViva.getId()).orElse(null);
-
-        Mensagem m1 = criarMensagem(iJoao, "DOADOR",
+        // ----- Chat no match Joao x Lar Viva -----
+        // As 2 mensagens iniciais; o "visto" e as reacoes sao aplicados em
+        // ensureChatDemo (idempotente, tambem cobre bancos ja semeados).
+        criarMensagem(iJoao, "DOADOR",
                 "Ola! Tenho fraldas tamanho G para doar, quando posso levar?");
-        Mensagem m2 = criarMensagem(iJoao, "ONG",
-                "Que otimo! Pode trazer na quinta de manha. Muito obrigada!");
-        Mensagem m3 = criarMensagem(iJoao, "DOADOR",
-                "Perfeito, levo umas 5 embalagens entao.");
-        // Ultima mensagem fica SEM recibo de leitura (aparece com 1 check).
         criarMensagem(iJoao, "ONG",
-                "Combinado! Deixei anotado na recepcao. Ate quinta!");
-
-        // "Visto": as tres primeiras ja foram lidas pelo outro lado.
-        marcarLida(m1);
-        marcarLida(m2);
-        marcarLida(m3);
-
-        // Reacoes (codigo utf8-safe; o app renderiza o emoji):
-        // a ONG amou a oferta do doador; o doador agradeceu com uma "prece".
-        if (larVivaUser != null) {
-            criarReacao(m1, larVivaUser.getId(), "ONG", "LOVE");
-        }
-        criarReacao(m2, joao.getId(), "DOADOR", "PRAY");
+                "Que otimo! Pode trazer na quinta de manha. Muito obrigada!");
 
         // ----- Prestacao de contas -----
         criarPrestacao(iJoao, "Fraldas entregues",
