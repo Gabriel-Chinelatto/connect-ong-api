@@ -67,8 +67,8 @@ public class PerfilService {
         Usuario u = usuarioRepository.findById(usuarioId).orElse(null);
         if (u == null) return naoEncontrado();
 
-        if (dto.getNovaSenha() == null || dto.getNovaSenha().length() < 4) {
-            return erro("A nova senha deve ter ao menos 4 caracteres");
+        if (dto.getNovaSenha() == null || dto.getNovaSenha().length() < 6) {
+            return erro("A nova senha deve ter ao menos 6 caracteres");
         }
         if (!passwordEncoder.matches(dto.getSenhaAtual(), u.getSenha())) {
             return erro("Senha atual incorreta");

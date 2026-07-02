@@ -86,6 +86,15 @@ public class SecurityConfig {
                             ).permitAll()
                             .requestMatchers(HttpMethod.POST, "/usuarios", "/usuarios/login", "/usuarios/registro").permitAll()
                             .requestMatchers(HttpMethod.POST, "/ongs/registro").permitAll()
+                            // Recursos administrativos/moderacao: exigem papel ONG.
+                            // (nao ha papel de admin ainda; ROLE_ONG e o papel privilegiado.)
+                            // Auditoria: so leitura administrativa.
+                            .requestMatchers("/audit-logs/**").hasRole("ONG")
+                            // Denuncias: registrar (POST) fica liberado a qualquer logado
+                            // (um doador precisa poder reportar); ja listar e resolver
+                            // (moderacao) exigem ROLE_ONG.
+                            .requestMatchers(HttpMethod.GET, "/denuncias/**").hasRole("ONG")
+                            .requestMatchers(HttpMethod.PUT, "/denuncias/**").hasRole("ONG")
                             // Todo o resto exige autenticacao via JWT
                             .anyRequest().authenticated();
                 })

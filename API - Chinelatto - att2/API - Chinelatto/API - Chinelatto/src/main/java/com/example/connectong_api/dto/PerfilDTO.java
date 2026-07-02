@@ -1,5 +1,7 @@
 package com.example.connectong_api.dto;
 
+import jakarta.validation.constraints.Size;
+
 /**
  * Dados de perfil do usuario (entrada e saida). Nunca inclui a senha.
  */
@@ -13,6 +15,10 @@ public class PerfilDTO {
     private String estado;
     private String bio;
     private String fotoUrl;
+
+    // Foto embutida em base64. Limita o tamanho para evitar payloads gigantes
+    // (DoS de memoria/banco). ~3 MB de string cobre uma foto comprimida com folga.
+    @Size(max = 3_000_000, message = "Imagem muito grande")
     private String fotoBase64;
     private String tipo;
     private Long ongId;

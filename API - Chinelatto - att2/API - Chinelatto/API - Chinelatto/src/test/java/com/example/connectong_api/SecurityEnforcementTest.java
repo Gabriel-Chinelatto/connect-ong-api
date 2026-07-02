@@ -10,6 +10,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
@@ -99,6 +100,24 @@ class SecurityEnforcementTest {
     void ownership_perfilDeOutroUsuario_retorna403() throws Exception {
         // Token do usuario 999 tentando ver o perfil do usuario 1000
         mockMvc.perform(get("/usuarios/1000/perfil")
+                        .header("Authorization", "Bearer " + tokenDoador()))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void ownership_verificarOngDeOutro_retorna403() throws Exception {
+        // Conceder o selo de verificacao a uma ONG (id 1) por quem NAO e dono da
+        // ONG (o doador nao tem ongId no token) deve ser barrado com 403 — prova
+        // que a IDOR "qualquer logado verifica qualquer ONG" foi fechada.
+        mockMvc.perform(put("/ongs/1/verificar")
+                        .header("Authorization", "Bearer " + tokenDoador()))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void audit_logs_comPapelDoador_retorna403() throws Exception {
+        // /audit-logs e restrito a ROLE_ONG; um doador autenticado leva 403.
+        mockMvc.perform(get("/audit-logs")
                         .header("Authorization", "Bearer " + tokenDoador()))
                 .andExpect(status().isForbidden());
     }

@@ -8,6 +8,7 @@ import com.example.connectong_api.service.PerfilService;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -40,7 +41,7 @@ public class PerfilController {
     @Operation(summary = "Atualizar o perfil do usuário")
     public ResponseEntity<?> atualizarPerfil(
             @PathVariable Long id,
-            @RequestBody PerfilDTO dto
+            @Valid @RequestBody PerfilDTO dto
     ) {
         security.exigirUsuario(id);
         return service.atualizarPerfil(id, dto);
@@ -50,7 +51,7 @@ public class PerfilController {
     @Operation(summary = "Alterar a senha do usuário")
     public ResponseEntity<?> alterarSenha(
             @PathVariable Long id,
-            @RequestBody AlterarSenhaDTO dto
+            @Valid @RequestBody AlterarSenhaDTO dto
     ) {
         security.exigirUsuario(id);
         return service.alterarSenha(id, dto);
