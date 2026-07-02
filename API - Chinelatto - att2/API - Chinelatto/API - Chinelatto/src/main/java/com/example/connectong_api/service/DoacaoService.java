@@ -1,6 +1,7 @@
 package com.example.connectong_api.service;
 
 import com.example.connectong_api.dto.DoacaoResponseDTO;
+import com.example.connectong_api.exception.AcessoNegadoException;
 import com.example.connectong_api.model.Doacao;
 import com.example.connectong_api.repository.DoacaoRepository;
 
@@ -28,28 +29,39 @@ public class DoacaoService {
     // LISTAR
     // =========================
 
+    // Catalogo global (usado pelo painel da ONG no desktop).
     public List<DoacaoResponseDTO> listar() {
-
-        return repository.findAll()
-                .stream()
-                .map(doacao -> new DoacaoResponseDTO(
-                        doacao.getId(),
-                        doacao.getNome(),
-                        doacao.getDescricao(),
-                        doacao.getQuantidade(),
-                        doacao.getCategoria(),
-                        doacao.getTipo(),
-                        doacao.getUrgente(),
-                        doacao.getNovo()
-                ))
+        return repository.findAll().stream()
+                .map(this::toDTO)
                 .collect(Collectors.toList());
+    }
+
+    // "Minhas Doacoes": so os itens do proprio doador (derivado do token).
+    public List<DoacaoResponseDTO> listarPorDoador(Long doadorId) {
+        return repository.findByDoadorId(doadorId).stream()
+                .map(this::toDTO)
+                .collect(Collectors.toList());
+    }
+
+    private DoacaoResponseDTO toDTO(Doacao d) {
+        return new DoacaoResponseDTO(
+                d.getId(),
+                d.getNome(),
+                d.getDescricao(),
+                d.getQuantidade(),
+                d.getCategoria(),
+                d.getTipo(),
+                d.getUrgente(),
+                d.getNovo()
+        );
     }
 
     // =========================
     // CRIAR
     // =========================
 
-    public ResponseEntity<?> criar(Doacao doacao) {
+    // doadorId vem do token (nunca do cliente): define o dono do item.
+    public ResponseEntity<?> criar(Doacao doacao, Long doadorId) {
 
         if (doacao.getNome() == null || doacao.getNome().isBlank()) {
 
@@ -67,25 +79,17 @@ public class DoacaoService {
             return ResponseEntity.badRequest().body(erro);
         }
 
+        doacao.setDoadorId(doadorId);
         Doacao nova = repository.save(doacao);
 
-        return ResponseEntity.ok(new DoacaoResponseDTO(
-                nova.getId(),
-                nova.getNome(),
-                nova.getDescricao(),
-                nova.getQuantidade(),
-                nova.getCategoria(),
-                nova.getTipo(),
-                nova.getUrgente(),
-                nova.getNovo()
-        ));
+        return ResponseEntity.ok(toDTO(nova));
     }
 
     // =========================
     // ATUALIZAR
     // =========================
 
-    public ResponseEntity<?> atualizar(Long id, Doacao doacaoAtualizada) {
+    public ResponseEntity<?> atualizar(Long id, Doacao doacaoAtualizada, Long solicitanteId) {
 
         Doacao doacao = repository.findById(id).orElse(null);
 
@@ -95,6 +99,13 @@ public class DoacaoService {
             erro.put("erro", "Doação não encontrada");
 
             return ResponseEntity.status(404).body(erro);
+        }
+
+        // So o dono pode editar (itens legados sem dono seguem editaveis).
+        if (doacao.getDoadorId() != null
+                && !doacao.getDoadorId().equals(solicitanteId)) {
+            throw new AcessoNegadoException(
+                    "Você não pode editar a doação de outro usuário.");
         }
 
         if (doacaoAtualizada.getNome() == null || doacaoAtualizada.getNome().isBlank()) {
@@ -123,23 +134,14 @@ public class DoacaoService {
 
         Doacao atualizada = repository.save(doacao);
 
-        return ResponseEntity.ok(new DoacaoResponseDTO(
-                atualizada.getId(),
-                atualizada.getNome(),
-                atualizada.getDescricao(),
-                atualizada.getQuantidade(),
-                atualizada.getCategoria(),
-                atualizada.getTipo(),
-                atualizada.getUrgente(),
-                atualizada.getNovo()
-        ));
+        return ResponseEntity.ok(toDTO(atualizada));
     }
 
     // =========================
     // DELETAR
     // =========================
 
-    public ResponseEntity<?> deletar(Long id) {
+    public ResponseEntity<?> deletar(Long id, Long solicitanteId) {
 
         Doacao doacao = repository.findById(id).orElse(null);
 
@@ -149,6 +151,13 @@ public class DoacaoService {
             erro.put("erro", "Doação não encontrada");
 
             return ResponseEntity.status(404).body(erro);
+        }
+
+        // So o dono pode excluir (itens legados sem dono seguem removiveis).
+        if (doacao.getDoadorId() != null
+                && !doacao.getDoadorId().equals(solicitanteId)) {
+            throw new AcessoNegadoException(
+                    "Você não pode excluir a doação de outro usuário.");
         }
 
         repository.delete(doacao);

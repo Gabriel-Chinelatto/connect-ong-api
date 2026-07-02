@@ -4,8 +4,11 @@ import jakarta.persistence.*;
 
 /**
  * Item de doacao do catalogo (o que se oferece/precisa), com categoria, quantidade
- * e marcadores de {@code urgente} e {@code novo}. Entidade simples de catalogo, sem
- * vinculo direto com doador/ONG (o vinculo doador-necessidade vive em {@link Interesse}).
+ * e marcadores de {@code urgente} e {@code novo}.
+ *
+ * {@code doadorId} = dono do item (o doador que cadastrou). Fica null nas linhas
+ * antigas (pre-Fase 5); e definido a partir do token no cadastro. Permite a
+ * listagem "Minhas Doacoes" por usuario (GET /doacoes/minhas).
  */
 @Entity
 @Table(name = "doacao")
@@ -23,9 +26,15 @@ public class Doacao {
     private Boolean urgente;
     private Boolean novo;
 
+    // Dono do item (doador que cadastrou). Null nas linhas legadas.
+    private Long doadorId;
+
     public Doacao(){}
 
     public Long getId() { return id; }
+
+    public Long getDoadorId() { return doadorId; }
+    public void setDoadorId(Long doadorId) { this.doadorId = doadorId; }
 
     public String getNome() { return nome; }
     public void setNome(String nome) { this.nome = nome; }

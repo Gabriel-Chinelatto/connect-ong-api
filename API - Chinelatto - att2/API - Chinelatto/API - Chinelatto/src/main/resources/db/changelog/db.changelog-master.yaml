@@ -475,3 +475,29 @@ databaseChangeLog:
             columns:
               - column:
                   name: status
+
+  # =====================================================================
+  # Bloco 21 (Fase 5) - dono da doacao de item.
+  # A tabela 'doacao' era um catalogo global (sem dono), por isso "Minhas
+  # Doacoes" no app aparecia igual para todos. Adiciona 'doador_id' (nullable:
+  # linhas antigas ficam sem dono e somem de "minhas") para tornar a lista
+  # por usuario. O GET /doacoes global continua para o desktop; o mobile passa
+  # a usar GET /doacoes/minhas.
+  # =====================================================================
+  - changeSet:
+      id: fase5-doacao-doador-id
+      author: connect-ong
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: doacao
+                columnName: doador_id
+      changes:
+        - addColumn:
+            tableName: doacao
+            columns:
+              - column:
+                  name: doador_id
+                  type: bigint
