@@ -16,10 +16,11 @@ import java.util.Date;
  * A validacao do token agora E exigida nos endpoints protegidos
  * (ver SecurityConfig / JwtAuthFilter).
  *
- * A chave secreta vem da propriedade "app.jwt.secret" (idealmente da variavel
- * de ambiente APP_JWT_SECRET em producao). O default abaixo existe so para o
- * ambiente de desenvolvimento NAO quebrar; em producao DEFINA um segredo novo
- * por variavel de ambiente (o valor antigo ja vazou no historico do Git).
+ * A chave secreta vem OBRIGATORIAMENTE da propriedade "app.jwt.secret" (mapeada
+ * da variavel de ambiente APP_JWT_SECRET em producao). NAO ha mais valor default:
+ * se a propriedade estiver ausente a aplicacao FALHA no startup, de proposito —
+ * assim nunca voltamos a assinar tokens com um segredo publico/versionado. Em
+ * desenvolvimento local o valor vem de application-local.properties (gitignore).
  */
 @Service
 public class JwtService {
@@ -27,7 +28,7 @@ public class JwtService {
     private final SecretKey key;
 
     public JwtService(
-            @Value("${app.jwt.secret:connect-ong-chave-secreta-jwt-super-segura-2026-256-bits-minimo!!}")
+            @Value("${app.jwt.secret}")
             String secret) {
         this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
     }
