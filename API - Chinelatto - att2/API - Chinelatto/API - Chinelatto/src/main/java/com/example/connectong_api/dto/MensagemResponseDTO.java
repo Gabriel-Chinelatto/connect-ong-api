@@ -1,5 +1,6 @@
 package com.example.connectong_api.dto;
 
+import java.util.List;
 import java.time.LocalDateTime;
 
 /**
@@ -15,6 +16,8 @@ public class MensagemResponseDTO {
     // "visto": true quando o outro participante ja leu (data_leitura preenchida).
     // O cliente mostra 1 check (enviada) ou 2 checks (lida) nas mensagens proprias.
     private boolean lida;
+    // Reacoes (emoji) desta mensagem: 0..2 num chat de 2 participantes.
+    private List<ReacaoDTO> reacoes;
 
     public MensagemResponseDTO(
             Long id,
@@ -22,7 +25,8 @@ public class MensagemResponseDTO {
             String remetente,
             String conteudo,
             LocalDateTime dataEnvio,
-            boolean lida
+            boolean lida,
+            List<ReacaoDTO> reacoes
     ) {
         this.id = id;
         this.interesseId = interesseId;
@@ -30,6 +34,7 @@ public class MensagemResponseDTO {
         this.conteudo = conteudo;
         this.dataEnvio = dataEnvio;
         this.lida = lida;
+        this.reacoes = reacoes;
     }
 
     public Long getId() { return id; }
@@ -38,4 +43,5 @@ public class MensagemResponseDTO {
     public String getConteudo() { return conteudo; }
     public LocalDateTime getDataEnvio() { return dataEnvio; }
     public boolean isLida() { return lida; }
+    public List<ReacaoDTO> getReacoes() { return reacoes; }
 }

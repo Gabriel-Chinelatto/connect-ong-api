@@ -26,6 +26,7 @@ public class DemoService {
     @Autowired private NecessidadeRepository necessidadeRepository;
     @Autowired private InteresseRepository interesseRepository;
     @Autowired private MensagemRepository mensagemRepository;
+    @Autowired private ReacaoRepository reacaoRepository;
     @Autowired private AvaliacaoRepository avaliacaoRepository;
     @Autowired private PrestacaoRepository prestacaoRepository;
     @Autowired private DoacaoFinanceiraRepository doacaoFinanceiraRepository;
@@ -117,11 +118,31 @@ public class DemoService {
         criarInteresse(nMaterial, ana, "ACEITO");
         criarInteresse(nRacao, empresa, "PENDENTE");
 
-        // ----- Chat no match Joao x Lar Viva -----
-        criarMensagem(iJoao, "DOADOR",
+        // ----- Chat no match Joao x Lar Viva (com "visto" e reacoes) -----
+        // A conta de login (Usuario) da ONG Lar Viva, para as reacoes do lado ONG.
+        Usuario larVivaUser = usuarioRepository.findByOngId(larViva.getId()).orElse(null);
+
+        Mensagem m1 = criarMensagem(iJoao, "DOADOR",
                 "Ola! Tenho fraldas tamanho G para doar, quando posso levar?");
-        criarMensagem(iJoao, "ONG",
+        Mensagem m2 = criarMensagem(iJoao, "ONG",
                 "Que otimo! Pode trazer na quinta de manha. Muito obrigada!");
+        Mensagem m3 = criarMensagem(iJoao, "DOADOR",
+                "Perfeito, levo umas 5 embalagens entao.");
+        // Ultima mensagem fica SEM recibo de leitura (aparece com 1 check).
+        criarMensagem(iJoao, "ONG",
+                "Combinado! Deixei anotado na recepcao. Ate quinta!");
+
+        // "Visto": as tres primeiras ja foram lidas pelo outro lado.
+        marcarLida(m1);
+        marcarLida(m2);
+        marcarLida(m3);
+
+        // Reacoes (codigo utf8-safe; o app renderiza o emoji):
+        // a ONG amou a oferta do doador; o doador agradeceu com uma "prece".
+        if (larVivaUser != null) {
+            criarReacao(m1, larVivaUser.getId(), "ONG", "LOVE");
+        }
+        criarReacao(m2, joao.getId(), "DOADOR", "PRAY");
 
         // ----- Prestacao de contas -----
         criarPrestacao(iJoao, "Fraldas entregues",
@@ -247,12 +268,29 @@ public class DemoService {
         return interesseRepository.save(i);
     }
 
-    private void criarMensagem(Interesse interesse, String remetente, String conteudo) {
+    private Mensagem criarMensagem(Interesse interesse, String remetente, String conteudo) {
         Mensagem m = new Mensagem();
         m.setInteresse(interesse);
         m.setRemetente(remetente);
         m.setConteudo(conteudo);
+        return mensagemRepository.save(m);
+    }
+
+    // Marca a mensagem como lida agora (recibo de leitura "visto").
+    private void marcarLida(Mensagem m) {
+        m.setDataLeitura(java.time.LocalDateTime.now());
         mensagemRepository.save(m);
+    }
+
+    // Reacao (emoji) demo a uma mensagem. Guarda o CODIGO (LIKE/LOVE/...), nunca o
+    // emoji cru (utf8 de 3 bytes do MySQL 5.6 nao aceita 4 bytes).
+    private void criarReacao(Mensagem m, Long usuarioId, String lado, String emojiCodigo) {
+        Reacao r = new Reacao();
+        r.setMensagemId(m.getId());
+        r.setUsuarioId(usuarioId);
+        r.setLado(lado);
+        r.setEmoji(emojiCodigo);
+        reacaoRepository.save(r);
     }
 
     private void criarPrestacao(Interesse interesse, String titulo, String descricao) {

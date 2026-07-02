@@ -242,4 +242,12 @@ class SecurityEnforcementTest {
         mockMvc.perform(post("/mensagens/digitando?interesseId=1"))
                 .andExpect(status().isUnauthorized());
     }
+
+    @Test
+    void reagirMensagem_semToken_retorna401() throws Exception {
+        mockMvc.perform(post("/mensagens/1/reacao")
+                        .contentType("application/json")
+                        .content("{\"emoji\":\"LIKE\"}"))
+                .andExpect(status().isUnauthorized());
+    }
 }

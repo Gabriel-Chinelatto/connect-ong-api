@@ -10,6 +10,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Map;
+
 /**
  * Recurso REST /mensagens: chat entre doador e ONG dentro de um match.
  * O chat so existe apos o interesse virar match ACEITO; mensagens sao listadas/enviadas
@@ -47,5 +49,12 @@ public class MensagemController {
     public ResponseEntity<?> digitando(@RequestParam Long interesseId) {
         service.registrarDigitando(interesseId);
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{id}/reacao")
+    @Operation(summary = "Reage (emoji) a uma mensagem, ou remove a propria reacao (toggle). Corpo: {\"emoji\":\"LIKE\"}")
+    public ResponseEntity<?> reagir(@PathVariable Long id,
+                                    @RequestBody Map<String, String> body) {
+        return service.reagir(id, body != null ? body.get("emoji") : null);
     }
 }

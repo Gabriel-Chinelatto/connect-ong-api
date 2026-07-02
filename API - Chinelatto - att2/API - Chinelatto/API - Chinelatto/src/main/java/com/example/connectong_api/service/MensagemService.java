@@ -3,11 +3,14 @@ package com.example.connectong_api.service;
 import com.example.connectong_api.dto.ChatStatusDTO;
 import com.example.connectong_api.dto.MensagemRequestDTO;
 import com.example.connectong_api.dto.MensagemResponseDTO;
+import com.example.connectong_api.dto.ReacaoDTO;
 import com.example.connectong_api.model.Interesse;
 import com.example.connectong_api.model.Mensagem;
+import com.example.connectong_api.model.Reacao;
 import com.example.connectong_api.model.Usuario;
 import com.example.connectong_api.repository.InteresseRepository;
 import com.example.connectong_api.repository.MensagemRepository;
+import com.example.connectong_api.repository.ReacaoRepository;
 import com.example.connectong_api.repository.UsuarioRepository;
 import com.example.connectong_api.security.SecurityUtils;
 
@@ -19,9 +22,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -51,6 +56,14 @@ public class MensagemService {
     @Autowired
     private DigitandoRegistry digitando;
 
+    @Autowired
+    private ReacaoRepository reacaoRepository;
+
+    // Codigos de reacao aceitos (o emoji em si e renderizado no app; guardar o
+    // emoji cru quebraria no utf8 de 3 bytes do MySQL 5.6).
+    private static final Set<String> EMOJIS_PERMITIDOS =
+            Set.of("LIKE", "LOVE", "LAUGH", "WOW", "SAD", "PRAY");
+
     // "Online" = teve atividade no chat nos ultimos 45s (o poll e de ~2s, entao
     // isso cobre folgadamente uma perda de batimento). "Digitando" = heartbeat nos
     // ultimos 5s.
@@ -73,10 +86,31 @@ public class MensagemService {
         String outroLado = ladoOposto(ladoDoChamador(interesse));
         repository.marcarLidas(interesseId, outroLado, LocalDateTime.now());
 
-        return repository.findByInteresseIdOrderByDataEnvioAsc(interesseId)
-                .stream()
-                .map(this::toDTO)
+        List<Mensagem> mensagens =
+                repository.findByInteresseIdOrderByDataEnvioAsc(interesseId);
+
+        // Carrega as reacoes de todas as mensagens em UMA query e agrupa por
+        // mensagem (evita N+1 no chat).
+        Map<Long, List<ReacaoDTO>> reacoesPorMensagem = reacoesDe(mensagens);
+
+        return mensagens.stream()
+                .map(m -> toDTO(m, reacoesPorMensagem.getOrDefault(
+                        m.getId(), Collections.emptyList())))
                 .collect(Collectors.toList());
+    }
+
+    // Reacoes agrupadas por mensagem, carregadas em lote.
+    private Map<Long, List<ReacaoDTO>> reacoesDe(List<Mensagem> mensagens) {
+        if (mensagens.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        List<Long> ids = mensagens.stream().map(Mensagem::getId).collect(Collectors.toList());
+        return reacaoRepository.findByMensagemIdIn(ids).stream()
+                .collect(Collectors.groupingBy(
+                        Reacao::getMensagemId,
+                        Collectors.mapping(
+                                r -> new ReacaoDTO(r.getEmoji(), r.getLado()),
+                                Collectors.toList())));
     }
 
     // Situacao do OUTRO participante (online / visto por ultimo / digitando) e,
@@ -230,17 +264,63 @@ public class MensagemService {
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)
-                .body(toDTO(salva));
+                .body(toDTO(salva, Collections.emptyList())); // mensagem nova: sem reacoes
     }
 
-    private MensagemResponseDTO toDTO(Mensagem m) {
+    // Reage (emoji) a uma mensagem, ou remove a propria reacao (toggle). No maximo
+    // 1 reacao por participante por mensagem. So participantes do match reagem.
+    @Transactional
+    public ResponseEntity<?> reagir(Long mensagemId, String emoji) {
+        if (emoji == null || !EMOJIS_PERMITIDOS.contains(emoji)) {
+            return erro("Reacao invalida. Use uma das: " + EMOJIS_PERMITIDOS);
+        }
+
+        Mensagem mensagem = repository.findById(mensagemId).orElse(null);
+        if (mensagem == null || mensagem.getInteresse() == null) {
+            return erro("Mensagem nao encontrada");
+        }
+
+        Interesse interesse = mensagem.getInteresse();
+        exigirParticipante(interesse);
+
+        Long meuId = security.usuarioId();
+        String meuLado = ladoDoChamador(interesse);
+
+        Reacao existente = reacaoRepository
+                .findByMensagemIdAndUsuarioId(mensagemId, meuId).orElse(null);
+
+        if (existente != null && existente.getEmoji().equals(emoji)) {
+            // Mesma reacao de novo = desfaz (toggle off).
+            reacaoRepository.delete(existente);
+        } else if (existente != null) {
+            // Troca a reacao anterior por outra.
+            existente.setEmoji(emoji);
+            reacaoRepository.save(existente);
+        } else {
+            Reacao nova = new Reacao();
+            nova.setMensagemId(mensagemId);
+            nova.setUsuarioId(meuId);
+            nova.setLado(meuLado);
+            nova.setEmoji(emoji);
+            reacaoRepository.save(nova);
+        }
+
+        // Devolve as reacoes atuais da mensagem (0..2).
+        List<ReacaoDTO> reacoes = reacaoRepository.findByMensagemId(mensagemId).stream()
+                .map(r -> new ReacaoDTO(r.getEmoji(), r.getLado()))
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(reacoes);
+    }
+
+    private MensagemResponseDTO toDTO(Mensagem m, List<ReacaoDTO> reacoes) {
         return new MensagemResponseDTO(
                 m.getId(),
                 m.getInteresse() != null ? m.getInteresse().getId() : null,
                 m.getRemetente(),
                 m.getConteudo(),
                 m.getDataEnvio(),
-                m.getDataLeitura() != null // lida = ja tem recibo de leitura
+                m.getDataLeitura() != null, // lida = ja tem recibo de leitura
+                reacoes
         );
     }
 

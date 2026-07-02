@@ -566,3 +566,66 @@ databaseChangeLog:
               - column:
                   name: ultimo_visto
                   type: datetime
+
+  # =====================================================================
+  # Chat - reacoes (emoji) as mensagens. Guarda o CODIGO da reacao (LIKE, LOVE,
+  # ...), nunca o emoji cru: o utf8 (3 bytes) do MySQL 5.6 quebraria com emoji
+  # (4 bytes). Sem boolean = sem gotcha BIT. Unicidade (1 reacao por usuario por
+  # mensagem) e garantida no codigo.
+  # =====================================================================
+  - changeSet:
+      id: chat-reacao-create-table
+      author: connect-ong
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: reacao
+      changes:
+        - createTable:
+            tableName: reacao
+            columns:
+              - column:
+                  name: id
+                  type: bigint
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: mensagem_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: usuario_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: lado
+                  type: varchar(10)
+              - column:
+                  name: emoji
+                  type: varchar(20)
+              - column:
+                  name: data_criacao
+                  type: datetime
+
+  - changeSet:
+      id: chat-reacao-idx-mensagem
+      author: connect-ong
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: MARK_RAN
+        - not:
+            - indexExists:
+                indexName: idx_reacao_mensagem
+      changes:
+        - createIndex:
+            indexName: idx_reacao_mensagem
+            tableName: reacao
+            columns:
+              - column:
+                  name: mensagem_id
