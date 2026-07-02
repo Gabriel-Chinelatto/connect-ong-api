@@ -27,11 +27,13 @@ public class Ong {
     @Email
     private String email;
 
-    @NotBlank
+    // Telefone e cidade sao OPCIONAIS no cadastro (o formulario da ONG e o
+    // OngRegistroDTO os tratam como opcionais). Antes eram @NotBlank, o que fazia
+    // o cadastro de uma ONG sem telefone/cidade falhar com erro de validacao de
+    // entidade em tempo de persist. Mantemos so o limite de tamanho.
     @Size(max = 20)
     private String telefone;
 
-    @NotBlank
     @Size(max = 50)
     private String cidade;
 

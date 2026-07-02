@@ -79,8 +79,16 @@ public class PrestacaoService {
             return erro("Match não encontrado");
         }
 
-        // So os participantes do match podem publicar prestacao de contas.
-        exigirParticipante(interesse);
+        // SEGURANCA: prestacao de contas e um ato da ONG (aparece no perfil publico
+        // dela como se ela tivesse prestado contas). So a ONG DONA da necessidade
+        // pode publicar — antes usava exigirParticipante, que deixava o DOADOR do
+        // match publicar uma prestacao atribuida a ONG. Ler continua liberado aos
+        // dois lados (metodo listar usa exigirParticipante).
+        Long ongDonaId = (interesse.getNecessidade() != null
+                && interesse.getNecessidade().getOng() != null)
+                ? interesse.getNecessidade().getOng().getId()
+                : null;
+        security.exigirOng(ongDonaId);
 
         if (!"ACEITO".equals(interesse.getStatus())) {
             return erro("A prestação de contas só vale para um match aceito");

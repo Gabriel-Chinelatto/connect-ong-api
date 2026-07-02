@@ -59,10 +59,15 @@ public class UsuarioService {
 
         // Monta a entidade SO com os campos permitidos. id e ongId nunca vêm do
         // cliente (evita mass assignment / escalonamento de privilegio).
+        // SEGURANCA: o tipo e SEMPRE forcado para DOADOR nesta rota publica. Antes
+        // o tipo vinha do cliente e, como /usuarios esta na whitelist publica,
+        // qualquer um podia POST /usuarios {"tipo":"ONG"} e receber um JWT com
+        // ROLE_ONG (escalonamento de privilegio). A unica forma legitima de criar
+        // uma conta ONG e /ongs/registro (que tambem cria o perfil e o vinculo).
         Usuario usuario = new Usuario();
         usuario.setNome(dados.getNome());
         usuario.setEmail(dados.getEmail());
-        usuario.setTipo(dados.getTipo());
+        usuario.setTipo("DOADOR");
         usuario.setSenha(passwordEncoder.encode(dados.getSenha()));
 
         Usuario novo =

@@ -35,7 +35,7 @@ class ValidacaoDtoTest {
         OngRegistroDTO dto = new OngRegistroDTO();
         dto.setNome("Lar Feliz");
         dto.setEmail("contato@larfeliz.org");
-        dto.setSenha("1234");
+        dto.setSenha("senha123"); // senha de ONG agora exige minimo 6 (igual doador)
         Set<ConstraintViolation<OngRegistroDTO>> v = validator.validate(dto);
         assertTrue(v.isEmpty(), "DTO valido nao deveria ter violacoes: " + v);
     }

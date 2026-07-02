@@ -119,15 +119,17 @@ public class ONGService {
             return erro("Email já cadastrado");
         }
 
-        // 1) cria o perfil da ONG
+        // 1) cria o perfil da ONG. Campos opcionais (telefone/cidade/descricao/
+        // cnpj) viram "" quando ausentes: evita null em colunas NOT NULL do banco
+        // e mantem a resposta consistente (o cliente exibe string, nunca null).
         Ong ong = new Ong(
                 dto.getNome(),
                 dto.getEmail(),
-                dto.getTelefone(),
-                dto.getCidade(),
-                dto.getDescricao()
+                naoNulo(dto.getTelefone()),
+                naoNulo(dto.getCidade()),
+                naoNulo(dto.getDescricao())
         );
-        ong.setCnpj(dto.getCnpj());
+        ong.setCnpj(naoNulo(dto.getCnpj()));
         Ong ongSalva = repository.save(ong);
 
         // 2) cria a conta de login (Usuario tipo ONG) vinculada ao perfil
@@ -322,6 +324,11 @@ public class ONGService {
                 o.getNotaMedia(),
                 o.getTotalAvaliacoes()
         );
+    }
+
+    // Coalesce de campo opcional: null -> "" (para nao violar colunas NOT NULL).
+    private String naoNulo(String valor) {
+        return valor != null ? valor : "";
     }
 
     private ResponseEntity<?> erro(

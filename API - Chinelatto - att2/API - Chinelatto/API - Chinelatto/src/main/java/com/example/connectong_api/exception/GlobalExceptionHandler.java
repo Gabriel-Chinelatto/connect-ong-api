@@ -1,6 +1,7 @@
 package com.example.connectong_api.exception;
 
 import jakarta.validation.ConstraintViolationException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -48,11 +49,19 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(corpo);
     }
 
-    // Validacao em parametros (@RequestParam/@PathVariable com @Validated) -> 400
+    // Violacoes de constraint (parametros @Validated OU validacao de entidade em
+    // tempo de persist) -> 400. Extraimos SO as mensagens legiveis das violacoes;
+    // nunca devolvemos ex.getMessage() cru, que vazaria nome de classe, propertyPath
+    // e detalhes internos (information disclosure).
     @ExceptionHandler(ConstraintViolationException.class)
     public ResponseEntity<Map<String, String>> tratarConstraint(
             ConstraintViolationException ex) {
-        return badRequest(ex.getMessage());
+        String mensagem = ex.getConstraintViolations().stream()
+                .map(v -> v.getMessage())
+                .filter(m -> m != null && !m.isBlank())
+                .findFirst()
+                .orElse("Dados invalidos.");
+        return badRequest(mensagem);
     }
 
     // JSON malformado ou tipo incompativel no corpo -> 400 (e nao 500)
@@ -67,6 +76,16 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, String>> tratarTipoInvalido(
             MethodArgumentTypeMismatchException ex) {
         return badRequest("Parametro '" + ex.getName() + "' com valor invalido.");
+    }
+
+    // Violacao de integridade no banco (ex.: texto maior que a coluna, valor
+    // duplicado numa coluna unica) -> 400 com mensagem generica. Evita que esses
+    // casos virem 500 e NUNCA expoe o SQL/constraint interno ao cliente.
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<Map<String, String>> tratarIntegridade(
+            DataIntegrityViolationException ex) {
+        return badRequest("Nao foi possivel salvar: verifique os dados enviados "
+                + "(algum campo pode estar longo demais ou duplicado).");
     }
 
     // Falha de autorizacao/ownership (usuario mexendo em dado de outro) -> 403

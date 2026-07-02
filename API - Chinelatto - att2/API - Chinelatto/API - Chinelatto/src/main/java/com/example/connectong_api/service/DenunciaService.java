@@ -4,6 +4,7 @@ import com.example.connectong_api.dto.DenunciaRequestDTO;
 import com.example.connectong_api.dto.DenunciaResponseDTO;
 import com.example.connectong_api.model.Denuncia;
 import com.example.connectong_api.repository.DenunciaRepository;
+import com.example.connectong_api.security.SecurityUtils;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -23,10 +24,16 @@ public class DenunciaService {
 
     @Autowired private DenunciaRepository repository;
     @Autowired private AuditService auditService;
+    @Autowired private SecurityUtils security;
 
     public ResponseEntity<?> criar(DenunciaRequestDTO dto) {
+        // SEGURANCA: o denunciante e SEMPRE o usuario autenticado (token), nunca o
+        // id vindo do corpo. Antes o cliente informava denuncianteId, o que permitia
+        // denunciar (e registrar auditoria) em nome de outra pessoa.
+        Long denuncianteId = security.usuarioId();
+
         Denuncia d = new Denuncia();
-        d.setDenuncianteId(dto.getDenuncianteId());
+        d.setDenuncianteId(denuncianteId);
         d.setTipoAlvo(dto.getTipoAlvo().trim().toUpperCase());
         d.setAlvoId(dto.getAlvoId());
         d.setMotivo(dto.getMotivo());
@@ -34,7 +41,7 @@ public class DenunciaService {
 
         Denuncia salva = repository.save(d);
 
-        auditService.registrar("DENUNCIA", dto.getDenuncianteId(),
+        auditService.registrar("DENUNCIA", denuncianteId,
                 "Denuncia de " + salva.getTipoAlvo() + " id=" + salva.getAlvoId()
                         + " motivo=" + salva.getMotivo());
 

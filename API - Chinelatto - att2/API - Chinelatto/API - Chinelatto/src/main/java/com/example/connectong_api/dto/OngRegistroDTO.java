@@ -32,7 +32,7 @@ public class OngRegistroDTO {
     private String cnpj;
 
     @NotBlank(message = "A senha e obrigatoria")
-    @Size(min = 4, max = 100, message = "A senha deve ter no minimo 4 caracteres")
+    @Size(min = 6, max = 100, message = "A senha deve ter no minimo 6 caracteres")
     private String senha;
 
     public String getNome() { return nome; }

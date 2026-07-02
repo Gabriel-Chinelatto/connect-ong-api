@@ -53,8 +53,10 @@ public class DoacaoFinanceiraService {
     }
 
     public List<DoacaoFinanceiraResponseDTO> listarPorOng(Long ongId) {
+        // A ONG ve quem doou e quanto, mas NAO o codigoPix (comprovante "copia e
+        // cola" e privado do doador). Antes o mesmo toDTO vazava o codigoPix aqui.
         return repository.findByOngIdOrderByDataCriacaoDesc(ongId)
-                .stream().map(this::toDTO).collect(Collectors.toList());
+                .stream().map(this::toDTOSemComprovante).collect(Collectors.toList());
     }
 
     // Registra a doacao financeira (PIX simulado) e gera o comprovante.
@@ -120,6 +122,20 @@ public class DoacaoFinanceiraService {
                 d.getDoadorNome(),
                 d.getValor(),
                 d.getCodigoPix(),
+                d.getStatus(),
+                d.getDataCriacao()
+        );
+    }
+
+    // Visao da ONG: igual ao toDTO, mas sem o codigoPix (comprovante do doador).
+    private DoacaoFinanceiraResponseDTO toDTOSemComprovante(DoacaoFinanceira d) {
+        return new DoacaoFinanceiraResponseDTO(
+                d.getId(),
+                d.getOngId(),
+                d.getOngNome(),
+                d.getDoadorNome(),
+                d.getValor(),
+                null,
                 d.getStatus(),
                 d.getDataCriacao()
         );

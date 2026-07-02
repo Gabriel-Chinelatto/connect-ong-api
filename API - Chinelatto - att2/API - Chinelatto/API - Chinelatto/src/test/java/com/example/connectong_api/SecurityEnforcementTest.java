@@ -11,6 +11,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
@@ -120,5 +121,29 @@ class SecurityEnforcementTest {
         mockMvc.perform(get("/audit-logs")
                         .header("Authorization", "Bearer " + tokenDoador()))
                 .andExpect(status().isForbidden());
+    }
+
+    // ===================== Regressoes desta rodada =====================
+
+    @Test
+    void cadastroPublico_ignoraTipoOng_forcaDoador() throws Exception {
+        // Escalonamento de privilegio: POST /usuarios e publico. Mesmo pedindo
+        // tipo=ONG, o servidor DEVE gravar DOADOR (senao o cliente ganharia um
+        // JWT com ROLE_ONG sem passar por /ongs/registro).
+        mockMvc.perform(post("/usuarios")
+                        .contentType("application/json")
+                        .content("{\"nome\":\"Hacker\",\"email\":\"esc@x.com\","
+                                + "\"senha\":\"senha123\",\"tipo\":\"ONG\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.tipo").value("DOADOR"));
+    }
+
+    @Test
+    void listarInteresses_semFiltro_retorna400() throws Exception {
+        // IDOR: sem doadorId/ongId o service caia em findAll() e devolvia TODOS os
+        // matches da plataforma. Agora exige um filtro -> 400 (e nunca findAll).
+        mockMvc.perform(get("/interesses")
+                        .header("Authorization", "Bearer " + tokenDoador()))
+                .andExpect(status().isBadRequest());
     }
 }

@@ -84,12 +84,6 @@ public class MensagemService {
             return erro("A mensagem não pode ser vazia");
         }
 
-        final String remetente = dto.getRemetente();
-        if (remetente == null
-                || (!remetente.equals("DOADOR") && !remetente.equals("ONG"))) {
-            return erro("Remetente inválido (use DOADOR ou ONG)");
-        }
-
         Interesse interesse =
                 interesseRepository.findById(dto.getInteresseId()).orElse(null);
         if (interesse == null) {
@@ -98,6 +92,16 @@ public class MensagemService {
 
         // So os participantes do match podem enviar mensagem.
         exigirParticipante(interesse);
+
+        // SEGURANCA: o remetente e derivado da IDENTIDADE DO TOKEN, nunca do corpo.
+        // Antes vinha do cliente, entao o doador podia enviar {"remetente":"ONG"} e
+        // a mensagem aparecia como se fosse da ONG (spoofing). Como exigirParticipante
+        // ja garantiu que o usuario e o doador OU a ONG do match, basta ver qual lado.
+        Long doadorId = interesse.getDoador() != null
+                ? interesse.getDoador().getId() : null;
+        final String remetente =
+                (doadorId != null && doadorId.equals(security.usuarioId()))
+                        ? "DOADOR" : "ONG";
 
         if (!"ACEITO".equals(interesse.getStatus())) {
             return erro("O chat só fica disponível após o match ser aceito");

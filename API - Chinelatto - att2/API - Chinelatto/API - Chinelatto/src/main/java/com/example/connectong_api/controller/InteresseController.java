@@ -11,6 +11,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
+import java.util.Map;
+
 /**
  * Recurso REST /interesses: hero feature do match. O doador demonstra interesse numa
  * necessidade e a ONG aceita (vira match) ou recusa; o match aceito e o que habilita o chat.
@@ -35,10 +38,18 @@ public class InteresseController {
             @RequestParam(required = false) Long doadorId,
             @RequestParam(required = false) Long ongId
     ) {
+        // SEGURANCA: e obrigatorio informar um filtro (doadorId OU ongId). Sem ele
+        // o service cairia em findAll() e devolveria TODOS os matches da plataforma
+        // (nomes de doadores, ONGs, necessidades) a qualquer autenticado — IDOR.
+        if (doadorId == null && ongId == null) {
+            Map<String, String> erro = new HashMap<>();
+            erro.put("erro", "Informe doadorId ou ongId para listar os interesses.");
+            return ResponseEntity.badRequest().body(erro);
+        }
         // O doador so lista os proprios interesses; a ONG so os da propria ONG.
         if (doadorId != null) {
             security.exigirUsuario(doadorId);
-        } else if (ongId != null) {
+        } else {
             security.exigirOng(ongId);
         }
         return ResponseEntity.ok(service.listar(doadorId, ongId));

@@ -7,7 +7,8 @@ import java.time.LocalDateTime;
 public class DenunciaResponseDTO {
 
     private Long id;
-    private Long denuncianteId;
+    // denuncianteId NAO e exposto: a denuncia e anonima para a moderacao (antes
+    // vazava a identidade de quem reportou a quem consultasse a lista).
     private String tipoAlvo;
     private Long alvoId;
     private String motivo;
@@ -17,7 +18,6 @@ public class DenunciaResponseDTO {
 
     public DenunciaResponseDTO(Denuncia d) {
         this.id = d.getId();
-        this.denuncianteId = d.getDenuncianteId();
         this.tipoAlvo = d.getTipoAlvo();
         this.alvoId = d.getAlvoId();
         this.motivo = d.getMotivo();
@@ -27,7 +27,6 @@ public class DenunciaResponseDTO {
     }
 
     public Long getId() { return id; }
-    public Long getDenuncianteId() { return denuncianteId; }
     public String getTipoAlvo() { return tipoAlvo; }
     public Long getAlvoId() { return alvoId; }
     public String getMotivo() { return motivo; }
