@@ -10,6 +10,7 @@ import com.example.connectong_api.model.Usuario;
 import com.example.connectong_api.repository.ONGRepository;
 import com.example.connectong_api.repository.PrestacaoRepository;
 import com.example.connectong_api.repository.UsuarioRepository;
+import com.example.connectong_api.security.SecurityUtils;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -60,6 +61,9 @@ public class ONGService {
 
     @Autowired
     private TransparenciaService transparenciaService;
+
+    @Autowired
+    private SecurityUtils security;
 
     // =========================
     // PERFIL PUBLICO (agrega tudo que o doador ve na pagina da ONG)
@@ -204,6 +208,12 @@ public class ONGService {
             );
         }
 
+        // Anti mass-assignment: campos de confianca/agregados NUNCA vem do cliente.
+        // (o id ja e ignorado por nao ter setter; aqui zeramos o resto por seguranca)
+        ong.setVerificada(false);
+        ong.setNotaMedia(0.0);
+        ong.setTotalAvaliacoes(0);
+
         Ong nova =
                 repository.save(ong);
 
@@ -217,6 +227,9 @@ public class ONGService {
             Long id,
             Ong ongAtualizada
     ) {
+
+        // So a propria ONG dona pode editar o seu perfil (senao 403).
+        security.exigirOng(id);
 
         return repository.findById(id)
                 .map(ong -> {
@@ -258,6 +271,9 @@ public class ONGService {
             Long id
     ) {
 
+        // So a propria ONG dona pode excluir a sua conta (senao 403).
+        security.exigirOng(id);
+
         return repository.findById(id)
                 .map(ong -> {
 
@@ -276,9 +292,15 @@ public class ONGService {
     // ERRO PADRÃO
     // =========================
     // =========================
-    // VERIFICAR (admin marca a ONG como verificada)
+    // VERIFICAR (concede o selo de confianca)
     // =========================
+    // DECISAO DE SEGURANCA: idealmente conceder o selo e uma acao ADMINISTRATIVA.
+    // Como o sistema ainda NAO tem um papel de admin (so DOADOR e ONG), fechamos
+    // aqui a IDOR de origem (qualquer logado verificava qualquer ONG) exigindo a
+    // propriedade: so a ONG dona alcanca este endpoint. Quando existir um papel
+    // de admin, mover esta concessao para ele (restringindo no SecurityConfig).
     public ResponseEntity<?> verificar(Long id) {
+        security.exigirOng(id);
         return repository.findById(id)
                 .map(ong -> {
                     ong.setVerificada(true);

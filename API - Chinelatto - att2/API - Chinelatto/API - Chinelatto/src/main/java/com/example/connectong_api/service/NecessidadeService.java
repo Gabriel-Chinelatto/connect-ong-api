@@ -6,6 +6,7 @@ import com.example.connectong_api.model.Necessidade;
 import com.example.connectong_api.model.Ong;
 import com.example.connectong_api.repository.NecessidadeRepository;
 import com.example.connectong_api.repository.ONGRepository;
+import com.example.connectong_api.security.SecurityUtils;
 import com.example.connectong_api.util.Categorias;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -42,6 +43,9 @@ public class NecessidadeService {
     @Autowired
     private NotificacaoService notificacaoService;
 
+    @Autowired
+    private SecurityUtils security;
+
     // =========================
     // LISTAR (filtra por ong, status ou categoria, se informados)
     // =========================
@@ -77,6 +81,9 @@ public class NecessidadeService {
         if (dto.getOngId() == null) {
             return erro("É obrigatório informar a ONG (ongId)");
         }
+
+        // So a propria ONG dona pode publicar necessidades em seu nome (senao 403).
+        security.exigirOng(dto.getOngId());
 
         Ong ong = ongRepository.findById(dto.getOngId()).orElse(null);
         if (ong == null) {

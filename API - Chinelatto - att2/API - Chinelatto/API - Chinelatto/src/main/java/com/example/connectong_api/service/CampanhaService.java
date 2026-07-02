@@ -7,6 +7,7 @@ import com.example.connectong_api.model.Ong;
 import com.example.connectong_api.repository.CampanhaRepository;
 import com.example.connectong_api.repository.ONGRepository;
 import com.example.connectong_api.repository.UsuarioRepository;
+import com.example.connectong_api.security.SecurityUtils;
 import com.example.connectong_api.util.Categorias;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,6 +34,10 @@ public class CampanhaService {
     @Autowired private UsuarioRepository usuarioRepository;
     @Autowired private NotificacaoService notificacaoService;
     @Autowired private AtividadeService atividadeService;
+    @Autowired private SecurityUtils security;
+
+    // Teto por contribuicao (mesmo limite da doacao financeira via DTO).
+    private static final double VALOR_MAXIMO_CONTRIBUICAO = 1_000_000.00;
 
     // =========================
     // LISTAR
@@ -67,6 +72,9 @@ public class CampanhaService {
     // CRIAR
     // =========================
     public ResponseEntity<?> criar(CampanhaRequestDTO dto) {
+        // So a propria ONG dona pode criar campanhas em seu nome (senao 403).
+        security.exigirOng(dto.getOngId());
+
         Ong ong = ongRepository.findById(dto.getOngId()).orElse(null);
         if (ong == null) return erro("ONG nao encontrada");
 
@@ -97,6 +105,7 @@ public class CampanhaService {
     // =========================
     public ResponseEntity<?> contribuir(Long id, Double valor, String doadorNome) {
         if (valor == null || valor <= 0) return erro("O valor deve ser maior que zero");
+        if (valor > VALOR_MAXIMO_CONTRIBUICAO) return erro("Valor acima do limite permitido");
 
         Campanha c = repository.findById(id).orElse(null);
         if (c == null) return ResponseEntity.notFound().build();
@@ -140,6 +149,11 @@ public class CampanhaService {
     public ResponseEntity<?> encerrar(Long id) {
         Campanha c = repository.findById(id).orElse(null);
         if (c == null) return ResponseEntity.notFound().build();
+
+        // So a ONG dona da campanha pode encerra-la (senao 403).
+        Long ongId = c.getOng() != null ? c.getOng().getId() : null;
+        security.exigirOng(ongId);
+
         c.setEncerrada(true);
         return ResponseEntity.ok(new CampanhaResponseDTO(repository.save(c)));
     }

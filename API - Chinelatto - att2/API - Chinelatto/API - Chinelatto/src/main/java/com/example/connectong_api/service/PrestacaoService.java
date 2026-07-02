@@ -6,6 +6,7 @@ import com.example.connectong_api.model.Interesse;
 import com.example.connectong_api.model.Prestacao;
 import com.example.connectong_api.repository.InteresseRepository;
 import com.example.connectong_api.repository.PrestacaoRepository;
+import com.example.connectong_api.security.SecurityUtils;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -37,7 +38,27 @@ public class PrestacaoService {
     @Autowired
     private AtividadeService atividadeService;
 
+    @Autowired
+    private SecurityUtils security;
+
+    // So os participantes do match (o doador ou a ONG dona) podem ler/publicar.
+    private void exigirParticipante(Interesse interesse) {
+        Long doadorId = interesse.getDoador() != null
+                ? interesse.getDoador().getId() : null;
+        Long ongId = (interesse.getNecessidade() != null
+                && interesse.getNecessidade().getOng() != null)
+                ? interesse.getNecessidade().getOng().getId() : null;
+        security.exigirUsuarioOuOng(doadorId, ongId);
+    }
+
     public List<PrestacaoResponseDTO> listar(Long interesseId) {
+        Interesse interesse =
+                interesseRepository.findById(interesseId).orElse(null);
+        if (interesse == null) {
+            return List.of(); // match inexistente: nada a listar
+        }
+        exigirParticipante(interesse);
+
         return repository.findByInteresseIdOrderByDataCriacaoDesc(interesseId)
                 .stream()
                 .map(this::toDTO)
@@ -57,6 +78,10 @@ public class PrestacaoService {
         if (interesse == null) {
             return erro("Match não encontrado");
         }
+
+        // So os participantes do match podem publicar prestacao de contas.
+        exigirParticipante(interesse);
+
         if (!"ACEITO".equals(interesse.getStatus())) {
             return erro("A prestação de contas só vale para um match aceito");
         }
