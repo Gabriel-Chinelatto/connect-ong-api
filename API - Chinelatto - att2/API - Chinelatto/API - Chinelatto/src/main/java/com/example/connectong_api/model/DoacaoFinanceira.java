@@ -25,6 +25,10 @@ public class DoacaoFinanceira {
     private String codigoPix;   // codigo "copia e cola" simulado
     private String status;      // CONFIRMADO (simulado)
 
+    // Campanha a qual esta doacao contribui (null = doacao avulsa para a ONG).
+    @Column(name = "campanha_id")
+    private Long campanhaId;
+
     private LocalDateTime dataCriacao;
 
     public DoacaoFinanceira() {}
@@ -57,6 +61,9 @@ public class DoacaoFinanceira {
 
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
+
+    public Long getCampanhaId() { return campanhaId; }
+    public void setCampanhaId(Long campanhaId) { this.campanhaId = campanhaId; }
 
     public LocalDateTime getDataCriacao() { return dataCriacao; }
 }

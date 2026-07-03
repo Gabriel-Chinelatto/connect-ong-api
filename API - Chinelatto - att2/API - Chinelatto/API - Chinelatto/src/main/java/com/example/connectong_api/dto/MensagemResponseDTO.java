@@ -19,6 +19,10 @@ public class MensagemResponseDTO {
     // Reacoes (emoji) desta mensagem: 0..2 num chat de 2 participantes.
     private List<ReacaoDTO> reacoes;
 
+    // Anexo (imagem) em base64 e seu tipo ("imagem"); null quando nao ha anexo.
+    private String anexoBase64;
+    private String anexoTipo;
+
     public MensagemResponseDTO(
             Long id,
             Long interesseId,
@@ -26,7 +30,9 @@ public class MensagemResponseDTO {
             String conteudo,
             LocalDateTime dataEnvio,
             boolean lida,
-            List<ReacaoDTO> reacoes
+            List<ReacaoDTO> reacoes,
+            String anexoBase64,
+            String anexoTipo
     ) {
         this.id = id;
         this.interesseId = interesseId;
@@ -35,6 +41,8 @@ public class MensagemResponseDTO {
         this.dataEnvio = dataEnvio;
         this.lida = lida;
         this.reacoes = reacoes;
+        this.anexoBase64 = anexoBase64;
+        this.anexoTipo = anexoTipo;
     }
 
     public Long getId() { return id; }
@@ -44,4 +52,6 @@ public class MensagemResponseDTO {
     public LocalDateTime getDataEnvio() { return dataEnvio; }
     public boolean isLida() { return lida; }
     public List<ReacaoDTO> getReacoes() { return reacoes; }
+    public String getAnexoBase64() { return anexoBase64; }
+    public String getAnexoTipo() { return anexoTipo; }
 }

@@ -10,4 +10,8 @@ public interface ONGRepository extends JpaRepository<Ong, Long> {
 
     // ONGs ativas (nao excluidas) — para as estatisticas publicas.
     long countByDataExclusaoIsNull();
+
+    // ONGs com reinado de Top 1 aberto (em condicoes normais, no maximo uma;
+    // lista para tolerar dados inconsistentes e fechar todos os reinados).
+    List<Ong> findByTop1DesdeIsNotNull();
 }

@@ -29,6 +29,15 @@ public class Mensagem {
 
     private LocalDateTime dataEnvio;
 
+    // Anexo (imagem) embutido em base64 (MEDIUMTEXT, DTO limita ~2.8MB).
+    // Uma mensagem pode ter texto vazio SE tiver anexo.
+    @Column(name = "anexo_base64", columnDefinition = "MEDIUMTEXT")
+    private String anexoBase64;
+
+    // Tipo do anexo (hoje so "imagem"; campo aberto para evoluir).
+    @Column(name = "anexo_tipo", length = 20)
+    private String anexoTipo;
+
     // Recibo de leitura ("visto"). null = ainda nao lida; preenchida com o momento
     // em que o outro participante abriu o chat. Usamos datetime (e nao um boolean)
     // para evitar o gotcha BIT/TINYINT com ddl-auto=validate no MySQL 5.6 e ja
@@ -54,6 +63,12 @@ public class Mensagem {
     public void setConteudo(String conteudo) { this.conteudo = conteudo; }
 
     public LocalDateTime getDataEnvio() { return dataEnvio; }
+
+    public String getAnexoBase64() { return anexoBase64; }
+    public void setAnexoBase64(String anexoBase64) { this.anexoBase64 = anexoBase64; }
+
+    public String getAnexoTipo() { return anexoTipo; }
+    public void setAnexoTipo(String anexoTipo) { this.anexoTipo = anexoTipo; }
 
     public LocalDateTime getDataLeitura() { return dataLeitura; }
     public void setDataLeitura(LocalDateTime dataLeitura) { this.dataLeitura = dataLeitura; }

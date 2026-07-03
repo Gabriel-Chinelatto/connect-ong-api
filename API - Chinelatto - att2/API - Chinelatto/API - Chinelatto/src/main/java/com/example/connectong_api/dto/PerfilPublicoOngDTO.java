@@ -29,6 +29,16 @@ public class PerfilPublicoOngDTO {
     private int transparenciaScore;     // 0-100 (Bloco 26)
     private String nivelTransparencia;  // BRONZE | PRATA | OURO
 
+    // Perfil rico (feira): capa em base64, endereco e fotos do local.
+    private String capaBase64;
+    private String endereco;
+    private List<String> fotosLocal;
+
+    // Streak do ranking: dias no topo (se for o atual #1) e duracao do ultimo
+    // reinado ja encerrado (se ja foi #1). Null quando nao se aplica.
+    private Integer diasNoTopo;
+    private Integer ultimoReinadoDias;
+
     private List<NecessidadeResponseDTO> necessidades;
     private List<CampanhaResponseDTO> campanhas;
     private List<AvaliacaoResponseDTO> avaliacoes;
@@ -53,6 +63,10 @@ public class PerfilPublicoOngDTO {
         this.verificada = o.getVerificada();
         this.notaMedia = o.getNotaMedia();
         this.totalAvaliacoes = o.getTotalAvaliacoes();
+
+        this.capaBase64 = o.getCapaBase64();
+        this.endereco = o.getEndereco();
+        this.ultimoReinadoDias = o.getUltimoReinadoDias();
 
         this.necessidades = necessidades;
         this.campanhas = campanhas;
@@ -79,6 +93,18 @@ public class PerfilPublicoOngDTO {
     public int getTotalPrestacoes() { return totalPrestacoes; }
     public int getTransparenciaScore() { return transparenciaScore; }
     public String getNivelTransparencia() { return nivelTransparencia; }
+
+    public String getCapaBase64() { return capaBase64; }
+    public String getEndereco() { return endereco; }
+
+    public List<String> getFotosLocal() { return fotosLocal; }
+    public void setFotosLocal(List<String> fotosLocal) { this.fotosLocal = fotosLocal; }
+
+    public Integer getDiasNoTopo() { return diasNoTopo; }
+    public void setDiasNoTopo(Integer diasNoTopo) { this.diasNoTopo = diasNoTopo; }
+
+    public Integer getUltimoReinadoDias() { return ultimoReinadoDias; }
+
     public List<NecessidadeResponseDTO> getNecessidades() { return necessidades; }
     public List<CampanhaResponseDTO> getCampanhas() { return campanhas; }
     public List<AvaliacaoResponseDTO> getAvaliacoes() { return avaliacoes; }

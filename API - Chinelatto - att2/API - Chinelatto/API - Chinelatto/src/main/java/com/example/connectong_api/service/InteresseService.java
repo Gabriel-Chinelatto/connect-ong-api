@@ -15,6 +15,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -22,9 +23,11 @@ import java.util.stream.Collectors;
 
 /**
  * Coracao do "match": registra o interesse de um doador numa necessidade e
- * gerencia seu ciclo PENDENTE -> ACEITO/RECUSADO. Impede interesse duplicado do
- * mesmo doador na mesma necessidade; quando a ONG aceita (status ACEITO) forma-se
- * o match que habilita o chat. So a ONG dona da necessidade pode aceitar/recusar.
+ * gerencia seu ciclo PENDENTE -> ACEITO/RECUSADO -> CONCLUIDO. Impede interesse
+ * duplicado do mesmo doador na mesma necessidade; quando a ONG aceita (status
+ * ACEITO) forma-se o match que habilita o chat; quando a doacao chega de fato,
+ * a ONG marca CONCLUIDO (grava dataConclusao e abre o prazo da prestacao de
+ * contas). So a ONG dona da necessidade pode aceitar/recusar/concluir.
  */
 @Service
 public class InteresseService {
@@ -138,6 +141,63 @@ public class InteresseService {
         return mudarStatus(id, "RECUSADO");
     }
 
+    // =========================
+    // CONCLUIR (a ONG confirma que a doacao foi recebida)
+    // =========================
+    // So a ONG dona da necessidade, e so a partir de um match ACEITO. Grava a
+    // dataConclusao (abre o prazo de 10 dias da prestacao de contas), notifica
+    // o doador e registra no feed global (best-effort).
+    public ResponseEntity<?> concluir(Long id) {
+        Interesse interesse = repository.findById(id).orElse(null);
+        if (interesse == null) {
+            Map<String, String> erro = new HashMap<>();
+            erro.put("erro", "Interesse não encontrado");
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(erro);
+        }
+
+        // Só a ONG DONA da necessidade pode concluir este match.
+        Long ongDonaId = (interesse.getNecessidade() != null
+                && interesse.getNecessidade().getOng() != null)
+                ? interesse.getNecessidade().getOng().getId()
+                : null;
+        security.exigirOng(ongDonaId);
+
+        if (!"ACEITO".equals(interesse.getStatus())) {
+            return erro("Só um match ACEITO pode ser marcado como concluído");
+        }
+
+        interesse.setStatus("CONCLUIDO");
+        interesse.setDataConclusao(LocalDateTime.now());
+        Interesse salvo = repository.save(interesse);
+
+        String tituloNec = interesse.getNecessidade() != null
+                ? interesse.getNecessidade().getTitulo()
+                : "uma necessidade";
+        String nomeOng = (interesse.getNecessidade() != null
+                && interesse.getNecessidade().getOng() != null)
+                ? interesse.getNecessidade().getOng().getNome()
+                : "ONG";
+
+        // notifica o doador que a ONG confirmou o recebimento
+        if (interesse.getDoador() != null) {
+            notificacaoService.criar(
+                    interesse.getDoador().getId(),
+                    "Doação recebida!",
+                    "Sua doação \"" + tituloNec
+                            + "\" foi marcada como recebida pela " + nomeOng,
+                    "MATCH");
+        }
+
+        // feed global best-effort
+        atividadeService.registrar(
+                "INTERESSE",
+                "Doacao \"" + tituloNec + "\" concluida com sucesso",
+                ongDonaId,
+                nomeOng);
+
+        return ResponseEntity.ok(toDTO(salvo));
+    }
+
     private ResponseEntity<?> mudarStatus(Long id, String novoStatus) {
         Interesse interesse = repository.findById(id).orElse(null);
         if (interesse == null) {
@@ -194,6 +254,7 @@ public class InteresseService {
                 i.getId(),
                 i.getStatus(),
                 i.getDataCriacao(),
+                i.getDataConclusao(),
                 n != null ? n.getId() : null,
                 n != null ? n.getTitulo() : null,
                 i.getDoador() != null ? i.getDoador().getId() : null,

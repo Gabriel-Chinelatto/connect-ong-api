@@ -21,6 +21,10 @@ public class TransparenciaDTO {
     private int score;       // 0-100
     private String nivel;    // BRONZE | PRATA | OURO
 
+    // Streak: dias consecutivos no topo do ranking. Preenchido SO para o #1
+    // atual (minimo 1); null para as demais posicoes.
+    private Integer diasNoTopo;
+
     public TransparenciaDTO(Ong o, int score, String nivel,
                             long totalPrestacoes, long campanhasConcluidas) {
         this.ongId = o.getId();
@@ -45,4 +49,7 @@ public class TransparenciaDTO {
     public long getCampanhasConcluidas() { return campanhasConcluidas; }
     public int getScore() { return score; }
     public String getNivel() { return nivel; }
+
+    public Integer getDiasNoTopo() { return diasNoTopo; }
+    public void setDiasNoTopo(Integer diasNoTopo) { this.diasNoTopo = diasNoTopo; }
 }

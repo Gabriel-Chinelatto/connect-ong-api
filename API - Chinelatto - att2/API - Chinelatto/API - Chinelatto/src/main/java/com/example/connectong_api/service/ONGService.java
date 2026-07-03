@@ -2,13 +2,14 @@ package com.example.connectong_api.service;
 
 import com.example.connectong_api.dto.OngRegistroDTO;
 import com.example.connectong_api.dto.OngResponseDTO;
+import com.example.connectong_api.dto.OngUpdateDTO;
 import com.example.connectong_api.dto.PerfilPublicoOngDTO;
-import com.example.connectong_api.dto.PrestacaoResponseDTO;
 import com.example.connectong_api.dto.UsuarioResponseDTO;
 import com.example.connectong_api.model.Ong;
+import com.example.connectong_api.model.OngFoto;
 import com.example.connectong_api.model.Usuario;
 import com.example.connectong_api.repository.ONGRepository;
-import com.example.connectong_api.repository.PrestacaoRepository;
+import com.example.connectong_api.repository.OngFotoRepository;
 import com.example.connectong_api.repository.UsuarioRepository;
 import com.example.connectong_api.security.SecurityUtils;
 
@@ -17,6 +18,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashMap;
 import java.util.List;
@@ -57,7 +59,10 @@ public class ONGService {
     private AvaliacaoService avaliacaoService;
 
     @Autowired
-    private PrestacaoRepository prestacaoRepository;
+    private PrestacaoService prestacaoService;
+
+    @Autowired
+    private OngFotoRepository ongFotoRepository;
 
     @Autowired
     private RateLimitService rateLimitService;
@@ -78,18 +83,6 @@ public class ONGService {
             return ResponseEntity.notFound().build();
         }
 
-        List<PrestacaoResponseDTO> prestacoes = prestacaoRepository
-                .findByInteresseNecessidadeOngIdOrderByDataCriacaoDesc(id)
-                .stream()
-                .map(p -> new PrestacaoResponseDTO(
-                        p.getId(),
-                        p.getInteresse() != null ? p.getInteresse().getId() : null,
-                        p.getTitulo(),
-                        p.getDescricao(),
-                        p.getFotoUrl(),
-                        p.getDataCriacao()))
-                .collect(Collectors.toList());
-
         var transp = transparenciaService.calcular(ong);
 
         PerfilPublicoOngDTO dto = new PerfilPublicoOngDTO(
@@ -97,9 +90,18 @@ public class ONGService {
                 necessidadeService.listar(id, null, null),
                 campanhaService.listar(id, false, null),
                 avaliacaoService.listar(id),
-                prestacoes,
+                prestacaoService.listarPorOng(id),
                 transp.getScore(),
                 transp.getNivel());
+
+        // Perfil rico: fotos do local (max 5).
+        dto.setFotosLocal(fotosLocal(id));
+
+        // Streak: diasNoTopo so aparece se esta ONG e a ATUAL #1 do ranking
+        // (top1Desde aberto); ultimoReinadoDias ja vai no construtor.
+        if (ong.getTop1Desde() != null) {
+            dto.setDiasNoTopo(transparenciaService.diasNoTopo(ong.getTop1Desde()));
+        }
 
         return ResponseEntity.ok(dto);
     }
@@ -235,11 +237,23 @@ public class ONGService {
     }
 
     // =========================
+    // BUSCAR POR ID (perfil completo, com capa/endereco/fotos do local)
+    // =========================
+    public ResponseEntity<?> obterPorId(Long id) {
+        Ong ong = repository.findById(id).orElse(null);
+        if (ong == null || ong.getDataExclusao() != null) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(toDTORico(ong));
+    }
+
+    // =========================
     // ATUALIZAR
     // =========================
+    @Transactional
     public ResponseEntity<?> atualizar(
             Long id,
-            Ong ongAtualizada
+            OngUpdateDTO dados
     ) {
 
         // So a propria ONG dona pode editar o seu perfil (senao 403).
@@ -248,30 +262,37 @@ public class ONGService {
         return repository.findById(id)
                 .map(ong -> {
 
-                    ong.setNome(
-                            ongAtualizada.getNome()
-                    );
+                    ong.setNome(dados.getNome());
+                    ong.setEmail(dados.getEmail());
+                    ong.setTelefone(dados.getTelefone());
+                    ong.setCidade(dados.getCidade());
+                    ong.setDescricao(dados.getDescricao());
 
-                    ong.setEmail(
-                            ongAtualizada.getEmail()
-                    );
+                    // Perfil rico: capa/endereco so sobrescrevem quando enviados
+                    // (null = mantem o atual, igual a foto do PerfilService).
+                    if (dados.getCapaBase64() != null) {
+                        ong.setCapaBase64(dados.getCapaBase64());
+                    }
+                    if (dados.getEndereco() != null) {
+                        ong.setEndereco(dados.getEndereco());
+                    }
 
-                    ong.setTelefone(
-                            ongAtualizada.getTelefone()
-                    );
+                    Ong atualizada = repository.save(ong);
 
-                    ong.setCidade(
-                            ongAtualizada.getCidade()
-                    );
+                    // Fotos do local: a lista enviada SUBSTITUI as existentes
+                    // (max 5, ja validado no DTO). Null = nao mexe.
+                    if (dados.getFotosLocal() != null) {
+                        ongFotoRepository.deleteByOngId(id);
+                        for (String foto : dados.getFotosLocal()) {
+                            if (foto == null || foto.isBlank()) continue;
+                            OngFoto of = new OngFoto();
+                            of.setOngId(id);
+                            of.setFoto(foto);
+                            ongFotoRepository.save(of);
+                        }
+                    }
 
-                    ong.setDescricao(
-                            ongAtualizada.getDescricao()
-                    );
-
-                    Ong atualizada =
-                            repository.save(ong);
-
-                    return ResponseEntity.ok(toDTO(atualizada));
+                    return ResponseEntity.ok(toDTORico(atualizada));
 
                 }).orElse(
                         ResponseEntity.notFound().build()
@@ -345,6 +366,24 @@ public class ONGService {
                 o.getNotaMedia(),
                 o.getTotalAvaliacoes()
         );
+    }
+
+    // Versao "rica" do DTO (GET /ongs/{id} e resposta do PUT): inclui capa,
+    // endereco e fotos do local. A listagem continua com o toDTO enxuto para
+    // nao inflar a resposta com megabytes de base64.
+    private OngResponseDTO toDTORico(Ong o) {
+        OngResponseDTO dto = toDTO(o);
+        dto.setCapaBase64(o.getCapaBase64());
+        dto.setEndereco(o.getEndereco());
+        dto.setFotosLocal(fotosLocal(o.getId()));
+        return dto;
+    }
+
+    // Fotos do local da ONG (base64), em ordem de insercao.
+    private List<String> fotosLocal(Long ongId) {
+        return ongFotoRepository.findByOngIdOrderByIdAsc(ongId).stream()
+                .map(OngFoto::getFoto)
+                .collect(Collectors.toList());
     }
 
     // Coalesce de campo opcional: null -> "" (para nao violar colunas NOT NULL).

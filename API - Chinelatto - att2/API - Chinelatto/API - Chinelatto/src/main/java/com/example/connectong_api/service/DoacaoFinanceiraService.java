@@ -2,9 +2,11 @@ package com.example.connectong_api.service;
 
 import com.example.connectong_api.dto.DoacaoFinanceiraRequestDTO;
 import com.example.connectong_api.dto.DoacaoFinanceiraResponseDTO;
+import com.example.connectong_api.model.Campanha;
 import com.example.connectong_api.model.DoacaoFinanceira;
 import com.example.connectong_api.model.Ong;
 import com.example.connectong_api.model.Usuario;
+import com.example.connectong_api.repository.CampanhaRepository;
 import com.example.connectong_api.repository.DoacaoFinanceiraRepository;
 import com.example.connectong_api.repository.ONGRepository;
 import com.example.connectong_api.repository.UsuarioRepository;
@@ -13,6 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashMap;
 import java.util.List;
@@ -22,9 +25,14 @@ import java.util.stream.Collectors;
 
 /**
  * Processa doacoes em dinheiro (PIX simulado) de um doador para uma ONG.
- * Ao doar, gera um codigo PIX "copia e cola" fake como comprovante, registra a
- * operacao na auditoria e notifica a conta da ONG. O feed publico omite valor e
- * doador por privacidade; o comprovante completo so volta para quem doou.
+ * FLUXO EM 2 FASES (feira): (1) gerarCodigo() cria o codigo "copia e cola"
+ * fake com o valor embutido, SEM persistir nada; (2) doar() registra a doacao
+ * CONFIRMADO reaproveitando o codigo recebido (ou gerando um, se nao veio).
+ * Se a doacao veio com campanhaId valido, incrementa o valor arrecadado da
+ * campanha (auto-encerrando ao bater a meta e notificando a ONG — mesma logica
+ * de /campanhas/{id}/contribuir, reaproveitada do CampanhaService).
+ * O feed publico omite valor e doador por privacidade; o comprovante completo
+ * so volta para quem doou.
  */
 @Service
 public class DoacaoFinanceiraService {
@@ -37,6 +45,12 @@ public class DoacaoFinanceiraService {
 
     @Autowired
     private UsuarioRepository usuarioRepository;
+
+    @Autowired
+    private CampanhaRepository campanhaRepository;
+
+    @Autowired
+    private CampanhaService campanhaService;
 
     @Autowired
     private NotificacaoService notificacaoService;
@@ -59,7 +73,20 @@ public class DoacaoFinanceiraService {
                 .stream().map(this::toDTOSemComprovante).collect(Collectors.toList());
     }
 
-    // Registra a doacao financeira (PIX simulado) e gera o comprovante.
+    // FASE 1 do PIX simulado: gera o codigo "copia e cola" com o valor embutido.
+    // STATELESS de proposito: nada e persistido aqui — a doacao so existe
+    // quando a fase 2 (doar) confirma. Abandonar o fluxo nao deixa lixo.
+    public ResponseEntity<?> gerarCodigo(Double valor) {
+        if (valor == null || valor <= 0) {
+            return erro("O valor deve ser maior que zero");
+        }
+        Map<String, String> corpo = new HashMap<>();
+        corpo.put("codigoPix", gerarCodigoPix(valor));
+        return ResponseEntity.ok(corpo);
+    }
+
+    // FASE 2: registra a doacao financeira (PIX simulado) e gera o comprovante.
+    @Transactional
     public ResponseEntity<?> doar(DoacaoFinanceiraRequestDTO dto) {
         if (dto.getOngId() == null || dto.getDoadorId() == null) {
             return erro("É obrigatório informar ongId e doadorId");
@@ -74,19 +101,46 @@ public class DoacaoFinanceiraService {
         Usuario doador = usuarioRepository.findById(dto.getDoadorId()).orElse(null);
         if (doador == null) return erro("Doador não encontrado");
 
+        // Campanha (opcional): valida ANTES de registrar a doacao.
+        Campanha campanha = null;
+        if (dto.getCampanhaId() != null) {
+            campanha = campanhaRepository.findById(dto.getCampanhaId()).orElse(null);
+            if (campanha == null) return erro("Campanha não encontrada");
+            Long ongDaCampanha = campanha.getOng() != null
+                    ? campanha.getOng().getId() : null;
+            if (!dto.getOngId().equals(ongDaCampanha)) {
+                return erro("A campanha não pertence a esta ONG");
+            }
+            if (campanha.getEncerrada()) {
+                return erro("Esta campanha já foi encerrada");
+            }
+        }
+
         DoacaoFinanceira doacao = new DoacaoFinanceira();
         doacao.setOngId(ong.getId());
         doacao.setOngNome(ong.getNome());
         doacao.setDoadorId(doador.getId());
         doacao.setDoadorNome(doador.getNome());
         doacao.setValor(dto.getValor());
-        doacao.setCodigoPix(gerarCodigoPix(dto.getValor()));
+        doacao.setCampanhaId(campanha != null ? campanha.getId() : null);
+        // PIX em 2 fases: reaproveita o codigo gerado na fase 1, se veio.
+        String codigo = (dto.getCodigoPix() != null && !dto.getCodigoPix().isBlank())
+                ? dto.getCodigoPix()
+                : gerarCodigoPix(dto.getValor());
+        doacao.setCodigoPix(codigo);
 
         DoacaoFinanceira salva = repository.save(doacao);
 
+        // Doacao de campanha: incrementa o arrecadado, auto-encerra ao bater a
+        // meta e notifica a ONG (logica unica, compartilhada com /contribuir).
+        if (campanha != null) {
+            campanhaService.registrarContribuicao(campanha, dto.getValor(), doador.getNome());
+        }
+
         auditService.registrar("DOACAO_FINANCEIRA", doador.getId(),
                 "Doacao PIX de R$ " + String.format("%.2f", dto.getValor())
-                        + " para " + ong.getNome() + " (ongId=" + ong.getId() + ")");
+                        + " para " + ong.getNome() + " (ongId=" + ong.getId() + ")"
+                        + (campanha != null ? " [campanhaId=" + campanha.getId() + "]" : ""));
 
         // notifica a ONG (conta de login vinculada, se houver)
         usuarioRepository.findByOngId(ong.getId()).ifPresent(ongUser ->
@@ -114,6 +168,14 @@ public class DoacaoFinanceiraService {
                 + String.format("%.0f", valor * 100);
     }
 
+    // Titulo da campanha vinculada (null quando a doacao nao e de campanha).
+    private String tituloCampanha(Long campanhaId) {
+        if (campanhaId == null) return null;
+        return campanhaRepository.findById(campanhaId)
+                .map(Campanha::getTitulo)
+                .orElse(null);
+    }
+
     private DoacaoFinanceiraResponseDTO toDTO(DoacaoFinanceira d) {
         return new DoacaoFinanceiraResponseDTO(
                 d.getId(),
@@ -123,7 +185,9 @@ public class DoacaoFinanceiraService {
                 d.getValor(),
                 d.getCodigoPix(),
                 d.getStatus(),
-                d.getDataCriacao()
+                d.getDataCriacao(),
+                d.getCampanhaId(),
+                tituloCampanha(d.getCampanhaId())
         );
     }
 
@@ -137,7 +201,9 @@ public class DoacaoFinanceiraService {
                 d.getValor(),
                 null,
                 d.getStatus(),
-                d.getDataCriacao()
+                d.getDataCriacao(),
+                d.getCampanhaId(),
+                tituloCampanha(d.getCampanhaId())
         );
     }
 

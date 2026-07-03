@@ -22,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -31,9 +32,11 @@ import java.util.stream.Collectors;
 
 /**
  * Gerencia o chat de um match (mensagens vinculadas a um Interesse).
- * Regra de negocio: so e possivel enviar mensagem apos o match estar ACEITO, e
- * apenas os dois participantes (o doador e a ONG dona da necessidade) podem ler
- * ou enviar, senao lanca AcessoNegadoException (403). Cada envio notifica o outro lado.
+ * Regra de negocio: so e possivel enviar mensagem apos o match estar ACEITO (o
+ * chat continua aberto em CONCLUIDO), e apenas os dois participantes (o doador
+ * e a ONG dona da necessidade) podem ler ou enviar, senao lanca
+ * AcessoNegadoException (403). Cada envio notifica o outro lado. Uma mensagem
+ * pode levar um anexo de imagem (base64) e, nesse caso, o texto pode ser vazio.
  */
 @Service
 public class MensagemService {
@@ -64,11 +67,16 @@ public class MensagemService {
     private static final Set<String> EMOJIS_PERMITIDOS =
             Set.of("LIKE", "LOVE", "LAUGH", "WOW", "SAD", "PRAY");
 
-    // "Online" = teve atividade no chat nos ultimos 45s (o poll e de ~2s, entao
-    // isso cobre folgadamente uma perda de batimento). "Digitando" = heartbeat nos
+    // "Online" = teve atividade no chat nos ultimos 2 MINUTOS desde o ultimo
+    // heartbeat (contrato do fix do "visto por ultimo": o servidor decide, o
+    // cliente nao compara horas — imune a fuso). "Digitando" = heartbeat nos
     // ultimos 5s.
-    private static final Duration JANELA_ONLINE = Duration.ofSeconds(45);
+    private static final Duration JANELA_ONLINE = Duration.ofMinutes(2);
     private static final Duration JANELA_DIGITANDO = Duration.ofSeconds(5);
+
+    // Status em que o chat esta disponivel: ACEITO (match ativo) e CONCLUIDO
+    // (doacao recebida — a conversa continua aberta para acompanhamento).
+    private static final Set<String> STATUS_COM_CHAT = Set.of("ACEITO", "CONCLUIDO");
 
     // Lista as mensagens de um match, em ordem cronologica, e marca como lidas as
     // mensagens que o OUTRO lado enviou (o participante abriu/atualizou o chat ->
@@ -115,12 +123,23 @@ public class MensagemService {
 
     // Situacao do OUTRO participante (online / visto por ultimo / digitando) e,
     // de quebra, registra o batimento de presenca de quem chamou (o poll do chat).
+    //
+    // BUG DO "VISTO POR ULTIMO" (causa raiz): ultimoVisto e um LocalDateTime —
+    // um horario SEM fuso, gravado com o relogio/fuso da JVM do servidor. O JSON
+    // sai como "2026-07-03T11:38:00" (sem offset) e cada cliente interpretava
+    // esse texto no SEU fuso (ou como UTC), mostrando 18:38 quando eram 11:38 e
+    // considerando o usuario "online" por horas. FIX robusto: (1) o campo
+    // ultimoVistoEpoch envia o MESMO instante em milissegundos desde a epoch
+    // (UTC), convertido aqui com o MESMO fuso da JVM que gravou — a prova de
+    // fuso em qualquer cliente; (2) o boolean "online" e calculado AQUI no
+    // servidor (janela de 2 min), entao o cliente nem precisa comparar horas.
+    // O campo antigo ultimoVisto continua na resposta por compatibilidade.
     @Transactional
     public ChatStatusDTO status(Long interesseId) {
         Interesse interesse =
                 interesseRepository.findById(interesseId).orElse(null);
         if (interesse == null) {
-            return new ChatStatusDTO(false, null, false);
+            return new ChatStatusDTO(false, null, null, false);
         }
         exigirParticipante(interesse);
 
@@ -139,10 +158,16 @@ public class MensagemService {
         boolean online = ultimoVisto != null
                 && ultimoVisto.isAfter(LocalDateTime.now().minus(JANELA_ONLINE));
 
+        // Epoch millis (UTC): gravacao e leitura usam o MESMO fuso da JVM,
+        // entao a conversao devolve o instante correto seja qual for o fuso.
+        Long ultimoVistoEpoch = ultimoVisto != null
+                ? ultimoVisto.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                : null;
+
         boolean estaDigitando =
                 digitando.estaDigitando(interesseId, outroLado, JANELA_DIGITANDO);
 
-        return new ChatStatusDTO(online, ultimoVisto, estaDigitando);
+        return new ChatStatusDTO(online, ultimoVisto, ultimoVistoEpoch, estaDigitando);
     }
 
     // Registra que quem chamou esta digitando agora (heartbeat efemero em memoria).
@@ -194,7 +219,7 @@ public class MensagemService {
                 : null;
     }
 
-    // Envia uma mensagem (so apos o match ser aceito).
+    // Envia uma mensagem (so apos o match ser aceito; segue valendo em CONCLUIDO).
     // @Transactional: o save da mensagem e a notificacao ao outro lado ficam
     // numa unica transacao (ou os dois acontecem, ou nenhum).
     @Transactional
@@ -204,7 +229,11 @@ public class MensagemService {
             return erro("É obrigatório informar o interesseId (o match)");
         }
 
-        if (dto.getConteudo() == null || dto.getConteudo().isBlank()) {
+        boolean temTexto = dto.getConteudo() != null && !dto.getConteudo().isBlank();
+        boolean temAnexo = dto.getAnexoBase64() != null && !dto.getAnexoBase64().isBlank();
+
+        // Texto OU anexo: mensagem totalmente vazia continua proibida.
+        if (!temTexto && !temAnexo) {
             return erro("A mensagem não pode ser vazia");
         }
 
@@ -227,14 +256,20 @@ public class MensagemService {
                 (doadorId != null && doadorId.equals(security.usuarioId()))
                         ? "DOADOR" : "ONG";
 
-        if (!"ACEITO".equals(interesse.getStatus())) {
+        if (!STATUS_COM_CHAT.contains(interesse.getStatus())) {
             return erro("O chat só fica disponível após o match ser aceito");
         }
 
         Mensagem mensagem = new Mensagem();
         mensagem.setInteresse(interesse);
         mensagem.setRemetente(remetente);
-        mensagem.setConteudo(dto.getConteudo());
+        mensagem.setConteudo(temTexto ? dto.getConteudo() : "");
+        if (temAnexo) {
+            mensagem.setAnexoBase64(dto.getAnexoBase64());
+            // Hoje so ha um tipo; se o cliente nao mandar, assume "imagem".
+            mensagem.setAnexoTipo(dto.getAnexoTipo() != null
+                    ? dto.getAnexoTipo() : "imagem");
+        }
 
         Mensagem salva = repository.save(mensagem);
 
@@ -320,7 +355,9 @@ public class MensagemService {
                 m.getConteudo(),
                 m.getDataEnvio(),
                 m.getDataLeitura() != null, // lida = ja tem recibo de leitura
-                reacoes
+                reacoes,
+                m.getAnexoBase64(),
+                m.getAnexoTipo()
         );
     }
 

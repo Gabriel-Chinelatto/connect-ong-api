@@ -23,10 +23,16 @@ public class Interesse {
     @JoinColumn(name = "doador_id")
     private Usuario doador;
 
-    // PENDENTE (aguardando a ONG) -> ACEITO ou RECUSADO
+    // PENDENTE (aguardando a ONG) -> ACEITO ou RECUSADO; ACEITO -> CONCLUIDO
+    // (a ONG confirma que recebeu a doacao fisicamente).
     private String status;
 
     private LocalDateTime dataCriacao;
+
+    // Momento em que a ONG marcou o match como CONCLUIDO (doacao recebida).
+    // Base do prazo de 10 dias da prestacao de contas (ver PrestacaoService).
+    @Column(name = "data_conclusao")
+    private LocalDateTime dataConclusao;
 
     public Interesse() {}
 
@@ -50,4 +56,7 @@ public class Interesse {
     public void setStatus(String status) { this.status = status; }
 
     public LocalDateTime getDataCriacao() { return dataCriacao; }
+
+    public LocalDateTime getDataConclusao() { return dataConclusao; }
+    public void setDataConclusao(LocalDateTime dataConclusao) { this.dataConclusao = dataConclusao; }
 }

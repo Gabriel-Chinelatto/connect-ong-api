@@ -54,6 +54,27 @@ public class Usuario {
     // some da UI, mas o historico e preservado, sem orfaos).
     private LocalDateTime dataExclusao;
 
+    // ----- Reputacao como DOADOR (avaliacao feita pelas ONGs) -----
+    // Agregados denormalizados de avaliacao_doador, recalculados a cada upsert
+    // (mesmo padrao de Ong.notaMedia/totalAvaliacoes). Null = nunca avaliado.
+    @Column(name = "nota_media_doador")
+    private Double notaMediaDoador;
+
+    @Column(name = "total_avaliacoes_doador")
+    private Integer totalAvaliacoesDoador;
+
+    // "Membro desde" do perfil publico. Contas criadas antes da coluna existir
+    // ficam com null (nao inventamos data); novas recebem now() no @PrePersist.
+    @Column(name = "criado_em")
+    private LocalDateTime criadoEm;
+
+    @PrePersist
+    public void aoCriar() {
+        if (this.criadoEm == null) {
+            this.criadoEm = LocalDateTime.now();
+        }
+    }
+
     // GETTERS E SETTERS
 
     public Long getId() {
@@ -127,4 +148,13 @@ public class Usuario {
 
     public LocalDateTime getDataExclusao() { return dataExclusao; }
     public void setDataExclusao(LocalDateTime dataExclusao) { this.dataExclusao = dataExclusao; }
+
+    public Double getNotaMediaDoador() { return notaMediaDoador; }
+    public void setNotaMediaDoador(Double notaMediaDoador) { this.notaMediaDoador = notaMediaDoador; }
+
+    public Integer getTotalAvaliacoesDoador() { return totalAvaliacoesDoador; }
+    public void setTotalAvaliacoesDoador(Integer totalAvaliacoesDoador) { this.totalAvaliacoesDoador = totalAvaliacoesDoador; }
+
+    public LocalDateTime getCriadoEm() { return criadoEm; }
+    public void setCriadoEm(LocalDateTime criadoEm) { this.criadoEm = criadoEm; }
 }

@@ -1,6 +1,7 @@
 package com.example.connectong_api.controller;
 
 import com.example.connectong_api.dto.OngRegistroDTO;
+import com.example.connectong_api.dto.OngUpdateDTO;
 import com.example.connectong_api.model.Ong;
 import com.example.connectong_api.service.ONGService;
 import com.example.connectong_api.service.TransparenciaService;
@@ -54,8 +55,14 @@ public class ONGController {
         );
     }
 
+    @GetMapping("/{id}")
+    @Operation(summary = "Buscar uma ONG pelo id (perfil completo: capa, endereço e fotos do local)")
+    public ResponseEntity<?> obterPorId(@PathVariable Long id) {
+        return service.obterPorId(id);
+    }
+
     @GetMapping("/{id}/perfil-publico")
-    @Operation(summary = "Perfil publico da ONG (dados + selo + avaliacoes + campanhas + necessidades + prestacoes)")
+    @Operation(summary = "Perfil publico da ONG (dados + selo + avaliacoes + campanhas + necessidades + prestacoes + capa/endereco/fotos + streak do ranking)")
     public ResponseEntity<?> perfilPublico(@PathVariable Long id) {
         return service.perfilPublico(id);
     }
@@ -76,10 +83,10 @@ public class ONGController {
     }
 
     @PutMapping("/{id}")
-    @Operation(summary = "Atualizar uma ONG existente")
+    @Operation(summary = "Atualizar uma ONG existente (aceita capaBase64, endereco e fotosLocal — a lista substitui as fotos atuais)")
     public ResponseEntity<?> atualizar(
             @PathVariable Long id,
-            @RequestBody Ong ong
+            @Valid @RequestBody OngUpdateDTO ong
     ) {
 
         return service.atualizar(

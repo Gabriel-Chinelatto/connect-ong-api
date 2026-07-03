@@ -3,6 +3,7 @@ package com.example.connectong_api.controller;
 import com.example.connectong_api.dto.CadastroUsuarioDTO;
 import com.example.connectong_api.dto.LoginRequestDTO;
 import com.example.connectong_api.dto.RegistroDoadorDTO;
+import com.example.connectong_api.service.PerfilDoadorService;
 import com.example.connectong_api.service.UsuarioService;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -24,6 +25,9 @@ public class UsuarioController {
 
     @Autowired
     private UsuarioService usuarioService;
+
+    @Autowired
+    private PerfilDoadorService perfilDoadorService;
 
     @PostMapping
     @Operation(summary = "Cadastrar um novo usuário (senha é criptografada)")
@@ -50,5 +54,11 @@ public class UsuarioController {
     ) {
 
         return usuarioService.login(credenciais);
+    }
+
+    @GetMapping("/{id}/perfil-publico")
+    @Operation(summary = "Perfil PÚBLICO do doador (sem login): reputação, stats e prestações recebidas — nunca expõe email/telefone/valores")
+    public ResponseEntity<?> perfilPublico(@PathVariable Long id) {
+        return perfilDoadorService.perfilPublico(id);
     }
 }

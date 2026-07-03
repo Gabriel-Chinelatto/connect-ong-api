@@ -16,4 +16,8 @@ public interface DoacaoFinanceiraRepository
     // Soma total doada (0 quando ainda nao ha doacoes)
     @Query("SELECT COALESCE(SUM(d.valor), 0) FROM DoacaoFinanceira d")
     double somarValores();
+
+    // CONTAGEM de doacoes PIX do doador (nunca somamos valores no perfil
+    // publico — privacidade).
+    long countByDoadorId(Long doadorId);
 }

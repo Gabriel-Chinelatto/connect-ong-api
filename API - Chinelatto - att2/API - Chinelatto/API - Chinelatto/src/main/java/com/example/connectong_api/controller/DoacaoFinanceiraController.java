@@ -28,8 +28,20 @@ public class DoacaoFinanceiraController {
     @Autowired
     private SecurityUtils security;
 
+    @PostMapping("/gerar-codigo")
+    @Operation(summary = "Fase 1 do PIX simulado: gera o código \"copia e cola\" com o valor embutido (STATELESS, nada é persistido)")
+    public ResponseEntity<?> gerarCodigo(@RequestBody java.util.Map<String, Object> body) {
+        // Basta estar autenticado; nada e persistido nesta fase.
+        Double valor = null;
+        Object bruto = body != null ? body.get("valor") : null;
+        if (bruto instanceof Number numero) {
+            valor = numero.doubleValue();
+        }
+        return service.gerarCodigo(valor);
+    }
+
     @PostMapping
-    @Operation(summary = "Fazer uma doação financeira (PIX simulado) e gerar o comprovante")
+    @Operation(summary = "Fazer uma doação financeira (PIX simulado) e gerar o comprovante; aceita codigoPix da fase 1 e campanhaId opcional")
     public ResponseEntity<?> doar(@Valid @RequestBody DoacaoFinanceiraRequestDTO dto) {
         // Doa em nome do proprio usuario autenticado, nunca de outro.
         security.exigirUsuario(dto.getDoadorId());

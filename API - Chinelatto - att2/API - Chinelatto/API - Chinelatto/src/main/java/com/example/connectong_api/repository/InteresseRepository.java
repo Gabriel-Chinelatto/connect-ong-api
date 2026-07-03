@@ -2,6 +2,8 @@ package com.example.connectong_api.repository;
 
 import com.example.connectong_api.model.Interesse;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 
@@ -18,4 +20,20 @@ public interface InteresseRepository extends JpaRepository<Interesse, Long> {
 
     // Total de matches num determinado status (ex.: "ACEITO")
     long countByStatus(String status);
+
+    // Matches de um doador num determinado status (ex.: "CONCLUIDO")
+    long countByDoadorIdAndStatus(Long doadorId, String status);
+
+    // Pendencias de prestacao de contas de UMA ONG: matches CONCLUIDOS que
+    // ainda nao receberam nenhuma prestacao.
+    @Query("SELECT i FROM Interesse i WHERE i.status = 'CONCLUIDO' "
+            + "AND i.necessidade.ong.id = :ongId "
+            + "AND NOT EXISTS (SELECT p FROM Prestacao p WHERE p.interesse = i)")
+    List<Interesse> concluidosSemPrestacaoPorOng(@Param("ongId") Long ongId);
+
+    // Todas as pendencias da plataforma (para a penalidade de transparencia
+    // no ranking, agrupadas por ONG em memoria).
+    @Query("SELECT i FROM Interesse i WHERE i.status = 'CONCLUIDO' "
+            + "AND NOT EXISTS (SELECT p FROM Prestacao p WHERE p.interesse = i)")
+    List<Interesse> concluidosSemPrestacao();
 }

@@ -77,4 +77,11 @@ public class InteresseController {
     public ResponseEntity<?> recusar(@PathVariable Long id) {
         return service.recusar(id);
     }
+
+    @PutMapping("/{id}/concluir")
+    @Operation(summary = "ONG marca o match ACEITO como CONCLUÍDO (doação recebida); abre o prazo da prestação de contas")
+    public ResponseEntity<?> concluir(@PathVariable Long id) {
+        // A checagem de dono (a ONG do interesse) e feita no service.
+        return service.concluir(id);
+    }
 }

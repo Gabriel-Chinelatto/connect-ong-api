@@ -27,6 +27,10 @@ public class Prestacao {
     @Column(length = 500)
     private String fotoUrl;
 
+    // Quanto (em R$) foi utilizado nesta prestacao (opcional; transparencia).
+    @Column(name = "valor_utilizado")
+    private Double valorUtilizado;
+
     private LocalDateTime dataCriacao;
 
     public Prestacao() {}
@@ -49,6 +53,9 @@ public class Prestacao {
 
     public String getFotoUrl() { return fotoUrl; }
     public void setFotoUrl(String fotoUrl) { this.fotoUrl = fotoUrl; }
+
+    public Double getValorUtilizado() { return valorUtilizado; }
+    public void setValorUtilizado(Double valorUtilizado) { this.valorUtilizado = valorUtilizado; }
 
     public LocalDateTime getDataCriacao() { return dataCriacao; }
 }

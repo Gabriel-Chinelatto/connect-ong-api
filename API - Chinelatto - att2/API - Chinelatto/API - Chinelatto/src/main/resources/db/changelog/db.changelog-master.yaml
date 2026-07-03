@@ -733,3 +733,369 @@ databaseChangeLog:
             columns:
               - column:
                   name: usuario_id
+
+  # =====================================================================
+  # Contratos da feira (A-G) - 2026-07-03.
+  # Padroes do projeto mantidos: sem boolean (datetime/int), datetime para
+  # LocalDateTime, MEDIUMTEXT para fotos/anexos base64 (~16MB max, o DTO
+  # limita a ~2.8MB), preConditions idempotentes (MARK_RAN).
+  # =====================================================================
+
+  # (A) PIX em 2 fases: doacao financeira pode nascer vinculada a uma campanha.
+  - changeSet:
+      id: feira-doacao-financeira-campanha-id
+      author: connect-ong
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: doacao_financeira
+                columnName: campanha_id
+      changes:
+        - addColumn:
+            tableName: doacao_financeira
+            columns:
+              - column:
+                  name: campanha_id
+                  type: bigint
+
+  - changeSet:
+      id: feira-idx-doacao-fin-campanha
+      author: connect-ong
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: MARK_RAN
+        - not:
+            - indexExists:
+                indexName: idx_doacao_fin_campanha
+      changes:
+        - createIndex:
+            indexName: idx_doacao_fin_campanha
+            tableName: doacao_financeira
+            columns:
+              - column:
+                  name: campanha_id
+
+  # (B) Match CONCLUIDO: momento em que a ONG marcou a doacao como recebida.
+  - changeSet:
+      id: feira-interesse-data-conclusao
+      author: connect-ong
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: interesse
+                columnName: data_conclusao
+      changes:
+        - addColumn:
+            tableName: interesse
+            columns:
+              - column:
+                  name: data_conclusao
+                  type: datetime
+
+  # (C) Prestacao rica: fotos (base64) e valor utilizado.
+  - changeSet:
+      id: feira-prestacao-foto-create-table
+      author: connect-ong
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: prestacao_foto
+      changes:
+        - createTable:
+            tableName: prestacao_foto
+            columns:
+              - column:
+                  name: id
+                  type: bigint
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: prestacao_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: foto
+                  type: mediumtext
+              - column:
+                  name: criado_em
+                  type: datetime
+
+  - changeSet:
+      id: feira-idx-prestacao-foto-prestacao
+      author: connect-ong
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: MARK_RAN
+        - not:
+            - indexExists:
+                indexName: idx_prestacao_foto_prestacao
+      changes:
+        - createIndex:
+            indexName: idx_prestacao_foto_prestacao
+            tableName: prestacao_foto
+            columns:
+              - column:
+                  name: prestacao_id
+
+  - changeSet:
+      id: feira-prestacao-valor-utilizado
+      author: connect-ong
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: prestacao
+                columnName: valor_utilizado
+      changes:
+        - addColumn:
+            tableName: prestacao
+            columns:
+              - column:
+                  name: valor_utilizado
+                  type: double
+
+  # (D) Avaliacao de doador (a ONG avalia o doador; upsert por ong+doador).
+  - changeSet:
+      id: feira-avaliacao-doador-create-table
+      author: connect-ong
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: avaliacao_doador
+      changes:
+        - createTable:
+            tableName: avaliacao_doador
+            columns:
+              - column:
+                  name: id
+                  type: bigint
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: doador_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: ong_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: nota
+                  type: int
+              - column:
+                  name: comentario
+                  type: varchar(500)
+              - column:
+                  name: criado_em
+                  type: datetime
+              - column:
+                  name: atualizado_em
+                  type: datetime
+
+  - changeSet:
+      id: feira-idx-avaliacao-doador-doador
+      author: connect-ong
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: MARK_RAN
+        - not:
+            - indexExists:
+                indexName: idx_aval_doador_doador
+      changes:
+        - createIndex:
+            indexName: idx_aval_doador_doador
+            tableName: avaliacao_doador
+            columns:
+              - column:
+                  name: doador_id
+
+  - changeSet:
+      id: feira-idx-avaliacao-doador-ong
+      author: connect-ong
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: MARK_RAN
+        - not:
+            - indexExists:
+                indexName: idx_aval_doador_ong
+      changes:
+        - createIndex:
+            indexName: idx_aval_doador_ong
+            tableName: avaliacao_doador
+            columns:
+              - column:
+                  name: ong_id
+
+  # (D) Agregados denormalizados da reputacao do doador no proprio usuario.
+  - changeSet:
+      id: feira-usuario-nota-doador
+      author: connect-ong
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: usuario
+                columnName: nota_media_doador
+      changes:
+        - addColumn:
+            tableName: usuario
+            columns:
+              - column:
+                  name: nota_media_doador
+                  type: double
+              - column:
+                  name: total_avaliacoes_doador
+                  type: int
+
+  # (D) "Membro desde": contas antigas ficam com null (nao inventamos data);
+  # novas contas recebem now() via @PrePersist na entidade.
+  - changeSet:
+      id: feira-usuario-criado-em
+      author: connect-ong
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: usuario
+                columnName: criado_em
+      changes:
+        - addColumn:
+            tableName: usuario
+            columns:
+              - column:
+                  name: criado_em
+                  type: datetime
+
+  # (E) Perfil rico da ONG: capa (base64) + endereco textual.
+  - changeSet:
+      id: feira-ong-capa-endereco
+      author: connect-ong
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: ong
+                columnName: capa_base64
+      changes:
+        - addColumn:
+            tableName: ong
+            columns:
+              - column:
+                  name: capa_base64
+                  type: mediumtext
+              - column:
+                  name: endereco
+                  type: varchar(255)
+
+  # (E) Fotos do local da ONG (max 5, controlado no codigo).
+  - changeSet:
+      id: feira-ong-foto-create-table
+      author: connect-ong
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: ong_foto
+      changes:
+        - createTable:
+            tableName: ong_foto
+            columns:
+              - column:
+                  name: id
+                  type: bigint
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: ong_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: foto
+                  type: mediumtext
+              - column:
+                  name: criado_em
+                  type: datetime
+
+  - changeSet:
+      id: feira-idx-ong-foto-ong
+      author: connect-ong
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: MARK_RAN
+        - not:
+            - indexExists:
+                indexName: idx_ong_foto_ong
+      changes:
+        - createIndex:
+            indexName: idx_ong_foto_ong
+            tableName: ong_foto
+            columns:
+              - column:
+                  name: ong_id
+
+  # (F) Chat: anexo de imagem (base64) na mensagem.
+  - changeSet:
+      id: feira-mensagem-anexo
+      author: connect-ong
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: mensagem
+                columnName: anexo_base64
+      changes:
+        - addColumn:
+            tableName: mensagem
+            columns:
+              - column:
+                  name: anexo_base64
+                  type: mediumtext
+              - column:
+                  name: anexo_tipo
+                  type: varchar(20)
+
+  # (G) Streak do Top 1 do ranking de transparencia.
+  - changeSet:
+      id: feira-ong-top1-streak
+      author: connect-ong
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: ong
+                columnName: top1_desde
+      changes:
+        - addColumn:
+            tableName: ong
+            columns:
+              - column:
+                  name: top1_desde
+                  type: datetime
+              - column:
+                  name: ultimo_reinado_dias
+                  type: int

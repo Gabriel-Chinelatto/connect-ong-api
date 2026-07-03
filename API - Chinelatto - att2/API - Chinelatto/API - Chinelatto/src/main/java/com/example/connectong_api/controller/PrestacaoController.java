@@ -30,6 +30,13 @@ public class PrestacaoController {
         return ResponseEntity.ok(service.listar(interesseId));
     }
 
+    @GetMapping("/pendencias")
+    @Operation(summary = "Pendências da ONG: matches CONCLUÍDOS sem prestação de contas (prazo de 10 dias; estourou = definitivo e penaliza o score)")
+    public ResponseEntity<?> pendencias(@RequestParam Long ongId) {
+        // So a ONG dona ve as proprias pendencias (checado no service).
+        return service.pendencias(ongId);
+    }
+
     @PostMapping
     @Operation(summary = "Publicar uma prestação de contas num match")
     public ResponseEntity<?> criar(@Valid @RequestBody PrestacaoRequestDTO dto) {

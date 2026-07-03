@@ -86,6 +86,11 @@ public class SecurityConfig {
                             ).permitAll()
                             .requestMatchers(HttpMethod.POST, "/usuarios", "/usuarios/login", "/usuarios/registro").permitAll()
                             .requestMatchers(HttpMethod.POST, "/ongs/registro").permitAll()
+                            // Perfil publico do DOADOR e suas avaliacoes: leitura
+                            // livre (reputacao publica, como o perfil da ONG). O
+                            // service nunca expoe email/telefone/valores.
+                            .requestMatchers(HttpMethod.GET, "/usuarios/*/perfil-publico").permitAll()
+                            .requestMatchers(HttpMethod.GET, "/avaliacoes-doador").permitAll()
                             // Recursos ADMINISTRATIVOS/MODERACAO: exigem ROLE_ADMIN, um
                             // papel dedicado e NAO auto-provisionavel (ver AdminBootstrap).
                             // Antes eram ROLE_ONG, mas ONG e auto-registravel (qualquer um

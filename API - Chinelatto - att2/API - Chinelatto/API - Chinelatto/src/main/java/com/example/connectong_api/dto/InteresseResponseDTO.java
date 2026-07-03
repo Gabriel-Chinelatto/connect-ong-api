@@ -12,6 +12,9 @@ public class InteresseResponseDTO {
     private String status;
     private LocalDateTime dataCriacao;
 
+    // Quando a ONG marcou o match como CONCLUIDO (null nos demais status).
+    private LocalDateTime dataConclusao;
+
     private Long necessidadeId;
     private String necessidadeTitulo;
 
@@ -25,6 +28,7 @@ public class InteresseResponseDTO {
             Long id,
             String status,
             LocalDateTime dataCriacao,
+            LocalDateTime dataConclusao,
             Long necessidadeId,
             String necessidadeTitulo,
             Long doadorId,
@@ -35,6 +39,7 @@ public class InteresseResponseDTO {
         this.id = id;
         this.status = status;
         this.dataCriacao = dataCriacao;
+        this.dataConclusao = dataConclusao;
         this.necessidadeId = necessidadeId;
         this.necessidadeTitulo = necessidadeTitulo;
         this.doadorId = doadorId;
@@ -46,6 +51,7 @@ public class InteresseResponseDTO {
     public Long getId() { return id; }
     public String getStatus() { return status; }
     public LocalDateTime getDataCriacao() { return dataCriacao; }
+    public LocalDateTime getDataConclusao() { return dataConclusao; }
     public Long getNecessidadeId() { return necessidadeId; }
     public String getNecessidadeTitulo() { return necessidadeTitulo; }
     public Long getDoadorId() { return doadorId; }

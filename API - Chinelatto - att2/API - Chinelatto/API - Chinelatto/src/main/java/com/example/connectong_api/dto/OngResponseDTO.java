@@ -1,5 +1,7 @@
 package com.example.connectong_api.dto;
 
+import java.util.List;
+
 public class OngResponseDTO {
 
     private Long id;
@@ -21,6 +23,12 @@ public class OngResponseDTO {
     private Double notaMedia;
 
     private Integer totalAvaliacoes;
+
+    // Perfil rico (preenchidos no GET /ongs/{id} e no PUT; ficam null na
+    // listagem para nao inflar a resposta com megabytes de base64).
+    private String capaBase64;
+    private String endereco;
+    private List<String> fotosLocal;
 
     public OngResponseDTO(
             Long id,
@@ -86,4 +94,13 @@ public class OngResponseDTO {
     public Integer getTotalAvaliacoes() {
         return totalAvaliacoes;
     }
+
+    public String getCapaBase64() { return capaBase64; }
+    public void setCapaBase64(String capaBase64) { this.capaBase64 = capaBase64; }
+
+    public String getEndereco() { return endereco; }
+    public void setEndereco(String endereco) { this.endereco = endereco; }
+
+    public List<String> getFotosLocal() { return fotosLocal; }
+    public void setFotosLocal(List<String> fotosLocal) { this.fotosLocal = fotosLocal; }
 }

@@ -5,6 +5,8 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 
+import java.util.List;
+
 /**
  * Dados de entrada para a ONG publicar uma prestacao de contas num match.
  */
@@ -25,6 +27,15 @@ public class PrestacaoRequestDTO {
     @Size(max = 500, message = "A URL da foto e muito longa")
     private String fotoUrl;
 
+    // Fotos embutidas em base64 (opcional): no maximo 5, cada uma limitada a
+    // ~2.8MB de string (mesmo teto do PerfilDTO, evita DoS de memoria/banco).
+    @Size(max = 5, message = "No maximo 5 fotos por prestacao")
+    private List<@Size(max = 3_000_000, message = "Imagem muito grande") String> fotos;
+
+    // Valor (R$) utilizado nesta prestacao (opcional; transparencia).
+    @Positive(message = "O valorUtilizado deve ser maior que zero")
+    private Double valorUtilizado;
+
     public Long getInteresseId() { return interesseId; }
     public void setInteresseId(Long interesseId) { this.interesseId = interesseId; }
 
@@ -36,4 +47,10 @@ public class PrestacaoRequestDTO {
 
     public String getFotoUrl() { return fotoUrl; }
     public void setFotoUrl(String fotoUrl) { this.fotoUrl = fotoUrl; }
+
+    public List<String> getFotos() { return fotos; }
+    public void setFotos(List<String> fotos) { this.fotos = fotos; }
+
+    public Double getValorUtilizado() { return valorUtilizado; }
+    public void setValorUtilizado(Double valorUtilizado) { this.valorUtilizado = valorUtilizado; }
 }

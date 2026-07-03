@@ -13,6 +13,10 @@ public class DoacaoFinanceiraResponseDTO {
     private String status;
     private LocalDateTime dataCriacao;
 
+    // Campanha vinculada (null quando a doacao nao foi para uma campanha).
+    private Long campanhaId;
+    private String campanhaTitulo;
+
     public DoacaoFinanceiraResponseDTO(
             Long id,
             Long ongId,
@@ -21,7 +25,9 @@ public class DoacaoFinanceiraResponseDTO {
             Double valor,
             String codigoPix,
             String status,
-            LocalDateTime dataCriacao
+            LocalDateTime dataCriacao,
+            Long campanhaId,
+            String campanhaTitulo
     ) {
         this.id = id;
         this.ongId = ongId;
@@ -31,6 +37,8 @@ public class DoacaoFinanceiraResponseDTO {
         this.codigoPix = codigoPix;
         this.status = status;
         this.dataCriacao = dataCriacao;
+        this.campanhaId = campanhaId;
+        this.campanhaTitulo = campanhaTitulo;
     }
 
     public Long getId() { return id; }
@@ -41,4 +49,6 @@ public class DoacaoFinanceiraResponseDTO {
     public String getCodigoPix() { return codigoPix; }
     public String getStatus() { return status; }
     public LocalDateTime getDataCriacao() { return dataCriacao; }
+    public Long getCampanhaId() { return campanhaId; }
+    public String getCampanhaTitulo() { return campanhaTitulo; }
 }

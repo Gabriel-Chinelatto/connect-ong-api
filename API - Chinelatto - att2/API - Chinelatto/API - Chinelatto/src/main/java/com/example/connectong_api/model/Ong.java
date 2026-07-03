@@ -58,6 +58,23 @@ public class Ong {
     // ranking e perfil publico; historico preservado).
     private LocalDateTime dataExclusao;
 
+    // ----- Perfil rico (feira) -----
+    // Capa do perfil como base64 (MEDIUMTEXT, DTO limita ~2.8MB) — nunca URL.
+    @Column(name = "capa_base64", columnDefinition = "MEDIUMTEXT")
+    private String capaBase64;
+
+    @Size(max = 255)
+    private String endereco;
+
+    // ----- Streak do Top 1 do ranking de transparencia -----
+    // top1Desde != null => esta ONG e a atual #1 (desde essa data).
+    // ultimoReinadoDias = duracao (em dias) do ultimo reinado ja encerrado.
+    @Column(name = "top1_desde")
+    private LocalDateTime top1Desde;
+
+    @Column(name = "ultimo_reinado_dias")
+    private Integer ultimoReinadoDias;
+
     public Ong() {}
 
     public Ong(String nome, String email, String telefone, String cidade, String descricao) {
@@ -99,4 +116,16 @@ public class Ong {
 
     public LocalDateTime getDataExclusao() { return dataExclusao; }
     public void setDataExclusao(LocalDateTime dataExclusao) { this.dataExclusao = dataExclusao; }
+
+    public String getCapaBase64() { return capaBase64; }
+    public void setCapaBase64(String capaBase64) { this.capaBase64 = capaBase64; }
+
+    public String getEndereco() { return endereco; }
+    public void setEndereco(String endereco) { this.endereco = endereco; }
+
+    public LocalDateTime getTop1Desde() { return top1Desde; }
+    public void setTop1Desde(LocalDateTime top1Desde) { this.top1Desde = top1Desde; }
+
+    public Integer getUltimoReinadoDias() { return ultimoReinadoDias; }
+    public void setUltimoReinadoDias(Integer ultimoReinadoDias) { this.ultimoReinadoDias = ultimoReinadoDias; }
 }

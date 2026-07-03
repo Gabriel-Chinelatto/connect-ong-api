@@ -111,6 +111,16 @@ public class CampanhaService {
         if (c == null) return ResponseEntity.notFound().build();
         if (c.getEncerrada()) return erro("Esta campanha ja foi encerrada");
 
+        Campanha salva = registrarContribuicao(c, valor, doadorNome);
+
+        return ResponseEntity.ok(new CampanhaResponseDTO(salva));
+    }
+
+    // Nucleo da contribuicao, tambem reaproveitado pela doacao PIX vinculada a
+    // campanha (DoacaoFinanceiraService): incrementa o arrecadado, auto-encerra
+    // ao bater a meta e notifica a conta da ONG dona. As validacoes (campanha
+    // existe/aberta, valor > 0) sao responsabilidade de quem chama.
+    public Campanha registrarContribuicao(Campanha c, Double valor, String doadorNome) {
         c.setValorArrecadado(c.getValorArrecadado() + valor);
         boolean atingiuMeta = c.getMetaValor() != null
                 && c.getValorArrecadado() >= c.getMetaValor();
@@ -140,7 +150,7 @@ public class CampanhaService {
                     c.getOng().getNome());
         }
 
-        return ResponseEntity.ok(new CampanhaResponseDTO(salva));
+        return salva;
     }
 
     // =========================

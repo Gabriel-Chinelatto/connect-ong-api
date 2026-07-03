@@ -20,4 +20,8 @@ public interface PrestacaoRepository extends JpaRepository<Prestacao, Long> {
     @Query("SELECT n.ong.id, COUNT(p) FROM Prestacao p "
             + "JOIN p.interesse i JOIN i.necessidade n GROUP BY n.ong.id")
     List<Object[]> contarPrestacoesPorOng();
+
+    // Prestacoes RECEBIDAS por um doador (prestacao -> interesse -> doador),
+    // exibidas no perfil publico do doador.
+    List<Prestacao> findByInteresseDoadorIdOrderByDataCriacaoDesc(Long doadorId);
 }
