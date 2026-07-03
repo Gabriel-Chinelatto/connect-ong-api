@@ -40,11 +40,23 @@ public class UsuarioService {
     @Autowired
     private AuditService auditService;
 
+    @Autowired
+    private RateLimitService rateLimitService;
+
     // =========================
     // CADASTRO
     // =========================
     @Transactional
     public ResponseEntity<?> cadastrar(CadastroUsuarioDTO dados) {
+
+        // Rate limiting por IP no cadastro publico. DECISAO: a mensagem "Email
+        // já cadastrado" permite enumerar contas, mas foi MANTIDA pela UX da
+        // feira (o visitante precisa entender o erro na hora); a mitigacao da
+        // enumeracao e este limite de ~5 cadastros/15min por IP, que inviabiliza
+        // varredura em massa (ver comentario no RateLimitService).
+        if (rateLimitService.excedeuSolicitacoes("cadastro")) {
+            return RateLimitService.resposta429();
+        }
 
         // valida email duplicado
         if (usuarioRepository.findByEmail(dados.getEmail()).isPresent()) {
@@ -99,6 +111,13 @@ public class UsuarioService {
     @Transactional
     public ResponseEntity<?> registrarDoador(RegistroDoadorDTO dados) {
 
+        // Mesmo limite por IP do cadastro (mitigacao de enumeracao de email:
+        // mantivemos a mensagem "Email já cadastrado" pela UX da feira e
+        // limitamos as tentativas — ver comentario em cadastrar()).
+        if (rateLimitService.excedeuSolicitacoes("cadastro")) {
+            return RateLimitService.resposta429();
+        }
+
         // email duplicado -> 409 Conflict (o mobile exibe body['erro'])
         if (usuarioRepository.findByEmail(dados.getEmail()).isPresent()) {
 
@@ -145,6 +164,14 @@ public class UsuarioService {
     // =========================
     public ResponseEntity<?> login(LoginRequestDTO credenciais) {
 
+        // Anti-forca-bruta: apos 5 falhas consecutivas para a mesma chave
+        // email+IP, o login fica bloqueado por 15 minutos -> 429 (sem nem
+        // conferir a senha). Um login com sucesso zera o contador.
+        String chaveLogin = credenciais.getEmail() + "|" + rateLimitService.ipDaRequisicao();
+        if (rateLimitService.bloqueadoPorFalhas("login", chaveLogin)) {
+            return RateLimitService.resposta429();
+        }
+
         Optional<Usuario> usuarioBanco =
                 usuarioRepository.findByEmail(credenciais.getEmail());
 
@@ -171,6 +198,9 @@ public class UsuarioService {
             resposta.setAccessToken(jwtService.gerarAccessToken(usuarioEncontrado));
             resposta.setRefreshToken(jwtService.gerarRefreshToken(usuarioEncontrado));
 
+            // sucesso zera o contador de falhas da chave email+IP
+            rateLimitService.limparFalhas("login", chaveLogin);
+
             auditService.registrar("LOGIN_SUCESSO", usuarioEncontrado.getId(),
                     "Login bem-sucedido: " + usuarioEncontrado.getEmail());
 
@@ -179,6 +209,7 @@ public class UsuarioService {
 
         // Falha: NAO distinguir "email inexistente" de "senha errada" (evita
         // enumeracao de usuarios). Sempre 401 com mensagem generica.
+        rateLimitService.registrarFalha("login", chaveLogin);
         Long idAuditado = usuarioBanco.map(Usuario::getId).orElse(null);
         auditService.registrar("LOGIN_FALHA", idAuditado,
                 "Tentativa de login invalida para: " + credenciais.getEmail());

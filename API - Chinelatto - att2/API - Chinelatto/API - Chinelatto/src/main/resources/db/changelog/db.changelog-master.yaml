@@ -671,3 +671,65 @@ databaseChangeLog:
               - column:
                   name: data_exclusao
                   type: datetime
+
+  # =====================================================================
+  # Esqueci a senha: codigos de recuperacao (POST /auth/esqueci-senha /
+  # /auth/redefinir-senha). usado_em datetime null em vez de flag boolean
+  # (padrao do projeto: o Liquibase criaria TINYINT e o Hibernate em modo
+  # validate espera BIT no MySQL 5.6). codigo = varchar para preservar zeros
+  # a esquerda; nunca contem emoji (utf8 3 bytes do MySQL 5.6 ok).
+  # =====================================================================
+  - changeSet:
+      id: esqueci-senha-senha-reset-create-table
+      author: connect-ong
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: senha_reset
+      changes:
+        - createTable:
+            tableName: senha_reset
+            columns:
+              - column:
+                  name: id
+                  type: bigint
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: usuario_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: codigo
+                  type: varchar(10)
+              - column:
+                  name: expira_em
+                  type: datetime
+              - column:
+                  name: usado_em
+                  type: datetime
+              - column:
+                  name: criado_em
+                  type: datetime
+
+  - changeSet:
+      id: esqueci-senha-senha-reset-idx-usuario
+      author: connect-ong
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: MARK_RAN
+        - not:
+            - indexExists:
+                indexName: idx_senha_reset_usuario
+      changes:
+        - createIndex:
+            indexName: idx_senha_reset_usuario
+            tableName: senha_reset
+            columns:
+              - column:
+                  name: usuario_id

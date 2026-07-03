@@ -60,6 +60,9 @@ public class ONGService {
     private PrestacaoRepository prestacaoRepository;
 
     @Autowired
+    private RateLimitService rateLimitService;
+
+    @Autowired
     private TransparenciaService transparenciaService;
 
     @Autowired
@@ -105,6 +108,13 @@ public class ONGService {
     // CADASTRO (cria o perfil da ONG + a conta de login, ja vinculados)
     // =========================
     public ResponseEntity<?> registrar(OngRegistroDTO dto) {
+
+        // Mesmo limite por IP dos demais cadastros publicos (mitigacao de
+        // enumeracao de email: a mensagem "Email já cadastrado" foi mantida
+        // pela UX da feira; o rate limiting inviabiliza varredura em massa).
+        if (rateLimitService.excedeuSolicitacoes("cadastro")) {
+            return RateLimitService.resposta429();
+        }
 
         if (dto.getNome() == null || dto.getNome().isBlank()) {
             return erro("Nome da ONG é obrigatório");

@@ -1,11 +1,15 @@
 package com.example.connectong_api.controller;
 
+import com.example.connectong_api.dto.EsqueciSenhaDTO;
+import com.example.connectong_api.dto.RedefinirSenhaDTO;
 import com.example.connectong_api.model.Usuario;
 import com.example.connectong_api.repository.UsuarioRepository;
 import com.example.connectong_api.service.JwtService;
+import com.example.connectong_api.service.SenhaResetService;
 
 import io.jsonwebtoken.Claims;
 
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -32,6 +36,30 @@ public class AuthController {
 
     @Autowired
     private UsuarioRepository usuarioRepository;
+
+    @Autowired
+    private SenhaResetService senhaResetService;
+
+    // =========================
+    // ESQUECI A SENHA (publico — /auth/** esta na whitelist do SecurityConfig)
+    // Contrato fixo com os frontends: body {"email"} -> SEMPRE 200 generico
+    // (anti-enumeracao). Com app.demo.enabled=true a resposta traz codigoDemo
+    // (simulacao de e-mail para a feira; ver javadoc do SenhaResetService).
+    // =========================
+    @PostMapping("/esqueci-senha")
+    public ResponseEntity<?> esqueciSenha(@Valid @RequestBody EsqueciSenhaDTO dto) {
+        return senhaResetService.solicitar(dto);
+    }
+
+    // =========================
+    // REDEFINIR SENHA (publico — /auth/** esta na whitelist do SecurityConfig)
+    // Contrato fixo: body {"email","codigo","novaSenha"} -> 200 no sucesso;
+    // qualquer falha de codigo -> 400 "Código inválido ou expirado." (generico).
+    // =========================
+    @PostMapping("/redefinir-senha")
+    public ResponseEntity<?> redefinirSenha(@Valid @RequestBody RedefinirSenhaDTO dto) {
+        return senhaResetService.redefinir(dto);
+    }
 
     // =========================
     // REFRESH (refresh token valido -> novo access token)
