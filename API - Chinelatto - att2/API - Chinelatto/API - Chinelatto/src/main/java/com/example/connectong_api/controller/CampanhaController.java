@@ -1,6 +1,7 @@
 package com.example.connectong_api.controller;
 
 import com.example.connectong_api.dto.CampanhaRequestDTO;
+import com.example.connectong_api.dto.ContribuicaoRequestDTO;
 import com.example.connectong_api.service.CampanhaService;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -9,8 +10,6 @@ import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.Map;
 
 /**
  * Recurso REST /campanhas: campanhas de arrecadacao das ONGs (meta + progresso).
@@ -51,13 +50,13 @@ public class CampanhaController {
     @Operation(summary = "Contribuir com um valor para a campanha (atualiza o progresso)")
     public ResponseEntity<?> contribuir(
             @PathVariable Long id,
-            @RequestBody Map<String, Object> body
+            @Valid @RequestBody ContribuicaoRequestDTO body
     ) {
-        Double valor = body.get("valor") != null
-                ? Double.valueOf(body.get("valor").toString()) : null;
-        String doadorNome = body.get("doadorNome") != null
-                ? body.get("doadorNome").toString() : null;
-        return service.contribuir(id, valor, doadorNome);
+        // Bug B2 corrigido: antes o corpo era um Map cru e Double.valueOf explodia
+        // com NumberFormatException (500) em entrada nao numerica. O DTO tipado
+        // mantem os MESMOS nomes de campo do contrato (valor, doadorNome) e
+        // devolve 400 com mensagem de campo quando o valor e invalido.
+        return service.contribuir(id, body.getValor(), body.getDoadorNome());
     }
 
     @PutMapping("/{id}/encerrar")
