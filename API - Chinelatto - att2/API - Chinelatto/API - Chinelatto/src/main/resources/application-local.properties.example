@@ -4,7 +4,7 @@
 # O arquivo "application-local.properties" NAO vai para o Git (esta no .gitignore),
 # entao a senha nunca mais fica exposta no repositorio.
 
-DB_PASSWORD=coloque_a_senha_aqui
+DB_PASSWORD=coloque_sua_senha_aqui
 
 # Segredo do JWT (OBRIGATORIO). O JwtService nao tem mais valor default:
 # sem esta propriedade a aplicacao FALHA no startup (de proposito).
