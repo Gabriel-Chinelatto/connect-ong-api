@@ -91,6 +91,10 @@ public class SecurityConfig {
                             // service nunca expoe email/telefone/valores.
                             .requestMatchers(HttpMethod.GET, "/usuarios/*/perfil-publico").permitAll()
                             .requestMatchers(HttpMethod.GET, "/avaliacoes-doador").permitAll()
+                            // Perfil publico da ONG: leitura livre — e o destino do
+                            // LINK COMPARTILHAVEL (/#/ong/{id}); sem isso, quem abre
+                            // o link deslogado recebia 401 e a tela quebrava.
+                            .requestMatchers(HttpMethod.GET, "/ongs/*/perfil-publico").permitAll()
                             // Recursos ADMINISTRATIVOS/MODERACAO: exigem ROLE_ADMIN, um
                             // papel dedicado e NAO auto-provisionavel (ver AdminBootstrap).
                             // Antes eram ROLE_ONG, mas ONG e auto-registravel (qualquer um
