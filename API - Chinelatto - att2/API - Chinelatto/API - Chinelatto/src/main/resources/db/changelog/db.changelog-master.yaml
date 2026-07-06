@@ -1099,3 +1099,83 @@ databaseChangeLog:
               - column:
                   name: ultimo_reinado_dias
                   type: int
+
+  # =====================================================================
+  # Bloqueio de doador pela ONG - 2026-07-06.
+  # Enquanto o par (ong_id, doador_id) existir, a ONG "some" para o doador
+  # (feed, busca, perfil completo) e o chat dos matches fica travado.
+  # criado_em = datetime (padrao do projeto: sem boolean no MySQL 5.6).
+  # Unicidade do par no indice uq_bloqueio_ong_doador (que tambem serve de
+  # indice por ong_id, prefixo a esquerda); idx_bloqueio_doador cobre a
+  # consulta "quem bloqueou este doador" feita a cada feed autenticado.
+  # =====================================================================
+  - changeSet:
+      id: bloqueio-create-table
+      author: connect-ong
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: bloqueio
+      changes:
+        - createTable:
+            tableName: bloqueio
+            columns:
+              - column:
+                  name: id
+                  type: bigint
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: ong_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: doador_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: criado_em
+                  type: datetime
+
+  - changeSet:
+      id: bloqueio-uq-ong-doador
+      author: connect-ong
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: MARK_RAN
+        - not:
+            - indexExists:
+                indexName: uq_bloqueio_ong_doador
+      changes:
+        - createIndex:
+            indexName: uq_bloqueio_ong_doador
+            tableName: bloqueio
+            unique: true
+            columns:
+              - column:
+                  name: ong_id
+              - column:
+                  name: doador_id
+
+  - changeSet:
+      id: bloqueio-idx-doador
+      author: connect-ong
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: MARK_RAN
+        - not:
+            - indexExists:
+                indexName: idx_bloqueio_doador
+      changes:
+        - createIndex:
+            indexName: idx_bloqueio_doador
+            tableName: bloqueio
+            columns:
+              - column:
+                  name: doador_id

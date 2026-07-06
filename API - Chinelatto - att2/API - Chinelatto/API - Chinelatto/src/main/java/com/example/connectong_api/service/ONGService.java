@@ -7,11 +7,14 @@ import com.example.connectong_api.dto.PerfilPublicoOngDTO;
 import com.example.connectong_api.dto.UsuarioResponseDTO;
 import com.example.connectong_api.model.Ong;
 import com.example.connectong_api.model.OngFoto;
+import com.example.connectong_api.model.Preferencia;
 import com.example.connectong_api.model.Usuario;
 import com.example.connectong_api.repository.ONGRepository;
 import com.example.connectong_api.repository.OngFotoRepository;
+import com.example.connectong_api.repository.PreferenciaRepository;
 import com.example.connectong_api.repository.UsuarioRepository;
 import com.example.connectong_api.security.SecurityUtils;
+import com.example.connectong_api.security.UsuarioAutenticado;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -21,8 +24,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -73,6 +78,12 @@ public class ONGService {
     @Autowired
     private SecurityUtils security;
 
+    @Autowired
+    private BloqueioService bloqueioService;
+
+    @Autowired
+    private PreferenciaRepository preferenciaRepository;
+
     // =========================
     // PERFIL PUBLICO (agrega tudo que o doador ve na pagina da ONG)
     // =========================
@@ -81,6 +92,19 @@ public class ONGService {
         // ONG inexistente OU excluida (soft-delete) -> 404.
         if (ong == null || ong.getDataExclusao() != null) {
             return ResponseEntity.notFound().build();
+        }
+
+        // BLOQUEIO: doador bloqueado por esta ONG recebe 200 com o corpo MINIMO
+        // (id, nome, bloqueado) — sem o resto do perfil. Requisicao anonima
+        // segue normal (o endpoint e publico, destino do link compartilhavel).
+        UsuarioAutenticado quem = security.atual();
+        if (quem != null && "DOADOR".equals(quem.getTipo())
+                && bloqueioService.bloqueado(id, quem.getId())) {
+            Map<String, Object> minimo = new LinkedHashMap<>();
+            minimo.put("id", ong.getId());
+            minimo.put("nome", ong.getNome());
+            minimo.put("bloqueado", true);
+            return ResponseEntity.ok(minimo);
         }
 
         var transp = transparenciaService.calcular(ong);
@@ -103,7 +127,41 @@ public class ONGService {
             dto.setDiasNoTopo(transparenciaService.diasNoTopo(ong.getTop1Desde()));
         }
 
+        // PRIVACIDADE REAL: os toggles mostrarEmail/mostrarTelefone (Preferencia
+        // da conta-ONG dona) valem no perfil publico — desligado = campo omitido.
+        aplicarPrivacidade(dto, id);
+
         return ResponseEntity.ok(dto);
+    }
+
+    /**
+     * Aplica os toggles de privacidade da conta-ONG dona ao perfil publico.
+     * Sem registro de Preferencia (usuario nunca abriu as configuracoes) valem
+     * os MESMOS defaults de Preferencia.padrao(): email OCULTO, telefone
+     * VISIVEL — o perfil publico nunca contradiz a tela de configuracoes.
+     * ONG legada sem conta de login vinculada: mantem o perfil como esta.
+     */
+    private void aplicarPrivacidade(PerfilPublicoOngDTO dto, Long ongId) {
+        Usuario conta = usuarioRepository.findByOngId(ongId).orElse(null);
+        if (conta == null) {
+            return;
+        }
+        Preferencia prefs = preferenciaRepository.findByUsuarioId(conta.getId())
+                .orElseGet(() -> Preferencia.padrao(conta.getId()));
+
+        // Campo null no registro (linha antiga, coluna criada depois) recai nos
+        // defaults do padrao(): email oculto, telefone visivel.
+        boolean exibirEmail = prefs.getMostrarEmail() != null
+                ? prefs.getMostrarEmail() : false;
+        boolean exibirTelefone = prefs.getMostrarTelefone() != null
+                ? prefs.getMostrarTelefone() : true;
+
+        if (!exibirEmail) {
+            dto.setEmail(null);
+        }
+        if (!exibirTelefone) {
+            dto.setTelefone(null);
+        }
     }
 
     // =========================
@@ -193,8 +251,14 @@ public class ONGService {
                     repository.findAll();
         }
 
+        // BLOQUEIO: na busca feita por um DOADOR autenticado, as ONGs que o
+        // bloquearam nao aparecem (anonimo/ONG = conjunto vazio, nao filtra).
+        Set<Long> ongsBloqueadoras =
+                bloqueioService.ongIdsQueBloquearamDoadorAtual();
+
         return lista.stream()
                 .filter(o -> o.getDataExclusao() == null) // esconde ONGs excluidas
+                .filter(o -> !ongsBloqueadoras.contains(o.getId()))
                 .map(this::toDTO)
                 .collect(Collectors.toList());
     }

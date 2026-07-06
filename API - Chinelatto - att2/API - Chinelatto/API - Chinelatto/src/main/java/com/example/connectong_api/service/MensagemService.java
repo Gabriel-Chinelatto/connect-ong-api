@@ -62,6 +62,9 @@ public class MensagemService {
     @Autowired
     private ReacaoRepository reacaoRepository;
 
+    @Autowired
+    private BloqueioService bloqueioService;
+
     // Codigos de reacao aceitos (o emoji em si e renderizado no app; guardar o
     // emoji cru quebraria no utf8 de 3 bytes do MySQL 5.6).
     private static final Set<String> EMOJIS_PERMITIDOS =
@@ -255,6 +258,20 @@ public class MensagemService {
         final String remetente =
                 (doadorId != null && doadorId.equals(security.usuarioId()))
                         ? "DOADOR" : "ONG";
+
+        // BLOQUEIO: se a ONG do match bloqueou o doador, o chat trava nos DOIS
+        // sentidos. Para o doador a mensagem e GENERICA (nao revela que ele foi
+        // bloqueado); para a ONG bloqueadora, explica como reverter.
+        Long ongDoMatch = (interesse.getNecessidade() != null
+                && interesse.getNecessidade().getOng() != null)
+                ? interesse.getNecessidade().getOng().getId() : null;
+        if (bloqueioService.bloqueado(ongDoMatch, doadorId)) {
+            Map<String, String> corpo = new HashMap<>();
+            corpo.put("erro", "DOADOR".equals(remetente)
+                    ? "Não é possível enviar mensagens para esta ONG."
+                    : "Você bloqueou este doador. Desbloqueie-o para voltar a conversar.");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(corpo);
+        }
 
         if (!STATUS_COM_CHAT.contains(interesse.getStatus())) {
             return erro("O chat só fica disponível após o match ser aceito");

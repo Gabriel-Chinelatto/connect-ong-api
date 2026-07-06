@@ -24,6 +24,10 @@ public class InteresseResponseDTO {
     private Long ongId;
     private String ongNome;
 
+    // A ONG deste match bloqueou o doador? O match segue listado (historico),
+    // mas o app usa este campo para desabilitar o chat.
+    private boolean bloqueadoPelaOng;
+
     public InteresseResponseDTO(
             Long id,
             String status,
@@ -58,4 +62,7 @@ public class InteresseResponseDTO {
     public String getDoadorNome() { return doadorNome; }
     public Long getOngId() { return ongId; }
     public String getOngNome() { return ongNome; }
+
+    public boolean isBloqueadoPelaOng() { return bloqueadoPelaOng; }
+    public void setBloqueadoPelaOng(boolean v) { this.bloqueadoPelaOng = v; }
 }

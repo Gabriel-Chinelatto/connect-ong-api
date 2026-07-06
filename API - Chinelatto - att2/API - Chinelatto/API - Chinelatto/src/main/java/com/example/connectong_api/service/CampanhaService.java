@@ -35,6 +35,7 @@ public class CampanhaService {
     @Autowired private NotificacaoService notificacaoService;
     @Autowired private AtividadeService atividadeService;
     @Autowired private SecurityUtils security;
+    @Autowired private BloqueioService bloqueioService;
 
     // Teto por contribuicao (mesmo limite da doacao financeira via DTO).
     private static final double VALOR_MAXIMO_CONTRIBUICAO = 1_000_000.00;
@@ -51,8 +52,14 @@ public class CampanhaService {
         } else {
             lista = repository.findAll();
         }
+        // BLOQUEIO: para um DOADOR autenticado, campanhas de ONGs que o
+        // bloquearam somem do feed (anonimo/ONG = conjunto vazio, nao filtra).
+        java.util.Set<Long> ongsBloqueadoras =
+                bloqueioService.ongIdsQueBloquearamDoadorAtual();
+
         return lista.stream()
                 .filter(c -> c.getOng() != null) // ignora campanhas orfas (dados legados)
+                .filter(c -> !ongsBloqueadoras.contains(c.getOng().getId()))
                 // filtro por categoria em memoria (compara valores normalizados)
                 .filter(c -> categoria == null || categoria.isBlank()
                         || Categorias.iguais(c.getCategoria(), categoria))
@@ -61,9 +68,13 @@ public class CampanhaService {
     }
 
     public List<CampanhaResponseDTO> destaques() {
+        // Mesmo filtro de bloqueio do feed (o carrossel tambem "some").
+        java.util.Set<Long> ongsBloqueadoras =
+                bloqueioService.ongIdsQueBloquearamDoadorAtual();
         return repository.findByDestaqueTrueAndEncerradaFalseOrderByIdDesc()
                 .stream()
                 .filter(c -> c.getOng() != null)
+                .filter(c -> !ongsBloqueadoras.contains(c.getOng().getId()))
                 .map(CampanhaResponseDTO::new)
                 .collect(Collectors.toList());
     }

@@ -84,6 +84,11 @@ public class PerfilPublicoOngDTO {
     public String getDescricao() { return descricao; }
     public String getTelefone() { return telefone; }
     public String getEmail() { return email; }
+
+    // Privacidade real: o service anula email/telefone quando o toggle
+    // (mostrarEmail/mostrarTelefone) da conta-ONG dona esta desligado.
+    public void setTelefone(String telefone) { this.telefone = telefone; }
+    public void setEmail(String email) { this.email = email; }
     public String getCnpj() { return cnpj; }
     public boolean isVerificada() { return verificada; }
     public double getNotaMedia() { return notaMedia; }

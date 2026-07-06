@@ -50,6 +50,9 @@ public class InteresseService {
     @Autowired
     private SecurityUtils security;
 
+    @Autowired
+    private BloqueioService bloqueioService;
+
     // =========================
     // DEMONSTRAR INTERESSE (um doador numa necessidade)
     // =========================
@@ -125,8 +128,27 @@ public class InteresseService {
             lista = repository.findAll();
         }
 
+        // BLOQUEIO: matches com ONG bloqueadora continuam listados (historico),
+        // mas ganham bloqueadoPelaOng=true para o app desabilitar o chat.
+        // Uma unica query por listagem (conjunto do doador ou da ONG).
+        java.util.Set<Long> ongsQueBloquearam = doadorId != null
+                ? bloqueioService.ongsQueBloquearam(doadorId)
+                : java.util.Set.of();
+        java.util.Set<Long> doadoresBloqueados = (doadorId == null && ongId != null)
+                ? bloqueioService.doadoresBloqueadosPor(ongId)
+                : java.util.Set.of();
+
         return lista.stream()
-                .map(this::toDTO)
+                .map(i -> {
+                    InteresseResponseDTO dto = toDTO(i);
+                    boolean bloqueado =
+                            (dto.getOngId() != null
+                                    && ongsQueBloquearam.contains(dto.getOngId()))
+                            || (dto.getDoadorId() != null
+                                    && doadoresBloqueados.contains(dto.getDoadorId()));
+                    dto.setBloqueadoPelaOng(bloqueado);
+                    return dto;
+                })
                 .collect(Collectors.toList());
     }
 

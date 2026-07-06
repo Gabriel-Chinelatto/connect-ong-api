@@ -46,6 +46,9 @@ public class NecessidadeService {
     @Autowired
     private SecurityUtils security;
 
+    @Autowired
+    private BloqueioService bloqueioService;
+
     // =========================
     // LISTAR (filtra por ong, status ou categoria, se informados)
     // =========================
@@ -61,9 +64,17 @@ public class NecessidadeService {
             lista = repository.findAll();
         }
 
+        // BLOQUEIO: para um DOADOR autenticado, as ONGs que o bloquearam somem
+        // do feed (uma unica query; requisicao anonima/ONG = conjunto vazio).
+        java.util.Set<Long> ongsBloqueadoras =
+                bloqueioService.ongIdsQueBloquearamDoadorAtual();
+
         return lista.stream()
                 // esconde necessidades de ONGs excluidas (soft-delete)
                 .filter(n -> n.getOng() == null || n.getOng().getDataExclusao() == null)
+                // esconde necessidades de ONGs que bloquearam o doador
+                .filter(n -> n.getOng() == null
+                        || !ongsBloqueadoras.contains(n.getOng().getId()))
                 // filtro por categoria em memoria (compara valores normalizados)
                 .filter(n -> categoria == null || categoria.isBlank()
                         || Categorias.iguais(n.getCategoria(), categoria))
