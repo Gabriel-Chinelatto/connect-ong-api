@@ -2,6 +2,7 @@ package com.example.connectong_api.service;
 
 import com.example.connectong_api.dto.NecessidadeRequestDTO;
 import com.example.connectong_api.dto.NecessidadeResponseDTO;
+import com.example.connectong_api.dto.NecessidadeUpdateDTO;
 import com.example.connectong_api.model.Necessidade;
 import com.example.connectong_api.model.Ong;
 import com.example.connectong_api.repository.NecessidadeRepository;
@@ -134,6 +135,32 @@ public class NecessidadeService {
         return ResponseEntity
                 .status(HttpStatus.CREATED)
                 .body(toDTO(salva));
+    }
+
+    // =========================
+    // EDITAR (somente a ONG dona)
+    // =========================
+    public ResponseEntity<?> atualizar(Long id, NecessidadeUpdateDTO dto) {
+
+        Necessidade necessidade = repository.findById(id).orElse(null);
+        if (necessidade == null) {
+            Map<String, String> erro = new HashMap<>();
+            erro.put("erro", "Necessidade não encontrada");
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(erro);
+        }
+
+        // So a ONG DONA da necessidade pode edita-la (senao 403). O dono vem da
+        // propria necessidade, nunca do cliente.
+        Long ongDonaId = necessidade.getOng() != null
+                ? necessidade.getOng().getId() : null;
+        security.exigirOng(ongDonaId);
+
+        necessidade.setTitulo(dto.getTitulo());
+        necessidade.setDescricao(dto.getDescricao());
+        necessidade.setCategoria(Categorias.normalizar(dto.getCategoria()));
+        necessidade.setUrgente(dto.getUrgente());
+
+        return ResponseEntity.ok(toDTO(repository.save(necessidade)));
     }
 
     // =========================

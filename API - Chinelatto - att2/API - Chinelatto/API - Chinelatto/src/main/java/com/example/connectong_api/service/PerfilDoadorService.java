@@ -1,10 +1,12 @@
 package com.example.connectong_api.service;
 
 import com.example.connectong_api.dto.PerfilPublicoDoadorDTO;
+import com.example.connectong_api.model.Preferencia;
 import com.example.connectong_api.model.Prestacao;
 import com.example.connectong_api.model.Usuario;
 import com.example.connectong_api.repository.DoacaoFinanceiraRepository;
 import com.example.connectong_api.repository.InteresseRepository;
+import com.example.connectong_api.repository.PreferenciaRepository;
 import com.example.connectong_api.repository.PrestacaoRepository;
 import com.example.connectong_api.repository.UsuarioRepository;
 
@@ -18,15 +20,20 @@ import java.util.stream.Collectors;
 
 /**
  * Perfil PUBLICO do doador (endpoint sem login, na whitelist do SecurityConfig).
- * PRIVACIDADE: nunca expoe email, telefone nem valores em R$ — as doacoes PIX
- * entram so como CONTAGEM. 404 para conta inexistente, excluida (soft-delete)
- * ou que nao seja DOADOR (perfis de ONG tem o proprio endpoint publico).
+ * PRIVACIDADE: nunca expoe valores em R$ (doacoes PIX entram so como CONTAGEM).
+ * email/telefone so aparecem quando o doador ligou os toggles mostrarEmail/
+ * mostrarTelefone (mesma regra do perfil publico da ONG); do contrario, null.
+ * 404 para conta inexistente, excluida (soft-delete) ou que nao seja DOADOR
+ * (perfis de ONG tem o proprio endpoint publico).
  */
 @Service
 public class PerfilDoadorService {
 
     @Autowired
     private UsuarioRepository usuarioRepository;
+
+    @Autowired
+    private PreferenciaRepository preferenciaRepository;
 
     @Autowired
     private InteresseRepository interesseRepository;
@@ -59,12 +66,23 @@ public class PerfilDoadorService {
                         .map(this::toPrestacaoRecebida)
                         .collect(Collectors.toList());
 
+        // Privacidade real: email/telefone so entram no payload quando o proprio
+        // doador ligou o toggle correspondente. Sem preferencia salva => ocultos
+        // (o campo vai null e o DTO omite via @JsonInclude(NON_NULL)).
+        Preferencia pref = preferenciaRepository.findByUsuarioId(id).orElse(null);
+        String emailPublico = (pref != null && Boolean.TRUE.equals(pref.getMostrarEmail()))
+                ? u.getEmail() : null;
+        String telefonePublico = (pref != null && Boolean.TRUE.equals(pref.getMostrarTelefone()))
+                ? u.getTelefone() : null;
+
         PerfilPublicoDoadorDTO dto = new PerfilPublicoDoadorDTO(
                 u.getId(),
                 u.getNome(),
                 u.getCidade(),
                 u.getEstado(),
                 u.getFotoBase64(),
+                emailPublico,
+                telefonePublico,
                 u.getCriadoEm(),
                 u.getNotaMediaDoador(),
                 u.getTotalAvaliacoesDoador(),

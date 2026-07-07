@@ -1,5 +1,6 @@
 package com.example.connectong_api.service;
 
+import com.example.connectong_api.dto.AlterarEmailDTO;
 import com.example.connectong_api.dto.AlterarSenhaDTO;
 import com.example.connectong_api.dto.PerfilDTO;
 import com.example.connectong_api.model.Preferencia;
@@ -38,6 +39,9 @@ public class PerfilService {
 
     @Autowired
     private BCryptPasswordEncoder passwordEncoder;
+
+    @Autowired
+    private AuditService auditService;
 
     // ===================== PERFIL =====================
     public ResponseEntity<?> obterPerfil(Long usuarioId) {
@@ -87,6 +91,47 @@ public class PerfilService {
         return ResponseEntity.ok(ok);
     }
 
+    // ===================== E-MAIL =====================
+    // Troca do e-mail da propria conta. Confirma a identidade pela senha atual
+    // (BCrypt -> 401 se errada) e garante unicidade do novo e-mail (409 se ja
+    // existir). A auditoria registra a troca SEM a senha. O ownership (so o
+    // proprio) e garantido no controller via exigirUsuario.
+    public ResponseEntity<?> alterarEmail(Long usuarioId, AlterarEmailDTO dto) {
+        Usuario u = usuarioRepository.findById(usuarioId).orElse(null);
+        if (u == null) return naoEncontrado();
+
+        // Senha atual incorreta -> 401 (sem revelar mais nada).
+        if (!passwordEncoder.matches(dto.getSenha(), u.getSenha())) {
+            Map<String, String> erro = new HashMap<>();
+            erro.put("erro", "Senha incorreta.");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(erro);
+        }
+
+        String novoEmail = dto.getNovoEmail() != null ? dto.getNovoEmail().trim() : null;
+
+        // Unicidade: qualquer OUTRA conta ja com esse e-mail -> 409. Se for o
+        // MESMO e-mail atual da conta, e no-op de sucesso (idempotente).
+        boolean emailEmUsoPorOutro = usuarioRepository.findByEmail(novoEmail)
+                .map(existente -> !existente.getId().equals(u.getId()))
+                .orElse(false);
+        if (emailEmUsoPorOutro) {
+            Map<String, String> erro = new HashMap<>();
+            erro.put("erro", "E-mail já cadastrado.");
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(erro);
+        }
+
+        u.setEmail(novoEmail);
+        usuarioRepository.save(u);
+
+        auditService.registrar("EMAIL_ALTERADO", u.getId(),
+                "E-mail da conta alterado para: " + novoEmail);
+
+        Map<String, String> ok = new HashMap<>();
+        ok.put("mensagem", "E-mail alterado.");
+        ok.put("email", novoEmail);
+        return ResponseEntity.ok(ok);
+    }
+
     // ===================== PREFERENCIAS =====================
     public ResponseEntity<?> obterPreferencias(Long usuarioId) {
         if (usuarioRepository.findById(usuarioId).isEmpty()) return naoEncontrado();
@@ -117,6 +162,12 @@ public class PerfilService {
         p.setPerfilPublico(dados.getPerfilPublico());
         p.setReceberContatos(dados.getReceberContatos());
         p.setReceberSugestoes(dados.getReceberSugestoes());
+        // 2FA e sensivel: um PUT parcial que nao envia o campo NAO deve desligar
+        // a verificacao por acidente. So sobrescreve quando doisFatores veio no
+        // corpo; ausente => preserva o valor atual.
+        if (dados.getDoisFatores() != null) {
+            p.setDoisFatores(dados.getDoisFatores());
+        }
 
         return ResponseEntity.ok(preferenciaRepository.save(p));
     }

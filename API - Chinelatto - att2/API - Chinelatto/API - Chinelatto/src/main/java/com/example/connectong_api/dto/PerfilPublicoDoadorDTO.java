@@ -1,12 +1,18 @@
 package com.example.connectong_api.dto;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+
 import java.time.LocalDateTime;
 import java.util.List;
 
 /**
  * Perfil PUBLICO de um DOADOR (endpoint sem login). PRIVACIDADE: nunca expoe
- * email, telefone nem valores em R$ — as doacoes PIX aparecem apenas como
- * CONTAGEM em stats.totalDoacoesPix.
+ * valores em R$ (as doacoes PIX aparecem apenas como CONTAGEM em
+ * stats.totalDoacoesPix). email e telefone so aparecem quando o proprio doador
+ * LIGOU os toggles mostrarEmail/mostrarTelefone nas preferencias — espelhando o
+ * que ja vale para o perfil publico da ONG. Com o toggle desligado (ou sem
+ * preferencia salva) o campo vai null e, por @JsonInclude(NON_NULL) nesses dois
+ * campos, e OMITIDO do JSON (o frontend le ausente = nao divulgado).
  */
 public class PerfilPublicoDoadorDTO {
 
@@ -15,6 +21,14 @@ public class PerfilPublicoDoadorDTO {
     private String cidade;
     private String estado;
     private String fotoBase64;
+
+    // Contato: so preenchidos quando o toggle de privacidade correspondente
+    // estiver ligado (senao null, e o NON_NULL abaixo omite o campo). Nunca
+    // vazam por padrao.
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private String email;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private String telefone;
 
     // Data de criacao da conta (null para contas anteriores a coluna).
     private LocalDateTime membroDesde;
@@ -27,7 +41,8 @@ public class PerfilPublicoDoadorDTO {
     private List<PrestacaoRecebidaDTO> prestacoesRecebidas;
 
     public PerfilPublicoDoadorDTO(Long id, String nome, String cidade, String estado,
-                                  String fotoBase64, LocalDateTime membroDesde,
+                                  String fotoBase64, String email, String telefone,
+                                  LocalDateTime membroDesde,
                                   Double notaMediaDoador, Integer totalAvaliacoesDoador,
                                   Stats stats,
                                   List<AvaliacaoDoadorResponseDTO> avaliacoes,
@@ -37,6 +52,8 @@ public class PerfilPublicoDoadorDTO {
         this.cidade = cidade;
         this.estado = estado;
         this.fotoBase64 = fotoBase64;
+        this.email = email;
+        this.telefone = telefone;
         this.membroDesde = membroDesde;
         this.notaMediaDoador = notaMediaDoador;
         this.totalAvaliacoesDoador = totalAvaliacoesDoador;
@@ -50,6 +67,8 @@ public class PerfilPublicoDoadorDTO {
     public String getCidade() { return cidade; }
     public String getEstado() { return estado; }
     public String getFotoBase64() { return fotoBase64; }
+    public String getEmail() { return email; }
+    public String getTelefone() { return telefone; }
     public LocalDateTime getMembroDesde() { return membroDesde; }
     public Double getNotaMediaDoador() { return notaMediaDoador; }
     public Integer getTotalAvaliacoesDoador() { return totalAvaliacoesDoador; }

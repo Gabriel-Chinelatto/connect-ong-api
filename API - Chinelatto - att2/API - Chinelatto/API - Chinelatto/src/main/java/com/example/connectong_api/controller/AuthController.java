@@ -1,9 +1,11 @@
 package com.example.connectong_api.controller;
 
 import com.example.connectong_api.dto.EsqueciSenhaDTO;
+import com.example.connectong_api.dto.Login2faDTO;
 import com.example.connectong_api.dto.RedefinirSenhaDTO;
 import com.example.connectong_api.model.Usuario;
 import com.example.connectong_api.repository.UsuarioRepository;
+import com.example.connectong_api.service.DoisFatoresService;
 import com.example.connectong_api.service.JwtService;
 import com.example.connectong_api.service.SenhaResetService;
 
@@ -40,6 +42,9 @@ public class AuthController {
     @Autowired
     private SenhaResetService senhaResetService;
 
+    @Autowired
+    private DoisFatoresService doisFatoresService;
+
     // =========================
     // ESQUECI A SENHA (publico — /auth/** esta na whitelist do SecurityConfig)
     // Contrato fixo com os frontends: body {"email"} -> SEMPRE 200 generico
@@ -59,6 +64,18 @@ public class AuthController {
     @PostMapping("/redefinir-senha")
     public ResponseEntity<?> redefinirSenha(@Valid @RequestBody RedefinirSenhaDTO dto) {
         return senhaResetService.redefinir(dto);
+    }
+
+    // =========================
+    // LOGIN 2FA (publico — /auth/** esta na whitelist do SecurityConfig)
+    // Segundo passo do login quando a conta tem doisFatores=1. Contrato: body
+    // {"email","codigo"} -> 200 com os MESMOS campos do login normal
+    // (accessToken/refreshToken/id/nome/tipo/ongId); codigo invalido/expirado
+    // -> 400 "Código inválido ou expirado." (generico).
+    // =========================
+    @PostMapping("/login-2fa")
+    public ResponseEntity<?> login2fa(@Valid @RequestBody Login2faDTO dto) {
+        return doisFatoresService.verificarLogin(dto.getEmail(), dto.getCodigo());
     }
 
     // =========================

@@ -1,5 +1,6 @@
 package com.example.connectong_api.controller;
 
+import com.example.connectong_api.dto.AlterarEmailDTO;
 import com.example.connectong_api.dto.AlterarSenhaDTO;
 import com.example.connectong_api.dto.PerfilDTO;
 import com.example.connectong_api.model.Preferencia;
@@ -55,6 +56,16 @@ public class PerfilController {
     ) {
         security.exigirUsuario(id);
         return service.alterarSenha(id, dto);
+    }
+
+    @PutMapping("/email")
+    @Operation(summary = "Alterar o e-mail da própria conta (exige a senha atual)")
+    public ResponseEntity<?> alterarEmail(
+            @PathVariable Long id,
+            @Valid @RequestBody AlterarEmailDTO dto
+    ) {
+        security.exigirUsuario(id);
+        return service.alterarEmail(id, dto);
     }
 
     @DeleteMapping

@@ -37,6 +37,14 @@ public class Preferencia {
     private Boolean receberContatos;
     private Boolean receberSugestoes;
 
+    // ----- Seguranca -----
+    // Verificacao em duas etapas (2FA). Int 0/1 (NAO boolean): segue o padrao do
+    // projeto no MySQL 5.6 (a coluna nasce int via Liquibase, sem o gotcha
+    // BIT/TINYINT do ddl-auto=validate). null (contas antigas, sem a coluna
+    // preenchida) e 0 significam DESLIGADO; so 1 exige o codigo no login.
+    @Column(name = "dois_fatores")
+    private Integer doisFatores;
+
     public Preferencia() {}
 
     /** Valores padrao para um usuario novo. */
@@ -58,6 +66,7 @@ public class Preferencia {
         p.perfilPublico = true;
         p.receberContatos = true;
         p.receberSugestoes = true;
+        p.doisFatores = 0; // 2FA desligado por padrao (logins existentes nao mudam)
         return p;
     }
 
@@ -110,4 +119,7 @@ public class Preferencia {
 
     public Boolean getReceberSugestoes() { return receberSugestoes; }
     public void setReceberSugestoes(Boolean v) { this.receberSugestoes = v; }
+
+    public Integer getDoisFatores() { return doisFatores; }
+    public void setDoisFatores(Integer doisFatores) { this.doisFatores = doisFatores; }
 }

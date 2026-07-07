@@ -1179,3 +1179,86 @@ databaseChangeLog:
             columns:
               - column:
                   name: doador_id
+
+  # =====================================================================
+  # Verificacao em duas etapas (2FA) - 2026-07-07.
+  # (1) Flag por conta na tabela preferencia (que predata o Liquibase, como
+  #     usuario/ong): coluna dois_fatores INT (nao boolean -> sem gotcha
+  #     BIT/TINYINT do ddl-auto=validate no MySQL 5.6). Linhas antigas ficam
+  #     NULL = desligado; o codigo trata null e 0 como 2FA off.
+  # (2) Tabela dois_fatores_codigo: codigos de 6 digitos (varchar, preserva
+  #     zeros a esquerda), validade 10 min, usado_em datetime null = valido
+  #     (padrao datetime-em-vez-de-flag). Espelha senha_reset.
+  # =====================================================================
+  - changeSet:
+      id: dois-fatores-preferencia-coluna
+      author: connect-ong
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: preferencia
+                columnName: dois_fatores
+      changes:
+        - addColumn:
+            tableName: preferencia
+            columns:
+              - column:
+                  name: dois_fatores
+                  type: int
+
+  - changeSet:
+      id: dois-fatores-codigo-create-table
+      author: connect-ong
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: dois_fatores_codigo
+      changes:
+        - createTable:
+            tableName: dois_fatores_codigo
+            columns:
+              - column:
+                  name: id
+                  type: bigint
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: usuario_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: codigo
+                  type: varchar(10)
+              - column:
+                  name: expira_em
+                  type: datetime
+              - column:
+                  name: usado_em
+                  type: datetime
+              - column:
+                  name: criado_em
+                  type: datetime
+
+  - changeSet:
+      id: dois-fatores-codigo-idx-usuario
+      author: connect-ong
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: MARK_RAN
+        - not:
+            - indexExists:
+                indexName: idx_dois_fatores_codigo_usuario
+      changes:
+        - createIndex:
+            indexName: idx_dois_fatores_codigo_usuario
+            tableName: dois_fatores_codigo
+            columns:
+              - column:
+                  name: usuario_id

@@ -1,6 +1,7 @@
 package com.example.connectong_api.controller;
 
 import com.example.connectong_api.dto.NecessidadeRequestDTO;
+import com.example.connectong_api.dto.NecessidadeUpdateDTO;
 import com.example.connectong_api.service.NecessidadeService;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -39,5 +40,15 @@ public class NecessidadeController {
             @Valid @RequestBody NecessidadeRequestDTO dto
     ) {
         return service.criar(dto);
+    }
+
+    @PutMapping("/{id}")
+    @Operation(summary = "Editar uma necessidade (somente a ONG dona)")
+    public ResponseEntity<?> editar(
+            @PathVariable Long id,
+            @Valid @RequestBody NecessidadeUpdateDTO dto
+    ) {
+        // A checagem de dono (a ONG da necessidade) e feita no service.
+        return service.atualizar(id, dto);
     }
 }

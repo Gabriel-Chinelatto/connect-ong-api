@@ -4,10 +4,13 @@ import com.example.connectong_api.dto.CadastroUsuarioDTO;
 import com.example.connectong_api.dto.LoginRequestDTO;
 import com.example.connectong_api.dto.RegistroDoadorDTO;
 import com.example.connectong_api.dto.UsuarioResponseDTO;
+import com.example.connectong_api.model.Preferencia;
 import com.example.connectong_api.model.Usuario;
+import com.example.connectong_api.repository.PreferenciaRepository;
 import com.example.connectong_api.repository.UsuarioRepository;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -42,6 +45,17 @@ public class UsuarioService {
 
     @Autowired
     private RateLimitService rateLimitService;
+
+    @Autowired
+    private PreferenciaRepository preferenciaRepository;
+
+    @Autowired
+    private DoisFatoresService doisFatoresService;
+
+    // Simulacao de envio (feira): quando ligado, a resposta que exige 2FA traz
+    // o codigo em codigoDemo (mesmo precedente do esqueci-senha e do PIX).
+    @Value("${app.demo.enabled:true}")
+    private boolean demoEnabled;
 
     // =========================
     // CADASTRO
@@ -186,6 +200,28 @@ public class UsuarioService {
 
             Usuario usuarioEncontrado = usuarioBanco.get();
 
+            // A senha ja esta correta: zera o contador de falhas da chave email+IP
+            // (vale tanto para o login normal quanto para o desafio 2FA abaixo).
+            rateLimitService.limparFalhas("login", chaveLogin);
+
+            // 2FA: se a conta ligou a verificacao em duas etapas (doisFatores=1),
+            // NAO emite tokens aqui. Gera um codigo de 6 digitos e responde
+            // {requer2fa:true, email, [codigoDemo]}; o cliente confirma em
+            // POST /auth/login-2fa. doisFatores=0/null => segue o login normal.
+            Preferencia pref = preferenciaRepository
+                    .findByUsuarioId(usuarioEncontrado.getId()).orElse(null);
+            if (pref != null && Integer.valueOf(1).equals(pref.getDoisFatores())) {
+                String codigo = doisFatoresService.gerarCodigo(usuarioEncontrado);
+
+                Map<String, Object> desafio = new LinkedHashMap<>();
+                desafio.put("requer2fa", true);
+                desafio.put("email", usuarioEncontrado.getEmail());
+                if (demoEnabled) {
+                    desafio.put("codigoDemo", codigo);
+                }
+                return ResponseEntity.ok(desafio);
+            }
+
             UsuarioResponseDTO resposta =
                     new UsuarioResponseDTO(
                             usuarioEncontrado.getId(),
@@ -197,9 +233,6 @@ public class UsuarioService {
 
             resposta.setAccessToken(jwtService.gerarAccessToken(usuarioEncontrado));
             resposta.setRefreshToken(jwtService.gerarRefreshToken(usuarioEncontrado));
-
-            // sucesso zera o contador de falhas da chave email+IP
-            rateLimitService.limparFalhas("login", chaveLogin);
 
             auditService.registrar("LOGIN_SUCESSO", usuarioEncontrado.getId(),
                     "Login bem-sucedido: " + usuarioEncontrado.getEmail());
