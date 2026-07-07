@@ -74,11 +74,16 @@ public class InteresseService {
             return erro("Doador não encontrado");
         }
 
-        // evita interesse duplicado do mesmo doador na mesma necessidade
-        boolean jaExiste = repository.findByDoadorId(dto.getDoadorId()).stream()
+        // Re-interesse: bloqueia SOMENTE se ja houver interesse EM ANDAMENTO
+        // (PENDENTE ou ACEITO) do mesmo doador nesta necessidade. Interesses
+        // anteriores ja CONCLUIDO ou RECUSADO nao bloqueiam — a necessidade
+        // recorrente pode ser doada de novo (novo ciclo de match).
+        boolean emAndamento = repository.findByDoadorId(dto.getDoadorId()).stream()
                 .anyMatch(i -> i.getNecessidade() != null
-                        && i.getNecessidade().getId().equals(dto.getNecessidadeId()));
-        if (jaExiste) {
+                        && i.getNecessidade().getId().equals(dto.getNecessidadeId())
+                        && ("PENDENTE".equals(i.getStatus())
+                                || "ACEITO".equals(i.getStatus())));
+        if (emAndamento) {
             return erro("Você já demonstrou interesse nesta necessidade");
         }
 

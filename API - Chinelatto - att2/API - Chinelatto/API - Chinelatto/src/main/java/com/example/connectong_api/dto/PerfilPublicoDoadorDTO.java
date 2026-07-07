@@ -94,14 +94,19 @@ public class PerfilPublicoDoadorDTO {
     public static class PrestacaoRecebidaDTO {
         private String titulo;
         private String descricao;
+        // Contraparte (a ONG que prestou contas): id p/ clique -> perfil publico
+        // da ONG nos apps; nome/titulo p/ exibir sem nova chamada.
+        private Long ongId;
         private String ongNome;
         private String necessidadeTitulo;
         private LocalDateTime criadoEm;
 
-        public PrestacaoRecebidaDTO(String titulo, String descricao, String ongNome,
-                                    String necessidadeTitulo, LocalDateTime criadoEm) {
+        public PrestacaoRecebidaDTO(String titulo, String descricao, Long ongId,
+                                    String ongNome, String necessidadeTitulo,
+                                    LocalDateTime criadoEm) {
             this.titulo = titulo;
             this.descricao = descricao;
+            this.ongId = ongId;
             this.ongNome = ongNome;
             this.necessidadeTitulo = necessidadeTitulo;
             this.criadoEm = criadoEm;
@@ -109,6 +114,7 @@ public class PerfilPublicoDoadorDTO {
 
         public String getTitulo() { return titulo; }
         public String getDescricao() { return descricao; }
+        public Long getOngId() { return ongId; }
         public String getOngNome() { return ongNome; }
         public String getNecessidadeTitulo() { return necessidadeTitulo; }
         public LocalDateTime getCriadoEm() { return criadoEm; }

@@ -94,9 +94,12 @@ public class PerfilDoadorService {
     }
 
     private PerfilPublicoDoadorDTO.PrestacaoRecebidaDTO toPrestacaoRecebida(Prestacao p) {
-        String ongNome = (p.getInteresse() != null
+        boolean temOng = p.getInteresse() != null
                 && p.getInteresse().getNecessidade() != null
-                && p.getInteresse().getNecessidade().getOng() != null)
+                && p.getInteresse().getNecessidade().getOng() != null;
+        Long ongId = temOng
+                ? p.getInteresse().getNecessidade().getOng().getId() : null;
+        String ongNome = temOng
                 ? p.getInteresse().getNecessidade().getOng().getNome() : null;
         String necessidadeTitulo = (p.getInteresse() != null
                 && p.getInteresse().getNecessidade() != null)
@@ -104,6 +107,7 @@ public class PerfilDoadorService {
         return new PerfilPublicoDoadorDTO.PrestacaoRecebidaDTO(
                 p.getTitulo(),
                 p.getDescricao(),
+                ongId,
                 ongNome,
                 necessidadeTitulo,
                 p.getDataCriacao());

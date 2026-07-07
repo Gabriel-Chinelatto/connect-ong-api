@@ -538,6 +538,11 @@ class ContratosFeiraTest {
                 .andExpect(jsonPath("$.prestacoesRecebidas[0].titulo")
                         .value("Agasalhos entregues"))
                 .andExpect(jsonPath("$.prestacoesRecebidas[0].ongNome").value(ong.getNome()))
+                // contraparte da prestacao recebida: id (clique -> perfil da ONG)
+                // + titulo da necessidade que gerou a doacao
+                .andExpect(jsonPath("$.prestacoesRecebidas[0].ongId").value(ong.getId()))
+                .andExpect(jsonPath("$.prestacoesRecebidas[0].necessidadeTitulo")
+                        .value("Agasalhos"))
                 // PRIVACIDADE: sem email/telefone e sem valores em R$
                 .andExpect(jsonPath("$.email").doesNotExist())
                 .andExpect(jsonPath("$.telefone").doesNotExist())
@@ -769,5 +774,94 @@ class ContratosFeiraTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.diasNoTopo").value(nullValue()))
                 .andExpect(jsonPath("$.ultimoReinadoDias", greaterThanOrEqualTo(1)));
+    }
+
+    // ===================== H) Contraparte nas prestacoes da ONG =====================
+
+    @Test
+    void perfilPublicoOng_prestacoes_trazemDoadorIdNomeENecessidade() throws Exception {
+        Ong ong = criarOng("ONG Prestacoes Contraparte");
+        Usuario contaOng = criarContaOng(ong);
+        Usuario doador = criarDoador("DoadorPrestacaoOng");
+        Necessidade nec = criarNecessidade(ong, "Cestas basicas");
+        Interesse match = criarInteresse(nec, doador, "CONCLUIDO");
+        match.setDataConclusao(LocalDateTime.now().minusDays(1));
+        interesseRepository.save(match);
+
+        // a ONG presta contas dessa doacao
+        mockMvc.perform(post("/prestacoes")
+                        .header("Authorization", "Bearer " + token(contaOng))
+                        .contentType("application/json")
+                        .content("{\"interesseId\":" + match.getId()
+                                + ",\"titulo\":\"Cestas entregues\""
+                                + ",\"descricao\":\"tudo certo\"}"))
+                .andExpect(status().isCreated());
+
+        // perfil publico da ONG: a prestacao carrega quem recebeu (dedupe + clique
+        // -> perfil publico do doador) e o titulo da necessidade
+        mockMvc.perform(get("/ongs/" + ong.getId() + "/perfil-publico")
+                        .header("Authorization", "Bearer " + token(contaOng)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.prestacoes", hasSize(1)))
+                .andExpect(jsonPath("$.prestacoes[0].titulo").value("Cestas entregues"))
+                .andExpect(jsonPath("$.prestacoes[0].doadorId").value(doador.getId()))
+                .andExpect(jsonPath("$.prestacoes[0].doadorNome").value(doador.getNome()))
+                .andExpect(jsonPath("$.prestacoes[0].necessidadeTitulo")
+                        .value("Cestas basicas"));
+    }
+
+    // ===================== I) Re-interesse apos conclusao =====================
+
+    @Test
+    void reInteresse_bloqueiaEmAndamento_masPermiteAposConcluidoOuRecusado()
+            throws Exception {
+        Ong ong = criarOng("ONG Re-interesse");
+        criarContaOng(ong);
+
+        // (1) interesse PENDENTE em andamento -> novo POST bloqueia
+        Usuario doadorPend = criarDoador("DoadorRePendente");
+        Necessidade necP = criarNecessidade(ong, "Doacao recorrente P");
+        criarInteresse(necP, doadorPend, "PENDENTE");
+        mockMvc.perform(post("/interesses")
+                        .header("Authorization", "Bearer " + token(doadorPend))
+                        .contentType("application/json")
+                        .content("{\"necessidadeId\":" + necP.getId()
+                                + ",\"doadorId\":" + doadorPend.getId() + "}"))
+                .andExpect(status().isBadRequest());
+
+        // (2) interesse ACEITO em andamento -> novo POST bloqueia
+        Usuario doadorAceito = criarDoador("DoadorReAceito");
+        Necessidade necA = criarNecessidade(ong, "Doacao recorrente A");
+        criarInteresse(necA, doadorAceito, "ACEITO");
+        mockMvc.perform(post("/interesses")
+                        .header("Authorization", "Bearer " + token(doadorAceito))
+                        .contentType("application/json")
+                        .content("{\"necessidadeId\":" + necA.getId()
+                                + ",\"doadorId\":" + doadorAceito.getId() + "}"))
+                .andExpect(status().isBadRequest());
+
+        // (3) unico interesse anterior CONCLUIDO -> novo POST cria (201)
+        Usuario doadorConc = criarDoador("DoadorReConcluido");
+        Necessidade necC = criarNecessidade(ong, "Doacao recorrente C");
+        criarInteresse(necC, doadorConc, "CONCLUIDO");
+        mockMvc.perform(post("/interesses")
+                        .header("Authorization", "Bearer " + token(doadorConc))
+                        .contentType("application/json")
+                        .content("{\"necessidadeId\":" + necC.getId()
+                                + ",\"doadorId\":" + doadorConc.getId() + "}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.status").value("PENDENTE"));
+
+        // (4) unico interesse anterior RECUSADO -> novo POST cria (201)
+        Usuario doadorRec = criarDoador("DoadorReRecusado");
+        Necessidade necR = criarNecessidade(ong, "Doacao recorrente R");
+        criarInteresse(necR, doadorRec, "RECUSADO");
+        mockMvc.perform(post("/interesses")
+                        .header("Authorization", "Bearer " + token(doadorRec))
+                        .contentType("application/json")
+                        .content("{\"necessidadeId\":" + necR.getId()
+                                + ",\"doadorId\":" + doadorRec.getId() + "}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.status").value("PENDENTE"));
     }
 }
