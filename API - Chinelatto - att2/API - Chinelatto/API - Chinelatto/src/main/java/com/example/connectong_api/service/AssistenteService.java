@@ -6,8 +6,13 @@ import com.example.connectong_api.dto.AssistenteResponseDTO.Sugestao;
 import com.example.connectong_api.model.Necessidade;
 import com.example.connectong_api.model.Ong;
 import com.example.connectong_api.model.Usuario;
+import com.example.connectong_api.model.DoacaoFinanceira;
+import com.example.connectong_api.model.Interesse;
+import com.example.connectong_api.repository.DoacaoFinanceiraRepository;
+import com.example.connectong_api.repository.InteresseRepository;
 import com.example.connectong_api.repository.NecessidadeRepository;
 import com.example.connectong_api.repository.ONGRepository;
+import com.example.connectong_api.repository.PrestacaoRepository;
 import com.example.connectong_api.repository.UsuarioRepository;
 import com.example.connectong_api.security.SecurityUtils;
 import com.example.connectong_api.security.UsuarioAutenticado;
@@ -56,6 +61,9 @@ public class AssistenteService {
     @Autowired private ONGRepository ongRepository;
     @Autowired private NecessidadeRepository necessidadeRepository;
     @Autowired private UsuarioRepository usuarioRepository;
+    @Autowired private DoacaoFinanceiraRepository doacaoFinanceiraRepository;
+    @Autowired private InteresseRepository interesseRepository;
+    @Autowired private PrestacaoRepository prestacaoRepository;
     @Autowired private SecurityUtils security;
     @Autowired private RateLimitService rateLimitService;
     @Autowired private ProvedorIA provedorIA;
@@ -100,9 +108,41 @@ public class AssistenteService {
     // Facil de estender: basta adicionar "bairro normalizado" -> "Cidade".
     private static final Map<String, String> BAIRROS_CIDADE = new LinkedHashMap<>();
     static {
+        // Campinas
         BAIRROS_CIDADE.put("barao geraldo", "Campinas");
         BAIRROS_CIDADE.put("cidade universitaria", "Campinas");
+        BAIRROS_CIDADE.put("cambui", "Campinas");
+        BAIRROS_CIDADE.put("taquaral", "Campinas");
+        BAIRROS_CIDADE.put("nova campinas", "Campinas");
+        BAIRROS_CIDADE.put("sousas", "Campinas");
+        // Limeira
+        BAIRROS_CIDADE.put("vila queiroz", "Limeira");
+        BAIRROS_CIDADE.put("jardim gloria", "Limeira");
+        BAIRROS_CIDADE.put("centro de limeira", "Limeira");
+        BAIRROS_CIDADE.put("nova europa", "Limeira");
+        BAIRROS_CIDADE.put("jardim aeroporto", "Limeira");
+        BAIRROS_CIDADE.put("parque hipodromo", "Limeira");
+        // Uberaba
+        BAIRROS_CIDADE.put("fabricio", "Uberaba");
+        BAIRROS_CIDADE.put("merces", "Uberaba");
+        BAIRROS_CIDADE.put("santa maria", "Uberaba");
+        BAIRROS_CIDADE.put("abadia", "Uberaba");
+        BAIRROS_CIDADE.put("universitario", "Uberaba");
     }
+
+    // (1) Gatilhos de INTENCAO DE DOACAO (fallback por regras). So montamos cards
+    // quando a mensagem casa uma categoria, cita uma ONG, ou contem um destes.
+    // Substrings (casam em qualquer parte da palavra).
+    private static final List<String> GATILHOS_DOACAO_SUBSTRING = List.of(
+            "doar", "doacao", "doacoes", "doando", "quero doar", "posso doar",
+            "onde doar", "o que doar", "para doar", "pra doar", "recomend",
+            "necessidad", "instituic", "caridade", "voluntari", "filantrop",
+            "arrecad", "desapeg", "quero ajudar", "ajudar quem", "como ajudar",
+            "quem precisa", "abrigo", "orfanato", "asilo");
+    // Palavras inteiras (evita casar dentro de outra palavra, ex.: "ong" em "longe").
+    private static final List<String> GATILHOS_DOACAO_PALAVRA = List.of(
+            "ong", "ongs", "perto", "proximo", "proxima", "proximos", "proximas",
+            "doacao", "sugira", "sugere");
 
     // ================================================================
     // ENTRADA PRINCIPAL
@@ -130,28 +170,33 @@ public class AssistenteService {
         Set<String> categoriasQuery = categoriasDetectadas(normalizar(mensagem));
         Contexto ctx = montarContexto(cidade, categoriasQuery, ongsAtivas, necessidadesAbertas);
 
+        // (4) USER-AWARE: se ha um doador AUTENTICADO, injeta um resumo CONCISO do
+        // historico DELE (categorias, ONGs, cidades). Anonimo => sem bloco (a IA e
+        // instruida a dizer que ainda nao tem historico). NUNCA dados de terceiros.
+        anexarResumoDoador(ctx);
+
         // (5) VISAO: se veio uma foto E ha provedor de visao, descreve os itens e
         // recomenda ONGs/categorias reais. Sem chave/sem imagem => fluxo de texto.
         boolean temImagem = temTexto(dto.getImagemBase64());
         if (temImagem && provedorIA.visaoDisponivel()) {
             AssistenteResponseDTO viaVisao = tentarVisao(dto, mensagem, cidade, ctx);
             if (viaVisao != null) {
-                return ResponseEntity.ok(sanitizar(viaVisao));
+                return ResponseEntity.ok(finalizar(viaVisao, mensagem));
             }
             // A chamada de visao falhou (timeout/429/rede): fallback amigavel.
-            return ResponseEntity.ok(sanitizar(respostaVisaoFalhou(cidade, ctx)));
+            return ResponseEntity.ok(finalizar(respostaVisaoFalhou(cidade, ctx), mensagem));
         }
 
         // 1) Tenta a IA (se ha chave e ela responde). Senao, cai no fallback.
         if (provedorIA.disponivel()) {
             AssistenteResponseDTO viaIa = tentarIa(dto, mensagem, cidade, ctx);
             if (viaIa != null) {
-                return ResponseEntity.ok(sanitizar(viaIa));
+                return ResponseEntity.ok(finalizar(viaIa, mensagem));
             }
         }
 
         // 2) FALLBACK por regras (sempre funciona, sem chave).
-        return ResponseEntity.ok(sanitizar(responderPorRegras(mensagem, cidade, ctx, "regras")));
+        return ResponseEntity.ok(finalizar(responderPorRegras(mensagem, cidade, ctx, "regras"), mensagem));
     }
 
     // ================================================================
@@ -207,16 +252,22 @@ public class AssistenteService {
     // Interpreta a saida da IA (JSON estruturado ou texto puro) -> resposta modo "ia".
     private AssistenteResponseDTO interpretarSaidaIa(String texto, String mensagem,
                                                      String cidade, Contexto ctx) {
-        // Tenta interpretar como JSON {resposta, sugestoes:[{tipo,id}]}.
+        // Tenta interpretar como JSON {resposta, sugestoes:[{tipo,id}], titulo}.
+        // (1) Respeitamos a decisao da IA: se ela devolveu sugestoes VAZIAS (conversa
+        // geral / item nao doavel), o retorno vem vazio — NAO forcamos cards.
         AssistenteResponseDTO estruturada = parsearJsonIa(texto, ctx);
         if (estruturada != null) {
             return estruturada;
         }
 
-        // A IA respondeu texto puro (nao-JSON): usa o texto como resposta e
-        // deriva as sugestoes por busca simples nos dados reais. Modo continua "ia".
-        AssistenteResponseDTO porRegras = responderPorRegras(mensagem, cidade, ctx, "ia");
-        return new AssistenteResponseDTO(texto.trim(), porRegras.getSugestoes(), "ia");
+        // A IA respondeu texto puro (nao-JSON): usa o texto como resposta. Só
+        // derivamos cards por regras quando a mensagem tem intencao clara de doacao;
+        // em conversa geral, sugestoes ficam VAZIAS. Modo continua "ia".
+        List<Sugestao> sugestoes = new ArrayList<>();
+        if (intencaoDoacao(normalizar(mensagem), ctx)) {
+            sugestoes = responderPorRegras(mensagem, cidade, ctx, "ia").getSugestoes();
+        }
+        return new AssistenteResponseDTO(texto.trim(), sugestoes, "ia");
     }
 
     /**
@@ -234,6 +285,9 @@ public class AssistenteService {
             String resposta = raiz.path("resposta").asText("").trim();
             if (resposta.isBlank()) return null;
 
+            // (5) Titulo curto sugerido pela IA (opcional). Sanitizado no finalizar.
+            String titulo = raiz.path("titulo").asText("").trim();
+
             List<Sugestao> sugestoes = new ArrayList<>();
             Set<String> vistos = new LinkedHashSet<>();
             JsonNode arr = raiz.path("sugestoes");
@@ -249,7 +303,7 @@ public class AssistenteService {
                     }
                 }
             }
-            return new AssistenteResponseDTO(resposta, sugestoes, "ia");
+            return new AssistenteResponseDTO(resposta, sugestoes, titulo, "ia");
         } catch (Exception e) {
             return null;
         }
@@ -270,22 +324,44 @@ public class AssistenteService {
     // System prompt: persona Dora + descreve o Connect ONG + injeta os dados reais.
     private String systemPrompt(String cidade, Contexto ctx, boolean visao) {
         StringBuilder sb = new StringBuilder();
-        // (4) PERSONA: Dora, calorosa, acolhedora, brasileira, breve.
-        sb.append("Voce e a Dora, a assistente de doacao do Connect ONG — uma ")
-          .append("plataforma que conecta DOADORES a ONGs. As ONGs publicam ")
-          .append("NECESSIDADES (o que precisam receber); o doador demonstra ")
-          .append("interesse, forma um match, conversa no chat e combina a entrega, ")
-          .append("ou doa dinheiro via PIX. Seu papel: ajudar o DOADOR a decidir ")
-          .append("para quem/o que doar. Fale como brasileira, com tom caloroso, ")
-          .append("acolhedor e breve; ao se apresentar, diga que voce e a Dora; ")
-          .append("incentive a solidariedade com naturalidade, sem ser piegas.\n\n");
+        // (4) PERSONA: Dora, conversacional, calorosa, com conhecimento geral.
+        sb.append("Voce e a Dora, a assistente do Connect ONG — uma plataforma que ")
+          .append("conecta DOADORES a ONGs. As ONGs publicam NECESSIDADES (o que ")
+          .append("precisam receber); o doador demonstra interesse, forma um match, ")
+          .append("conversa no chat e combina a entrega, ou doa dinheiro via PIX. ")
+          .append("Voce e uma assistente CONVERSACIONAL simpatica, com CONHECIMENTO ")
+          .append("GERAL: conversa normalmente sobre qualquer assunto, responde ")
+          .append("perguntas gerais e bate-papo. Fale como brasileira, com tom ")
+          .append("caloroso, acolhedor e breve; ao se apresentar, diga que voce e a ")
+          .append("Dora; incentive a solidariedade com naturalidade, sem ser piegas.\n\n");
+
+        // (1) MODO CONVERSA: cards SO quando o usuario esta pedindo ajuda com doacao.
+        sb.append("QUANDO INCLUIR CARDS (o array \"sugestoes\"): APENAS quando o ")
+          .append("usuario estiver pedindo recomendacao de doacao — onde/o que doar, ")
+          .append("achar ONGs, para quem doar tal item, o que uma ONG precisa. Nesse ")
+          .append("caso, sugira ONGs/necessidades reais da lista abaixo. Para ")
+          .append("CONVERSA GERAL ou off-topic (ex.: 'qual a capital da Franca?', ")
+          .append("'quem ganhou a copa?', bate-papo), o array \"sugestoes\" deve vir ")
+          .append("VAZIO e voce apenas conversa; no maximo, no fim, ofereca ajuda com ")
+          .append("doacao DE LEVE, sem despejar cards.\n\n");
 
         if (visao) {
-            sb.append("O doador enviou uma FOTO de itens que quer doar. Descreva ")
-              .append("brevemente o que voce identifica na imagem e, com base nisso, ")
-              .append("recomende ONGs/necessidades reais da lista abaixo (pela ")
-              .append("categoria dos itens e pela localizacao). Se nao der para ")
-              .append("identificar, peca gentilmente para descrever em texto.\n\n");
+            // (2) VISAO mais esperta: descreve e so recomenda se for item doavel.
+            sb.append("O doador enviou uma FOTO. Descreva brevemente o que voce ve. ")
+              .append("Se for item(ns) DOAVEL(is) — roupas, alimentos, higiene, ")
+              .append("brinquedos, livros, material escolar, utensilios domesticos, ")
+              .append("moveis, eletronicos etc. —, identifique a categoria e recomende ")
+              .append("ONGs/necessidades reais da lista abaixo (por categoria e ")
+              .append("localizacao), preenchendo \"sugestoes\". Se NAO for algo doavel ")
+              .append("(pessoa, selfie, paisagem, documento, animal de estimacao), ")
+              .append("responda com gentileza (ex.: 'essa foto nao parece um item para ")
+              .append("doacao; me mostra o que voce quer doar?') e deixe \"sugestoes\" ")
+              .append("VAZIO. Nunca trave nem invente.\n\n");
+        }
+
+        // (4) USER-AWARE: resumo do doador logado, se houver.
+        if (temTexto(ctx.resumoUsuario)) {
+            sb.append(ctx.resumoUsuario).append("\n\n");
         }
 
         if (cidade != null && !cidade.isBlank()) {
@@ -323,23 +399,38 @@ public class AssistenteService {
         }
 
         sb.append("\nRegras: responda SEMPRE em portugues do Brasil, de forma breve, ")
-          .append("acolhedora e objetiva. Recomende apenas ONGs/necessidades da lista ")
-          .append("acima, citando o nome e a cidade. ")
+          .append("acolhedora e objetiva. Ao recomendar doacao, use apenas ONGs/")
+          .append("necessidades da lista acima, citando o nome e a cidade. ")
           // (1) Localizacao vem da CONVERSA, nao do cadastro.
           .append("Use SEMPRE a localizacao que o doador DIZ na conversa (a cidade ou ")
           .append("o bairro que ele mencionar); NAO assuma a cidade do cadastro se ele ")
-          .append("indicar outra. Priorize o que estiver perto dessa localizacao. Se ")
-          .append("nada casar exatamente, sugira as opcoes mais proximas e explique. ")
-          .append("Nao invente ONGs, dados de contato nem PIX.\n")
-          // (3) PROIBIDO vazar ids/codigos na prosa.
+          .append("indicar outra. ")
+          // (3) Geografia com o proprio conhecimento: deduz cidade a partir do bairro.
+          .append("Se ele citar um BAIRRO, use seu conhecimento geografico para deduzir ")
+          .append("a cidade (ex.: 'esse bairro fica em Limeira') e recomende ONGs dessa ")
+          .append("cidade. Priorize o que estiver perto dessa localizacao. Se NAO houver ")
+          .append("ONG cadastrada na cidade deduzida, diga isso com franqueza e sugira as ")
+          .append("mais proximas ou opcoes gerais. Nao invente ONGs, contato nem PIX.\n")
+          // (4) Personalizacao + privacidade.
+          .append("Se houver um resumo do doador logado acima, use-o para personalizar ")
+          .append("('vejo que voce costuma doar X para ONGs em Y...') e para responder ")
+          .append("'quem sou eu?' ou 'com base no que ja doei, onde posso doar?'. Se NAO ")
+          .append("houver resumo (visitante sem login/sem historico), diga com gentileza ")
+          .append("que ainda nao tem o historico dele e ofereca ajuda para comecar. NUNCA ")
+          .append("exponha dados de OUTROS usuarios.\n")
+          // (3-old) PROIBIDO vazar ids/codigos na prosa.
           .append("NUNCA escreva ids, codigos ou trechos como \"[id=123]\" no campo ")
-          .append("\"resposta\": na prosa cite APENAS o nome e a cidade da ONG/")
-          .append("necessidade. Os ids vao SOMENTE dentro do array \"sugestoes\".\n")
-          .append("Responda EXCLUSIVAMENTE com um JSON valido, sem texto fora dele, ")
-          .append("no formato: {\"resposta\":\"seu texto\",\"sugestoes\":[{\"tipo\":")
-          .append("\"NECESSIDADE\",\"id\":123},{\"tipo\":\"ONG\",\"id\":45}]}. ")
-          .append("Inclua em sugestoes os ids reais das opcoes citadas (no maximo ")
-          .append(MAX_SUGESTOES).append("). Se nao houver o que sugerir, use lista vazia.");
+          .append("\"resposta\" nem no \"titulo\": na prosa cite APENAS o nome e a ")
+          .append("cidade da ONG/necessidade. Os ids vao SOMENTE dentro de \"sugestoes\".\n")
+          .append("Responda EXCLUSIVAMENTE com um JSON valido, sem texto fora dele, no ")
+          .append("formato: {\"resposta\":\"seu texto\",\"sugestoes\":[{\"tipo\":")
+          .append("\"NECESSIDADE\",\"id\":123},{\"tipo\":\"ONG\",\"id\":45}],")
+          .append("\"titulo\":\"assunto em 2-4 palavras\"}. ")
+          .append("O \"titulo\" resume o assunto da conversa em 2 a 4 palavras (PT-BR, ")
+          .append("sem ids nem emoji), para nomear o chat. Inclua em \"sugestoes\" os ids ")
+          .append("reais das opcoes citadas (no maximo ").append(MAX_SUGESTOES)
+          .append("); em CONVERSA GERAL ou item nao doavel, use \"sugestoes\":[] (lista ")
+          .append("vazia).");
         return sb.toString();
     }
 
@@ -349,6 +440,12 @@ public class AssistenteService {
     private AssistenteResponseDTO responderPorRegras(String mensagem, String cidade,
                                                      Contexto ctx, String modo) {
         String norm = normalizar(mensagem);
+
+        // (1) MODO CONVERSA no fallback: se NAO ha intencao clara de doacao, responde
+        // curto e conversacional, SEM cards (nao despeja ONGs em pergunta geral).
+        if (!intencaoDoacao(norm, ctx)) {
+            return respostaConversacional(modo);
+        }
 
         // (C) Pergunta sobre uma ONG especifica citada pelo nome.
         Ong ongCitada = ongCitadaNaMensagem(norm, ctx);
@@ -477,6 +574,152 @@ public class AssistenteService {
             sugestoes.add(cardNecessidade(n));
         }
         return new AssistenteResponseDTO(sb.toString(), sugestoes, modo);
+    }
+
+    // (1) Ha intencao clara de DOACAO na mensagem? (categoria reconhecida, ONG
+    // citada, ou algum gatilho de doar/ong/perto...). Em conversa geral, false.
+    private boolean intencaoDoacao(String norm, Contexto ctx) {
+        if (norm == null || norm.isBlank()) return false;
+        if (!categoriasDetectadas(norm).isEmpty()) return true;
+        if (ongCitadaNaMensagem(norm, ctx) != null) return true;
+        for (String g : GATILHOS_DOACAO_SUBSTRING) {
+            if (norm.contains(g)) return true;
+        }
+        for (String g : GATILHOS_DOACAO_PALAVRA) {
+            if (contemPalavra(norm, g)) return true;
+        }
+        return false;
+    }
+
+    // (1) Conversa geral no fallback (sem chave de IA): resposta curta e simpatica,
+    // SEM cards. O fallback nao tem conhecimento geral, entao conversa de leve e
+    // reencaminha para o que ela sabe fazer: ajudar a doar.
+    private AssistenteResponseDTO respostaConversacional(String modo) {
+        String txt = "Oi! Eu sou a Dora, do Connect ONG. Adoro bater papo, mas sobre "
+                + "esse assunto eu nao vou saber responder com detalhe. O que eu faco "
+                + "de melhor e te ajudar a doar: e so me dizer o que voce tem para doar "
+                + "(roupas, alimentos, higiene, brinquedos, material escolar...) ou de "
+                + "que cidade voce e, que eu sugiro ONGs e necessidades reais.";
+        return new AssistenteResponseDTO(txt, new ArrayList<>(), modo);
+    }
+
+    /**
+     * (4) USER-AWARE. Se ha um doador AUTENTICADO, monta um resumo CONCISO do
+     * historico DELE (categorias que ja doou, ONGs que ajudou, cidades, contagens)
+     * a partir de dados REAIS: matches CONCLUIDOS (Interesse), doacoes PIX e
+     * prestacoes recebidas. Injeta no Contexto para o system prompt personalizar.
+     * NUNCA le dados de outro usuario (tudo filtrado pelo id do token). Anonimo ou
+     * sem historico => nao injeta bloco (a IA e instruida a lidar com isso).
+     */
+    private void anexarResumoDoador(Contexto ctx) {
+        UsuarioAutenticado atual = security.atual();
+        if (atual == null || atual.getId() == null) return;
+        // So o DOADOR tem historico de doacao; ONG logada nao se aplica.
+        if (atual.getTipo() != null && !"DOADOR".equalsIgnoreCase(atual.getTipo())) return;
+
+        Long doadorId = atual.getId();
+        Usuario u = usuarioRepository.findById(doadorId).orElse(null);
+        if (u != null && u.getDataExclusao() != null) return; // conta excluida
+
+        Set<String> categorias = new LinkedHashSet<>();
+        Set<String> ongsAjudadas = new LinkedHashSet<>();
+        Set<String> cidades = new LinkedHashSet<>();
+        int matchesConcluidos = 0;
+
+        // Matches CONCLUIDOS (doacao de item confirmada pela ONG) — sao a fonte mais
+        // rica: categoria da necessidade, ONG e cidade.
+        for (Interesse i : interesseRepository.findByDoadorId(doadorId)) {
+            if (!"CONCLUIDO".equalsIgnoreCase(i.getStatus())) continue;
+            matchesConcluidos++;
+            Necessidade n = i.getNecessidade();
+            if (n == null) continue;
+            if (temTexto(n.getCategoria())) categorias.add(Categorias.normalizar(n.getCategoria()));
+            if (n.getOng() != null) {
+                if (temTexto(n.getOng().getNome())) ongsAjudadas.add(n.getOng().getNome().trim());
+                if (temTexto(n.getOng().getCidade())) cidades.add(n.getOng().getCidade().trim());
+            }
+        }
+
+        // Doacoes financeiras (PIX): adicionam ONGs ajudadas.
+        List<DoacaoFinanceira> pix = doacaoFinanceiraRepository
+                .findByDoadorIdOrderByDataCriacaoDesc(doadorId);
+        for (DoacaoFinanceira d : pix) {
+            if (temTexto(d.getOngNome())) ongsAjudadas.add(d.getOngNome().trim());
+        }
+        int doacoesPix = pix.size();
+        long prestacoesRecebidas = prestacaoRepository
+                .findByInteresseDoadorIdOrderByDataCriacaoDesc(doadorId).size();
+
+        boolean semHistorico = matchesConcluidos == 0 && doacoesPix == 0
+                && ongsAjudadas.isEmpty() && categorias.isEmpty();
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("Sobre o DOADOR logado (use para personalizar; e o proprio usuario, ")
+          .append("NUNCA exponha dados de terceiros):");
+        if (u != null && temTexto(u.getNome())) sb.append("\n- Nome: ").append(u.getNome().trim());
+        if (u != null && temTexto(u.getCidade())) sb.append("\n- Cidade do cadastro: ").append(u.getCidade().trim());
+        if (!categorias.isEmpty()) {
+            sb.append("\n- Ja doou itens nas categorias: ")
+              .append(String.join(", ", limitar(new ArrayList<>(categorias), 6)));
+        }
+        if (!ongsAjudadas.isEmpty()) {
+            sb.append("\n- Ja ajudou as ONGs: ")
+              .append(String.join(", ", limitar(new ArrayList<>(ongsAjudadas), 6)));
+        }
+        if (!cidades.isEmpty()) {
+            sb.append("\n- Cidades onde ja doou: ")
+              .append(String.join(", ", limitar(new ArrayList<>(cidades), 4)));
+        }
+        sb.append("\n- Matches concluidos: ").append(matchesConcluidos)
+          .append("; doacoes via PIX: ").append(doacoesPix)
+          .append("; prestacoes de contas recebidas: ").append(prestacoesRecebidas).append(".");
+        if (semHistorico) {
+            sb.append("\n- Ele ainda NAO tem historico de doacao. Se ele perguntar sobre ")
+              .append("si, diga isso com gentileza e ofereca ajuda para comecar a doar.");
+        }
+        ctx.resumoUsuario = sb.toString();
+    }
+
+    // (5) Deriva um titulo simples da 1a mensagem quando a IA nao mandou um (ou no
+    // fallback): capitaliza e corta em ~4 palavras / 40 chars, sem ids.
+    private String tituloDe(String mensagem) {
+        String limpa = limparTitulo(mensagem);
+        if (limpa == null || limpa.isBlank()) return "Conversa";
+        String[] palavras = limpa.split("\\s+");
+        int n = Math.min(palavras.length, 4);
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < n; i++) {
+            if (i > 0) sb.append(' ');
+            sb.append(palavras[i]);
+        }
+        String t = sb.toString().trim();
+        if (t.isEmpty()) return "Conversa";
+        return Character.toUpperCase(t.charAt(0)) + t.substring(1);
+    }
+
+    // (5) SANITIZA o titulo: remove ids/codigos, aspas e quebras, colapsa espacos e
+    // corta em 40 chars. Retorna null quando entra nulo.
+    private String limparTitulo(String t) {
+        if (t == null) return null;
+        String s = t.replaceAll("(?i)[\\[(]?\\s*id\\s*[:=]?\\s*\\d+\\s*[\\])]?", " ")
+                    .replaceAll("[\\r\\n\"]", " ")
+                    .replaceAll("[\\[\\](){}]", " ")
+                    .replaceAll("\\s{2,}", " ")
+                    .trim();
+        if (s.length() > 40) s = s.substring(0, 40).trim();
+        return s;
+    }
+
+    // (3+5) Passo final comum: sanitiza a prosa (remove ids) e GARANTE um titulo
+    // (usa o da IA se veio limpo; senao deriva da mensagem do usuario).
+    private AssistenteResponseDTO finalizar(AssistenteResponseDTO dto, String mensagem) {
+        sanitizar(dto);
+        if (dto != null) {
+            String t = limparTitulo(dto.getTitulo());
+            if (t == null || t.isBlank()) t = tituloDe(mensagem);
+            dto.setTitulo(t);
+        }
+        return dto;
     }
 
     // (5) A chamada de VISAO falhou (timeout/429/rede): pede a descricao em texto,
@@ -807,5 +1050,7 @@ public class AssistenteService {
         Map<Long, Ong> ongPorId = new LinkedHashMap<>();
         Map<Long, Necessidade> necessidadePorId = new LinkedHashMap<>();
         Map<Long, List<String>> categoriasPorOng = new LinkedHashMap<>();
+        // (4) Resumo do doador autenticado (null p/ anonimo) — injetado no prompt.
+        String resumoUsuario;
     }
 }

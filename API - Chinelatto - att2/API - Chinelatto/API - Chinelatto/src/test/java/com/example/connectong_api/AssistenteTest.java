@@ -1,13 +1,19 @@
 package com.example.connectong_api;
 
+import com.example.connectong_api.model.Interesse;
 import com.example.connectong_api.model.Necessidade;
 import com.example.connectong_api.model.Ong;
+import com.example.connectong_api.model.Usuario;
+import com.example.connectong_api.repository.InteresseRepository;
 import com.example.connectong_api.repository.NecessidadeRepository;
 import com.example.connectong_api.repository.ONGRepository;
+import com.example.connectong_api.repository.UsuarioRepository;
+import com.example.connectong_api.service.JwtService;
 import com.example.connectong_api.service.ProvedorIA;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -39,6 +45,9 @@ class AssistenteTest {
     @Autowired private MockMvc mockMvc;
     @Autowired private ONGRepository ongRepository;
     @Autowired private NecessidadeRepository necessidadeRepository;
+    @Autowired private UsuarioRepository usuarioRepository;
+    @Autowired private InteresseRepository interesseRepository;
+    @Autowired private JwtService jwtService;
 
     // Substitui o GroqService por um mock: controlamos disponivel()/completar().
     @MockBean private ProvedorIA provedorIA;
@@ -331,5 +340,140 @@ class AssistenteTest {
                         .contentType("application/json")
                         .content("{}"))
                 .andExpect(status().isBadRequest());
+    }
+
+    // ===============================================================
+    // NOVOS COMPORTAMENTOS (modo conversa, empty sugestoes, titulo,
+    // visao nao-doavel, user-aware)
+    // ===============================================================
+
+    // (a) SEM IA + pergunta GERAL -> conversa, sugestoes VAZIAS (nao despeja cards).
+    @Test
+    void perguntaGeral_semIa_naoRetornaCards() throws Exception {
+        Mockito.when(provedorIA.disponivel()).thenReturn(false);
+
+        mockMvc.perform(post("/assistente")
+                        .contentType("application/json")
+                        .content("{\"mensagem\":\"qual a capital da Franca?\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.modo").value("regras"))
+                .andExpect(jsonPath("$.sugestoes", empty()))
+                .andExpect(jsonPath("$.resposta", not(emptyString())))
+                // titulo derivado da 1a mensagem
+                .andExpect(jsonPath("$.titulo", not(emptyOrNullString())));
+    }
+
+    // (a2) COM IA + pergunta geral: a IA devolve sugestoes vazias -> respeitamos
+    // (NAO forcamos o fallback a preencher).
+    @Test
+    void perguntaGeral_comIa_sugestoesVaziasSaoRespeitadas() throws Exception {
+        Mockito.when(provedorIA.disponivel()).thenReturn(true);
+        Mockito.when(provedorIA.completar(Mockito.anyList()))
+                .thenReturn(Optional.of("{\"resposta\":\"A capital da Franca e Paris!\","
+                        + "\"sugestoes\":[],\"titulo\":\"Capital da Franca\"}"));
+
+        mockMvc.perform(post("/assistente")
+                        .contentType("application/json")
+                        .content("{\"mensagem\":\"qual a capital da Franca?\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.modo").value("ia"))
+                .andExpect(jsonPath("$.sugestoes", empty()))
+                .andExpect(jsonPath("$.titulo").value("Capital da Franca"));
+    }
+
+    // (b) SEM IA + pergunta de DOACAO -> cards preenchidos.
+    @Test
+    void perguntaDeDoacao_semIa_retornaCards() throws Exception {
+        Mockito.when(provedorIA.disponivel()).thenReturn(false);
+
+        mockMvc.perform(post("/assistente")
+                        .contentType("application/json")
+                        .content("{\"mensagem\":\"quero doar roupas\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.modo").value("regras"))
+                .andExpect(jsonPath("$.sugestoes", not(empty())))
+                .andExpect(jsonPath("$.titulo", not(emptyOrNullString())));
+    }
+
+    // (c) VISAO de item NAO doavel: a IA descreve gentil e devolve sugestoes vazias
+    // -> sem cards (respeitado).
+    @Test
+    void visao_itemNaoDoavel_semCards() throws Exception {
+        Mockito.when(provedorIA.visaoDisponivel()).thenReturn(true);
+        Mockito.when(provedorIA.completarComImagem(Mockito.anyList(), Mockito.anyString()))
+                .thenReturn(Optional.of("{\"resposta\":\"Isso parece uma selfie, nao um "
+                        + "item para doacao. Me mostra o que voce quer doar?\","
+                        + "\"sugestoes\":[],\"titulo\":\"Foto de pessoa\"}"));
+
+        mockMvc.perform(post("/assistente")
+                        .contentType("application/json")
+                        .content("{\"mensagem\":\"da pra doar isso?\","
+                                + "\"imagemBase64\":\"data:image/jpeg;base64,QUJD\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.modo").value("ia"))
+                .andExpect(jsonPath("$.sugestoes", empty()))
+                .andExpect(jsonPath("$.resposta", containsString("doar")));
+    }
+
+    // (d) USER-AWARE: doador autenticado com historico -> o system prompt injeta um
+    // resumo DELE (categoria/ONG que ele ja ajudou). Capturamos as mensagens.
+    @Test
+    @SuppressWarnings("unchecked")
+    void usuarioAutenticadoComHistorico_injetaResumoNoPrompt() throws Exception {
+        Mockito.when(provedorIA.disponivel()).thenReturn(true);
+        Mockito.when(provedorIA.completar(Mockito.anyList()))
+                .thenReturn(Optional.of("{\"resposta\":\"Voce costuma ajudar por aqui!\","
+                        + "\"sugestoes\":[],\"titulo\":\"Meu historico\"}"));
+
+        // Cria um DOADOR real e um match CONCLUIDO com a necessidade de Roupas.
+        Usuario doador = new Usuario();
+        doador.setNome("Maria Doadora");
+        doador.setEmail("maria" + SEQ.getAndIncrement() + "@assist.test");
+        doador.setTipo("DOADOR");
+        doador.setCidade("Limeira");
+        doador = usuarioRepository.save(doador);
+
+        Necessidade nec = necessidadeRepository.findById(necessidadeRoupasId).orElseThrow();
+        Interesse i = new Interesse();
+        i.setDoador(doador);
+        i.setNecessidade(nec);
+        i.setStatus("CONCLUIDO");
+        interesseRepository.save(i);
+
+        String token = jwtService.gerarAccessToken(doador);
+
+        mockMvc.perform(post("/assistente")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType("application/json")
+                        .content("{\"mensagem\":\"quem sou eu? com base no que ja doei, "
+                                + "onde posso doar?\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.modo").value("ia"));
+
+        // O system prompt deve conter o resumo do doador (categoria Roupas + doador).
+        ArgumentCaptor<List<ProvedorIA.MensagemIA>> captor = ArgumentCaptor.forClass(List.class);
+        Mockito.verify(provedorIA).completar(captor.capture());
+        String system = captor.getValue().stream()
+                .filter(m -> "system".equals(m.papel()))
+                .map(ProvedorIA.MensagemIA::conteudo)
+                .findFirst().orElse("");
+        org.junit.jupiter.api.Assertions.assertTrue(
+                system.contains("DOADOR logado"),
+                "o prompt deveria conter o bloco do doador logado");
+        org.junit.jupiter.api.Assertions.assertTrue(
+                system.contains("Roupas"),
+                "o prompt deveria citar a categoria ja doada (Roupas)");
+    }
+
+    // (e) TITULO presente na resposta em modo regras (derivado da 1a mensagem).
+    @Test
+    void titulo_presenteNaResposta() throws Exception {
+        Mockito.when(provedorIA.disponivel()).thenReturn(false);
+
+        mockMvc.perform(post("/assistente")
+                        .contentType("application/json")
+                        .content("{\"mensagem\":\"tenho roupas pra doar em Limeira\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.titulo", not(emptyOrNullString())));
     }
 }
