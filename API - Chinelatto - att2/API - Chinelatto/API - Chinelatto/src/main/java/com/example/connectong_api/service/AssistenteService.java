@@ -94,6 +94,16 @@ public class AssistenteService {
                 "curativo", "fisioterap"));
     }
 
+    // Bairros/distritos conhecidos -> cidade. Usado para detectar a localizacao
+    // MENCIONADA na conversa quando o doador cita um bairro (e nao a cidade).
+    // Chaves SEM acento e minusculas (comparadas contra a mensagem normalizada).
+    // Facil de estender: basta adicionar "bairro normalizado" -> "Cidade".
+    private static final Map<String, String> BAIRROS_CIDADE = new LinkedHashMap<>();
+    static {
+        BAIRROS_CIDADE.put("barao geraldo", "Campinas");
+        BAIRROS_CIDADE.put("cidade universitaria", "Campinas");
+    }
+
     // ================================================================
     // ENTRADA PRINCIPAL
     // ================================================================
@@ -104,21 +114,44 @@ public class AssistenteService {
         }
 
         String mensagem = dto.getMensagem() != null ? dto.getMensagem().trim() : "";
-        String cidade = resolverCidade(dto);
 
-        // Dados reais (ONGs ativas + necessidades abertas), priorizando a cidade.
-        Contexto ctx = montarContexto(cidade);
+        // Dados reais lidos AO VIVO do banco a cada request (add/editar/excluir ONG
+        // ou necessidade reflete sem redeploy; soft-deletadas/inativas nao entram).
+        List<Ong> ongsAtivas = carregarOngsAtivas();
+        List<Necessidade> necessidadesAbertas = carregarNecessidadesAbertas();
+
+        // (1) LOCALIZACAO ADAPTAVEL: a cidade/bairro citado NA MENSAGEM vence a do
+        // perfil. So se a mensagem nao disser nada usamos a cidade do body/perfil.
+        String cidadeMensagem = detectarLocalizacaoNaMensagem(mensagem, ongsAtivas);
+        String cidade = cidadeMensagem != null ? cidadeMensagem : resolverCidade(dto);
+
+        // (2) GROUNDING QUERY-AWARE: filtra/prioriza pelos itens relevantes a
+        // pergunta (localizacao detectada + categorias mencionadas) antes de cortar.
+        Set<String> categoriasQuery = categoriasDetectadas(normalizar(mensagem));
+        Contexto ctx = montarContexto(cidade, categoriasQuery, ongsAtivas, necessidadesAbertas);
+
+        // (5) VISAO: se veio uma foto E ha provedor de visao, descreve os itens e
+        // recomenda ONGs/categorias reais. Sem chave/sem imagem => fluxo de texto.
+        boolean temImagem = temTexto(dto.getImagemBase64());
+        if (temImagem && provedorIA.visaoDisponivel()) {
+            AssistenteResponseDTO viaVisao = tentarVisao(dto, mensagem, cidade, ctx);
+            if (viaVisao != null) {
+                return ResponseEntity.ok(sanitizar(viaVisao));
+            }
+            // A chamada de visao falhou (timeout/429/rede): fallback amigavel.
+            return ResponseEntity.ok(sanitizar(respostaVisaoFalhou(cidade, ctx)));
+        }
 
         // 1) Tenta a IA (se ha chave e ela responde). Senao, cai no fallback.
         if (provedorIA.disponivel()) {
             AssistenteResponseDTO viaIa = tentarIa(dto, mensagem, cidade, ctx);
             if (viaIa != null) {
-                return ResponseEntity.ok(viaIa);
+                return ResponseEntity.ok(sanitizar(viaIa));
             }
         }
 
         // 2) FALLBACK por regras (sempre funciona, sem chave).
-        return ResponseEntity.ok(responderPorRegras(mensagem, cidade, ctx, "regras"));
+        return ResponseEntity.ok(sanitizar(responderPorRegras(mensagem, cidade, ctx, "regras")));
     }
 
     // ================================================================
@@ -126,8 +159,34 @@ public class AssistenteService {
     // ================================================================
     private AssistenteResponseDTO tentarIa(AssistenteRequestDTO dto, String mensagem,
                                            String cidade, Contexto ctx) {
+        List<ProvedorIA.MensagemIA> mensagens = montarMensagens(dto, mensagem, cidade, ctx, false);
+
+        Optional<String> saida = provedorIA.completar(mensagens);
+        if (saida.isEmpty()) {
+            return null; // IA indisponivel/falhou -> fallback
+        }
+        return interpretarSaidaIa(saida.get(), mensagem, cidade, ctx);
+    }
+
+    // (5) Caminho de VISAO: mesma montagem, mas system prompt orientado a foto e
+    // a chamada anexa a imagem. Retorna null se a visao falhar (chamador mostra
+    // um fallback amigavel). Reusa a validacao de ids e o parse de JSON do texto.
+    private AssistenteResponseDTO tentarVisao(AssistenteRequestDTO dto, String mensagem,
+                                              String cidade, Contexto ctx) {
+        List<ProvedorIA.MensagemIA> mensagens = montarMensagens(dto, mensagem, cidade, ctx, true);
+
+        Optional<String> saida = provedorIA.completarComImagem(mensagens, dto.getImagemBase64());
+        if (saida.isEmpty()) {
+            return null; // visao falhou -> chamador mostra fallback amigavel
+        }
+        return interpretarSaidaIa(saida.get(), mensagem, cidade, ctx);
+    }
+
+    // Monta system + historico + mensagem do usuario (comum a texto e visao).
+    private List<ProvedorIA.MensagemIA> montarMensagens(AssistenteRequestDTO dto, String mensagem,
+                                                        String cidade, Contexto ctx, boolean visao) {
         List<ProvedorIA.MensagemIA> mensagens = new ArrayList<>();
-        mensagens.add(new ProvedorIA.MensagemIA("system", systemPrompt(cidade, ctx)));
+        mensagens.add(new ProvedorIA.MensagemIA("system", systemPrompt(cidade, ctx, visao)));
 
         // Historico truncado (ultimas MAX_HISTORICO trocas).
         if (dto.getHistorico() != null) {
@@ -142,14 +201,12 @@ public class AssistenteService {
             }
         }
         mensagens.add(new ProvedorIA.MensagemIA("user", mensagem));
+        return mensagens;
+    }
 
-        Optional<String> saida = provedorIA.completar(mensagens);
-        if (saida.isEmpty()) {
-            return null; // IA indisponivel/falhou -> fallback
-        }
-
-        String texto = saida.get();
-
+    // Interpreta a saida da IA (JSON estruturado ou texto puro) -> resposta modo "ia".
+    private AssistenteResponseDTO interpretarSaidaIa(String texto, String mensagem,
+                                                     String cidade, Contexto ctx) {
         // Tenta interpretar como JSON {resposta, sugestoes:[{tipo,id}]}.
         AssistenteResponseDTO estruturada = parsearJsonIa(texto, ctx);
         if (estruturada != null) {
@@ -210,17 +267,30 @@ public class AssistenteService {
         return null;
     }
 
-    // System prompt: descreve o Connect ONG + injeta os dados reais.
-    private String systemPrompt(String cidade, Contexto ctx) {
+    // System prompt: persona Dora + descreve o Connect ONG + injeta os dados reais.
+    private String systemPrompt(String cidade, Contexto ctx, boolean visao) {
         StringBuilder sb = new StringBuilder();
-        sb.append("Voce e o assistente virtual do Connect ONG, uma plataforma que ")
-          .append("conecta DOADORES a ONGs. As ONGs publicam NECESSIDADES (o que ")
-          .append("precisam receber); o doador demonstra interesse, forma um match, ")
-          .append("conversa no chat e combina a entrega, ou doa dinheiro via PIX. ")
-          .append("Seu papel: ajudar o DOADOR a decidir para quem/o que doar.\n\n");
+        // (4) PERSONA: Dora, calorosa, acolhedora, brasileira, breve.
+        sb.append("Voce e a Dora, a assistente de doacao do Connect ONG — uma ")
+          .append("plataforma que conecta DOADORES a ONGs. As ONGs publicam ")
+          .append("NECESSIDADES (o que precisam receber); o doador demonstra ")
+          .append("interesse, forma um match, conversa no chat e combina a entrega, ")
+          .append("ou doa dinheiro via PIX. Seu papel: ajudar o DOADOR a decidir ")
+          .append("para quem/o que doar. Fale como brasileira, com tom caloroso, ")
+          .append("acolhedor e breve; ao se apresentar, diga que voce e a Dora; ")
+          .append("incentive a solidariedade com naturalidade, sem ser piegas.\n\n");
+
+        if (visao) {
+            sb.append("O doador enviou uma FOTO de itens que quer doar. Descreva ")
+              .append("brevemente o que voce identifica na imagem e, com base nisso, ")
+              .append("recomende ONGs/necessidades reais da lista abaixo (pela ")
+              .append("categoria dos itens e pela localizacao). Se nao der para ")
+              .append("identificar, peca gentilmente para descrever em texto.\n\n");
+        }
 
         if (cidade != null && !cidade.isBlank()) {
-            sb.append("Cidade do doador: ").append(cidade).append(".\n\n");
+            sb.append("Localizacao de referencia (a que o doador indicou ou a do ")
+              .append("cadastro): ").append(cidade).append(".\n\n");
         }
 
         sb.append("ONGs ativas (use SOMENTE estas ao recomendar):\n");
@@ -254,10 +324,17 @@ public class AssistenteService {
 
         sb.append("\nRegras: responda SEMPRE em portugues do Brasil, de forma breve, ")
           .append("acolhedora e objetiva. Recomende apenas ONGs/necessidades da lista ")
-          .append("acima, citando o nome e a cidade. Se o doador informou a cidade, ")
-          .append("priorize o que estiver perto. Se nada casar exatamente, sugira as ")
-          .append("opcoes mais proximas e explique. Nao invente ONGs, dados de contato ")
-          .append("nem PIX.\n")
+          .append("acima, citando o nome e a cidade. ")
+          // (1) Localizacao vem da CONVERSA, nao do cadastro.
+          .append("Use SEMPRE a localizacao que o doador DIZ na conversa (a cidade ou ")
+          .append("o bairro que ele mencionar); NAO assuma a cidade do cadastro se ele ")
+          .append("indicar outra. Priorize o que estiver perto dessa localizacao. Se ")
+          .append("nada casar exatamente, sugira as opcoes mais proximas e explique. ")
+          .append("Nao invente ONGs, dados de contato nem PIX.\n")
+          // (3) PROIBIDO vazar ids/codigos na prosa.
+          .append("NUNCA escreva ids, codigos ou trechos como \"[id=123]\" no campo ")
+          .append("\"resposta\": na prosa cite APENAS o nome e a cidade da ONG/")
+          .append("necessidade. Os ids vao SOMENTE dentro do array \"sugestoes\".\n")
           .append("Responda EXCLUSIVAMENTE com um JSON valido, sem texto fora dele, ")
           .append("no formato: {\"resposta\":\"seu texto\",\"sugestoes\":[{\"tipo\":")
           .append("\"NECESSIDADE\",\"id\":123},{\"tipo\":\"ONG\",\"id\":45}]}. ")
@@ -385,7 +462,8 @@ public class AssistenteService {
 
     private AssistenteResponseDTO respostaPadrao(String cidade, Contexto ctx, String modo) {
         StringBuilder sb = new StringBuilder();
-        sb.append("Oi! Sou o assistente do Connect ONG e posso te ajudar a doar. ")
+        sb.append("Oi! Eu sou a Dora, a assistente de doacao do Connect ONG, e posso ")
+          .append("te ajudar a doar. ")
           .append("Me conte o que voce tem para doar (roupas, alimentos, higiene, ")
           .append("brinquedos, material escolar...) ou de que cidade voce e, que eu ")
           .append("sugiro ONGs e necessidades reais. Enquanto isso, veja algumas que ")
@@ -401,22 +479,62 @@ public class AssistenteService {
         return new AssistenteResponseDTO(sb.toString(), sugestoes, modo);
     }
 
+    // (5) A chamada de VISAO falhou (timeout/429/rede): pede a descricao em texto,
+    // mas ja mostra algumas necessidades reais para nao deixar o doador sem opcao.
+    private AssistenteResponseDTO respostaVisaoFalhou(String cidade, Contexto ctx) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("Nao consegui analisar a foto agora. Me conta em texto o que voce ")
+          .append("tem para doar (roupas, alimentos, higiene, brinquedos, material ")
+          .append("escolar...) que eu sugiro ONGs e necessidades reais. ")
+          .append("Enquanto isso, veja algumas que estao precisando:");
+
+        List<Sugestao> sugestoes = new ArrayList<>();
+        List<Necessidade> destaque = new ArrayList<>(ctx.necessidades);
+        ordenarNecessidades(destaque, cidade);
+        for (Necessidade n : limitar(destaque, MAX_SUGESTOES)) {
+            sugestoes.add(cardNecessidade(n));
+        }
+        return new AssistenteResponseDTO(sb.toString(), sugestoes, "regras");
+    }
+
+    /**
+     * (3) SANITIZA a prosa: remove qualquer id/codigo vazado ("[id=123]", "id=123",
+     * "id: 123", "(id 45)", "[id 7]") do campo `resposta`, em AMBOS os modos (IA e
+     * regras). Os cards continuam intactos em `sugestoes`. Rede de seguranca alem
+     * da instrucao no system prompt e da prosa sem ids do fallback.
+     */
+    private AssistenteResponseDTO sanitizar(AssistenteResponseDTO dto) {
+        if (dto == null || dto.getResposta() == null) return dto;
+        String r = dto.getResposta();
+        // "[id=123]" / "(id 45)" / "[id: 7]" — com colchetes ou parenteses.
+        r = r.replaceAll("(?i)[\\[(]\\s*id\\s*[:=]?\\s*\\d+\\s*[\\])]", "");
+        // "id=123" / "id: 45" / "id 7" — soltos no meio do texto.
+        r = r.replaceAll("(?i)\\bid\\s*[:=]\\s*\\d+", "");
+        r = r.replaceAll("(?i)\\bid\\s+\\d+\\b", "");
+        // Limpa residuos: colchetes/parenteses vazios, espacos duplos e espaco
+        // antes de pontuacao.
+        r = r.replaceAll("[\\[(]\\s*[\\])]", "")
+             .replaceAll("\\s{2,}", " ")
+             .replaceAll("\\s+([,.;:!?])", "$1")
+             .trim();
+        dto.setResposta(r);
+        return dto;
+    }
+
     // ================================================================
     // MONTAGEM DO CONTEXTO (dados reais)
     // ================================================================
-    private Contexto montarContexto(String cidade) {
-        Contexto ctx = new Contexto();
-
-        // ONGs ativas.
+    // ONGs ativas, lidas AO VIVO do banco (soft-deletadas nao entram).
+    private List<Ong> carregarOngsAtivas() {
         List<Ong> ongs = new ArrayList<>();
         for (Ong o : ongRepository.findAll()) {
             if (o.getDataExclusao() == null) ongs.add(o);
         }
-        ordenarOngs(ongs, cidade);
-        ctx.ongs = limitar(ongs, LIMITE_ONGS);
-        for (Ong o : ctx.ongs) ctx.ongPorId.put(o.getId(), o);
+        return ongs;
+    }
 
-        // Necessidades abertas (status ABERTA ou nulo, de ONG ativa).
+    // Necessidades abertas (status ABERTA/nulo) de ONG ativa, lidas AO VIVO.
+    private List<Necessidade> carregarNecessidadesAbertas() {
         List<Necessidade> necessidades = new ArrayList<>();
         for (Necessidade n : necessidadeRepository.findAll()) {
             boolean aberta = n.getStatus() == null || n.getStatus().isBlank()
@@ -424,20 +542,90 @@ public class AssistenteService {
             boolean ongAtiva = n.getOng() != null && n.getOng().getDataExclusao() == null;
             if (aberta && ongAtiva) necessidades.add(n);
         }
-        ordenarNecessidades(necessidades, cidade);
+        return necessidades;
+    }
+
+    /**
+     * (2) GROUNDING QUERY-AWARE E ESCALAVEL. Recebe TODAS as ONGs ativas e
+     * necessidades abertas (ja lidas ao vivo) e escolhe as ~LIMITE mais RELEVANTES
+     * a pergunta ANTES de cortar: pontua por (a) categoria(s) mencionadas e (b)
+     * localizacao detectada; empates caem para urgente/verificada e recente/nota.
+     * Assim, mesmo com centenas de ONGs, as relevantes ao que o doador perguntou
+     * SEMPRE entram no teto; sobrando espaco, completa com urgentes/recentes.
+     * Quando a pergunta nao traz categoria/cidade, degrada para a ordenacao antiga
+     * (cidade -> urgente/verificada -> recente/nota).
+     */
+    private Contexto montarContexto(String cidade, Set<String> categoriasQuery,
+                                    List<Ong> ongsAtivas, List<Necessidade> necessidadesAbertas) {
+        Contexto ctx = new Contexto();
+        String cid = normalizar(cidade);
+
+        // Categorias que cada ONG pede, a partir de TODAS as necessidades abertas
+        // (usado para pontuar a relevancia da ONG por categoria da pergunta).
+        Map<Long, Set<String>> catsPorOngTodas = new LinkedHashMap<>();
+        for (Necessidade n : necessidadesAbertas) {
+            if (n.getOng() == null || !temTexto(n.getCategoria())) continue;
+            catsPorOngTodas
+                    .computeIfAbsent(n.getOng().getId(), k -> new LinkedHashSet<>())
+                    .add(Categorias.normalizar(n.getCategoria()));
+        }
+
+        // Necessidades: relevancia (categoria+cidade) primeiro, depois urgente/recente.
+        List<Necessidade> necessidades = new ArrayList<>(necessidadesAbertas);
+        necessidades.sort(Comparator
+                .comparingInt((Necessidade n) -> -pontuacaoNecessidade(n, cid, categoriasQuery))
+                .thenComparing(n -> Boolean.TRUE.equals(n.getUrgente()) ? 0 : 1)
+                .thenComparing(n -> n.getDataCriacao() != null
+                        ? n.getDataCriacao() : LocalDateTime.MIN, Comparator.reverseOrder()));
         ctx.necessidades = limitar(necessidades, LIMITE_NECESSIDADES);
         for (Necessidade n : ctx.necessidades) ctx.necessidadePorId.put(n.getId(), n);
 
-        // Categorias que cada ONG mais pede (a partir das necessidades abertas).
-        for (Necessidade n : ctx.necessidades) {
-            if (n.getOng() == null || !temTexto(n.getCategoria())) continue;
-            ctx.categoriasPorOng
-                    .computeIfAbsent(n.getOng().getId(), k -> new ArrayList<>());
-            List<String> lista = ctx.categoriasPorOng.get(n.getOng().getId());
-            String cat = Categorias.normalizar(n.getCategoria());
-            if (!lista.contains(cat)) lista.add(cat);
+        // ONGs: relevancia (cidade+categoria) primeiro, depois verificada/nota.
+        List<Ong> ongs = new ArrayList<>(ongsAtivas);
+        ongs.sort(Comparator
+                .comparingInt((Ong o) -> -pontuacaoOng(o, cid, categoriasQuery, catsPorOngTodas))
+                .thenComparing(o -> o.getVerificada() ? 0 : 1)
+                .thenComparing(Ong::getNotaMedia, Comparator.reverseOrder()));
+        ctx.ongs = limitar(ongs, LIMITE_ONGS);
+        for (Ong o : ctx.ongs) ctx.ongPorId.put(o.getId(), o);
+
+        // Categorias por ONG (restrito ao recorte injetado) — para o system prompt.
+        for (Ong o : ctx.ongs) {
+            Set<String> cats = catsPorOngTodas.get(o.getId());
+            if (cats != null && !cats.isEmpty()) {
+                ctx.categoriasPorOng.put(o.getId(), new ArrayList<>(cats));
+            }
         }
         return ctx;
+    }
+
+    // Relevancia da necessidade p/ a pergunta: +2 se casa alguma categoria citada,
+    // +1 se e da localizacao detectada. (Sem categoria/cidade na pergunta => 0,
+    // degradando para o desempate por urgente/recente = comportamento antigo.)
+    private int pontuacaoNecessidade(Necessidade n, String cidadeNorm, Set<String> categoriasQuery) {
+        int p = 0;
+        if (!categoriasQuery.isEmpty() && categoriasQuery.stream()
+                .anyMatch(c -> Categorias.iguais(n.getCategoria(), c))) {
+            p += 2;
+        }
+        if (mesmaCidadeNec(n, cidadeNorm)) p += 1;
+        return p;
+    }
+
+    // Relevancia da ONG p/ a pergunta: +2 se e da localizacao detectada, +1 se
+    // costuma pedir alguma categoria citada.
+    private int pontuacaoOng(Ong o, String cidadeNorm, Set<String> categoriasQuery,
+                             Map<Long, Set<String>> catsPorOng) {
+        int p = 0;
+        if (temTexto(cidadeNorm) && cidadeNorm.equals(normalizar(o.getCidade()))) p += 2;
+        if (!categoriasQuery.isEmpty()) {
+            Set<String> cats = catsPorOng.get(o.getId());
+            if (cats != null && cats.stream()
+                    .anyMatch(c -> categoriasQuery.stream().anyMatch(q -> Categorias.iguais(c, q)))) {
+                p += 1;
+            }
+        }
+        return p;
     }
 
     // ================================================================
@@ -451,15 +639,6 @@ public class AssistenteService {
                 .thenComparing(n -> Boolean.TRUE.equals(n.getUrgente()) ? 0 : 1)
                 .thenComparing(n -> n.getDataCriacao() != null
                         ? n.getDataCriacao() : LocalDateTime.MIN, Comparator.reverseOrder()));
-    }
-
-    // ONGs: cidade do doador primeiro, depois verificadas, depois melhor nota.
-    private void ordenarOngs(List<Ong> lista, String cidade) {
-        String cid = normalizar(cidade);
-        lista.sort(Comparator
-                .comparing((Ong o) -> temTexto(cid) && cid.equals(normalizar(o.getCidade())) ? 0 : 1)
-                .thenComparing(o -> o.getVerificada() ? 0 : 1)
-                .thenComparing(Ong::getNotaMedia, Comparator.reverseOrder()));
     }
 
     private boolean mesmaCidadeNec(Necessidade n, String cidadeNorm) {
@@ -511,6 +690,54 @@ public class AssistenteService {
             sub.append("Verificada");
         }
         return new Sugestao("ONG", o.getId(), o.getNome(), sub.toString());
+    }
+
+    /**
+     * (1) Detecta a localizacao MENCIONADA no texto da mensagem, que deve VENCER a
+     * cidade do perfil/body. Estrategia:
+     *   1) bairros/distritos conhecidos (mapa BAIRROS_CIDADE) -> cidade;
+     *   2) nomes das cidades REAIS das ONGs ativas (case/acento-insensivel),
+     *      preferindo o nome mais longo para evitar casar um pedaco.
+     * Retorna a cidade detectada (forma de exibicao) ou null se nada for citado.
+     */
+    private String detectarLocalizacaoNaMensagem(String mensagem, List<Ong> ongsAtivas) {
+        String norm = normalizar(mensagem);
+        if (norm.isBlank()) return null;
+
+        // 1) bairros conhecidos -> cidade.
+        for (Map.Entry<String, String> e : BAIRROS_CIDADE.entrySet()) {
+            if (norm.contains(e.getKey())) return e.getValue();
+        }
+
+        // 2) cidades reais das ONGs (do banco, ao vivo). Maior nome primeiro.
+        List<Ong> ordenadas = new ArrayList<>(ongsAtivas);
+        ordenadas.sort(Comparator.comparingInt(
+                (Ong o) -> o.getCidade() == null ? 0 : o.getCidade().length()).reversed());
+        for (Ong o : ordenadas) {
+            String cidade = o.getCidade();
+            if (!temTexto(cidade)) continue;
+            String cidadeNorm = normalizar(cidade);
+            // >= 3 chars e comparacao por palavra inteira (evita casar substrings).
+            if (cidadeNorm.length() >= 3 && contemPalavra(norm, cidadeNorm)) {
+                return cidade.trim();
+            }
+        }
+        return null;
+    }
+
+    // true se `alvo` aparece em `texto` delimitado por inicio/fim ou nao-letras
+    // (evita casar "sao" dentro de "sao paulo" errado, ou cidade dentro de palavra).
+    private boolean contemPalavra(String texto, String alvo) {
+        int from = 0;
+        while (true) {
+            int i = texto.indexOf(alvo, from);
+            if (i < 0) return false;
+            boolean antesOk = i == 0 || !Character.isLetterOrDigit(texto.charAt(i - 1));
+            int fim = i + alvo.length();
+            boolean depoisOk = fim >= texto.length() || !Character.isLetterOrDigit(texto.charAt(fim));
+            if (antesOk && depoisOk) return true;
+            from = i + 1;
+        }
     }
 
     // Cidade: a do body tem prioridade; senao a do perfil do usuario logado.

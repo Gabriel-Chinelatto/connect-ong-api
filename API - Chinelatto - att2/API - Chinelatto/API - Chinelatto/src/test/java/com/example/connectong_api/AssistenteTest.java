@@ -47,6 +47,7 @@ class AssistenteTest {
 
     private Long ongLimeiraId;
     private Long necessidadeRoupasId;
+    private Long necessidadeRoupasCampinasId;
 
     @BeforeEach
     void seed() {
@@ -67,6 +68,20 @@ class AssistenteTest {
         cobertores.setUrgente(true);
         cobertores = necessidadeRepository.save(cobertores);
         necessidadeRoupasId = cobertores.getId();
+
+        // ONG em Campinas, tambem com uma necessidade de Roupas (para provar que a
+        // cidade CITADA na mensagem/bairro vence a cidade "de fora" - Limeira).
+        Ong casaCampinas = new Ong("Casa Solidaria " + n, "casacamp" + n + "@assist.test",
+                "1932332000", "Campinas", "Apoia familias.");
+        casaCampinas = ongRepository.save(casaCampinas);
+        Necessidade agasalhos = new Necessidade();
+        agasalhos.setOng(casaCampinas);
+        agasalhos.setTitulo("Agasalhos adultos " + n);
+        agasalhos.setDescricao("Casacos e blusas de frio.");
+        agasalhos.setCategoria("Roupas");
+        agasalhos.setUrgente(false);
+        agasalhos = necessidadeRepository.save(agasalhos);
+        necessidadeRoupasCampinasId = agasalhos.getId();
 
         // Uma ONG/necessidade de outra cidade e categoria (ruido para a busca).
         Ong outra = new Ong("Abrigo Patinhas " + n, "patinhas" + n + "@assist.test",
@@ -176,6 +191,127 @@ class AssistenteTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.modo").value("regras"))
                 .andExpect(jsonPath("$.sugestoes", not(empty())));
+    }
+
+    // ---------------------------------------------------------------
+    // (1) LOCALIZACAO ADAPTAVEL: cidade CITADA na mensagem vence a de fora.
+    // Body diz "Limeira", a mensagem diz "Campinas" -> prioriza Campinas.
+    // ---------------------------------------------------------------
+    @Test
+    void localizacao_cidadeCitadaNaMensagem_venceCidadeDeFora() throws Exception {
+        Mockito.when(provedorIA.disponivel()).thenReturn(false);
+
+        mockMvc.perform(post("/assistente")
+                        .contentType("application/json")
+                        .content("{\"mensagem\":\"tenho roupas para doar em Campinas\","
+                                + "\"cidade\":\"Limeira\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.modo").value("regras"))
+                // a necessidade de Roupas de CAMPINAS vem primeiro (a mensagem venceu
+                // a cidade "Limeira" enviada no body). O subtitulo do card traz a cidade.
+                .andExpect(jsonPath("$.sugestoes[0].subtitulo", containsString("Campinas")))
+                .andExpect(jsonPath("$.sugestoes[*].id",
+                        hasItem(necessidadeRoupasCampinasId.intValue())));
+    }
+
+    // ---------------------------------------------------------------
+    // (1b) BAIRRO conhecido "Barao Geraldo" -> Campinas.
+    // ---------------------------------------------------------------
+    @Test
+    void localizacao_bairroBaraoGeraldo_mapeiaParaCampinas() throws Exception {
+        Mockito.when(provedorIA.disponivel()).thenReturn(false);
+
+        mockMvc.perform(post("/assistente")
+                        .contentType("application/json")
+                        .content("{\"mensagem\":\"tenho roupas, moro no Barao Geraldo\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.modo").value("regras"))
+                // bairro mapeou para Campinas -> a necessidade de Campinas vem primeiro
+                .andExpect(jsonPath("$.sugestoes[0].subtitulo", containsString("Campinas")))
+                .andExpect(jsonPath("$.sugestoes[*].id",
+                        hasItem(necessidadeRoupasCampinasId.intValue())));
+    }
+
+    // ---------------------------------------------------------------
+    // (3) SANITIZACAO: id vazado pela IA no texto sai limpo da resposta.
+    // ---------------------------------------------------------------
+    @Test
+    void sanitizacao_idNoTextoDaIa_saiLimpo() throws Exception {
+        Mockito.when(provedorIA.disponivel()).thenReturn(true);
+        String json = "{\"resposta\":\"A [id=5] Casa Renascer precisa de cobertores id=5.\","
+                + "\"sugestoes\":[{\"tipo\":\"NECESSIDADE\",\"id\":" + necessidadeRoupasId + "}]}";
+        Mockito.when(provedorIA.completar(Mockito.anyList()))
+                .thenReturn(Optional.of(json));
+
+        mockMvc.perform(post("/assistente")
+                        .contentType("application/json")
+                        .content("{\"mensagem\":\"tenho cobertores\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.modo").value("ia"))
+                .andExpect(jsonPath("$.resposta", not(containsString("id="))))
+                .andExpect(jsonPath("$.resposta", not(containsString("[id"))))
+                // o card estruturado permanece intacto
+                .andExpect(jsonPath("$.sugestoes[0].id").value(necessidadeRoupasId.intValue()));
+    }
+
+    // ---------------------------------------------------------------
+    // (3b) FALLBACK por regras: prosa amigavel SEM ids, cards no estruturado.
+    // ---------------------------------------------------------------
+    @Test
+    void fallbackRegras_prosaSemIds_cardsNoEstruturado() throws Exception {
+        Mockito.when(provedorIA.disponivel()).thenReturn(false);
+
+        mockMvc.perform(post("/assistente")
+                        .contentType("application/json")
+                        .content("{\"mensagem\":\"tenho roupas pra doar em Limeira\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.modo").value("regras"))
+                .andExpect(jsonPath("$.resposta", not(containsString("id="))))
+                .andExpect(jsonPath("$.resposta", not(containsString("[id"))))
+                .andExpect(jsonPath("$.sugestoes", not(empty())))
+                .andExpect(jsonPath("$.sugestoes[0].id", notNullValue()));
+    }
+
+    // ---------------------------------------------------------------
+    // (5) VISAO: request com imagemBase64 roteia para o provedor de visao.
+    // ---------------------------------------------------------------
+    @Test
+    void visao_comImagem_roteiaParaProvedorDeVisao() throws Exception {
+        Mockito.when(provedorIA.visaoDisponivel()).thenReturn(true);
+        String json = "{\"resposta\":\"Vejo cobertores na foto! A Lar Viva precisa deles.\","
+                + "\"sugestoes\":[{\"tipo\":\"NECESSIDADE\",\"id\":" + necessidadeRoupasId + "}]}";
+        Mockito.when(provedorIA.completarComImagem(Mockito.anyList(), Mockito.anyString()))
+                .thenReturn(Optional.of(json));
+
+        mockMvc.perform(post("/assistente")
+                        .contentType("application/json")
+                        .content("{\"mensagem\":\"o que faco com isto?\","
+                                + "\"imagemBase64\":\"data:image/jpeg;base64,QUJD\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.modo").value("ia"))
+                .andExpect(jsonPath("$.sugestoes[0].id").value(necessidadeRoupasId.intValue()));
+
+        // roteou para a VISAO (modelo multimodal), NAO para o completar de texto
+        Mockito.verify(provedorIA).completarComImagem(Mockito.anyList(), Mockito.anyString());
+        Mockito.verify(provedorIA, Mockito.never()).completar(Mockito.anyList());
+    }
+
+    // ---------------------------------------------------------------
+    // (5b) VISAO falha (timeout/429) -> fallback amigavel "me conta em texto".
+    // ---------------------------------------------------------------
+    @Test
+    void visao_falha_caiEmFallbackAmigavel() throws Exception {
+        Mockito.when(provedorIA.visaoDisponivel()).thenReturn(true);
+        Mockito.when(provedorIA.completarComImagem(Mockito.anyList(), Mockito.anyString()))
+                .thenReturn(Optional.empty());
+
+        mockMvc.perform(post("/assistente")
+                        .contentType("application/json")
+                        .content("{\"mensagem\":\"o que faco com isto?\","
+                                + "\"imagemBase64\":\"data:image/jpeg;base64,QUJD\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.modo").value("regras"))
+                .andExpect(jsonPath("$.resposta", containsString("texto")));
     }
 
     // ---------------------------------------------------------------

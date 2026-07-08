@@ -12,13 +12,18 @@ import java.util.List;
  * {
  *   "mensagem": "tenho roupas pra doar em Limeira",   (obrigatorio)
  *   "historico": [ {"papel":"user|assistente","texto":"..."} ],  (opcional)
- *   "cidade": "Limeira"                                (opcional; se ausente e o
+ *   "cidade": "Limeira",                               (opcional; se ausente e o
  *                                                       usuario estiver logado,
  *                                                       usamos a cidade do perfil)
+ *   "imagemBase64": "data:image/jpeg;base64,...."      (opcional; foto do que a
+ *                                                       pessoa quer doar — dispara
+ *                                                       o modelo de VISAO da Groq)
  * }
  *
  * A mensagem tem tamanho limitado (@Size) para nao estourar tokens da IA nem
  * abrir espaco para abuso. O historico e truncado no service (ultimas ~6 trocas).
+ * A imagem (quando enviada) NUNCA e persistida nem logada; so trafega para o
+ * provedor de visao dentro da requisicao.
  */
 public class AssistenteRequestDTO {
 
@@ -33,6 +38,13 @@ public class AssistenteRequestDTO {
     @Size(max = 60, message = "Cidade muito longa")
     private String cidade;
 
+    // Foto (opcional) do que a pessoa quer doar, para o modelo de VISAO da Groq.
+    // Aceita data URL ("data:image/jpeg;base64,...") ou base64 puro. O teto de
+    // ~6M caracteres comporta uma imagem de ate ~4MB depois do encode base64.
+    // NUNCA e persistida nem logada.
+    @Size(max = 6_000_000, message = "Imagem muito grande (máx. ~4MB)")
+    private String imagemBase64;
+
     public String getMensagem() { return mensagem; }
     public void setMensagem(String mensagem) { this.mensagem = mensagem; }
 
@@ -41,6 +53,9 @@ public class AssistenteRequestDTO {
 
     public String getCidade() { return cidade; }
     public void setCidade(String cidade) { this.cidade = cidade; }
+
+    public String getImagemBase64() { return imagemBase64; }
+    public void setImagemBase64(String imagemBase64) { this.imagemBase64 = imagemBase64; }
 
     /** Uma troca do historico: papel = "user" ou "assistente"; texto = conteudo. */
     public static class MensagemHistorico {

@@ -29,6 +29,22 @@ public interface ProvedorIA {
     Optional<String> completar(List<MensagemIA> mensagens);
 
     /**
+     * true quando o provedor de VISAO (multimodal) esta configurado. Hoje usa a
+     * mesma chave do texto; separado para o chamador poder decidir o roteamento.
+     */
+    default boolean visaoDisponivel() { return disponivel(); }
+
+    /**
+     * VISAO (multimodal): envia a conversa + UMA imagem (data URL ou base64 puro)
+     * e retorna o texto do assistente. A imagem e anexada a ultima mensagem do
+     * usuario no formato OpenAI-compat (content array com type=image_url).
+     * Nunca lanca: em qualquer erro/timeout devolve {@link Optional#empty()} — o
+     * chamador entao mostra um fallback amigavel. A imagem NUNCA e persistida nem
+     * logada.
+     */
+    Optional<String> completarComImagem(List<MensagemIA> mensagens, String imagemBase64);
+
+    /**
      * Uma mensagem no formato do chat: papel = "system" | "user" | "assistant".
      * (record = imutavel; sem dependencia nova.)
      */

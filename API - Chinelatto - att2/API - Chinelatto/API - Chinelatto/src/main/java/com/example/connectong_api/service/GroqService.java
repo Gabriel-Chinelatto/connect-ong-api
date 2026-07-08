@@ -33,9 +33,13 @@ import java.util.Optional;
  * Sem chave (o padrao) o assistente funciona 100% no modo REGRAS (fallback
  * local). NUNCA comite a chave. A chave nunca e logada.
  *
- * Modelo padrao: llama-3.1-8b-instant (rapido e gratuito). Trocavel por
+ * Modelo padrao (texto): llama-3.1-8b-instant (rapido e gratuito). Trocavel por
  * app.ia.groq.modelo. URL trocavel por app.ia.groq.url (permite apontar para
  * outro endpoint compativel com OpenAI).
+ *
+ * Modelo de VISAO (multimodal, tambem gratuito): meta-llama/llama-4-maverick-
+ * 17b-128e-instruct — usado quando o doador envia uma FOTO do que quer doar.
+ * Trocavel por app.ia.groq.modelo-visao. (NAO usar o "scout", ja deprecado.)
  * ============================================================================
  */
 @Service
@@ -46,6 +50,9 @@ public class GroqService implements ProvedorIA {
 
     @Value("${app.ia.groq.modelo:llama-3.1-8b-instant}")
     private String modelo;
+
+    @Value("${app.ia.groq.modelo-visao:meta-llama/llama-4-maverick-17b-128e-instruct}")
+    private String modeloVisao;
 
     @Value("${app.ia.groq.url:https://api.groq.com/openai/v1/chat/completions}")
     private String url;
@@ -73,12 +80,27 @@ public class GroqService implements ProvedorIA {
 
     @Override
     public Optional<String> completar(List<MensagemIA> mensagens) {
+        return chamar(mensagens, null);
+    }
+
+    @Override
+    public Optional<String> completarComImagem(List<MensagemIA> mensagens, String imagemBase64) {
+        if (imagemBase64 == null || imagemBase64.isBlank()) {
+            // Sem imagem: cai no fluxo de texto normal.
+            return completar(mensagens);
+        }
+        return chamar(mensagens, imagemBase64);
+    }
+
+    // Faz a chamada HTTP. imagemBase64 == null => texto (modelo de texto);
+    // != null => visao (modelo multimodal, imagem anexada a ultima msg do usuario).
+    private Optional<String> chamar(List<MensagemIA> mensagens, String imagemBase64) {
         if (!disponivel() || mensagens == null || mensagens.isEmpty()) {
             return Optional.empty();
         }
 
         try {
-            String corpo = montarCorpo(mensagens);
+            String corpo = montarCorpo(mensagens, imagemBase64);
 
             HttpRequest req = HttpRequest.newBuilder()
                     .uri(URI.create(url))
@@ -111,18 +133,56 @@ public class GroqService implements ProvedorIA {
         }
     }
 
-    // Monta o JSON do chat/completions no formato OpenAI.
-    private String montarCorpo(List<MensagemIA> mensagens) throws Exception {
+    // Monta o JSON do chat/completions no formato OpenAI. Quando imagemBase64 != null,
+    // usa o modelo de VISAO e anexa a imagem a ULTIMA mensagem "user" (content array
+    // com {type:image_url}). As demais mensagens seguem como content string simples.
+    private String montarCorpo(List<MensagemIA> mensagens, String imagemBase64) throws Exception {
+        boolean comImagem = imagemBase64 != null && !imagemBase64.isBlank();
+
         ObjectNode raiz = objectMapper.createObjectNode();
-        raiz.put("model", modelo);
+        raiz.put("model", comImagem ? modeloVisao : modelo);
         raiz.put("temperature", temperatura);
 
+        // Indice da ultima mensagem do usuario (onde a imagem sera anexada).
+        int idxUltimoUser = -1;
+        if (comImagem) {
+            for (int i = mensagens.size() - 1; i >= 0; i--) {
+                if ("user".equals(mensagens.get(i).papel())) { idxUltimoUser = i; break; }
+            }
+        }
+
         ArrayNode arr = raiz.putArray("messages");
-        for (MensagemIA m : mensagens) {
+        for (int i = 0; i < mensagens.size(); i++) {
+            MensagemIA m = mensagens.get(i);
             ObjectNode msg = arr.addObject();
             msg.put("role", m.papel());
-            msg.put("content", m.conteudo());
+            if (comImagem && i == idxUltimoUser) {
+                // content array: texto + imagem (formato multimodal OpenAI-compat).
+                ArrayNode conteudo = msg.putArray("content");
+                ObjectNode parteTexto = conteudo.addObject();
+                parteTexto.put("type", "text");
+                parteTexto.put("text", m.conteudo() == null || m.conteudo().isBlank()
+                        ? "Descreva o que aparece nesta foto e para quem eu poderia doar."
+                        : m.conteudo());
+                ObjectNode parteImg = conteudo.addObject();
+                parteImg.put("type", "image_url");
+                ObjectNode urlNode = parteImg.putObject("image_url");
+                urlNode.put("url", comoDataUrl(imagemBase64));
+            } else {
+                msg.put("content", m.conteudo());
+            }
         }
         return objectMapper.writeValueAsString(raiz);
     }
+
+    // Garante o prefixo data URL. Se ja vier "data:...;base64,..." usa como esta;
+    // se vier base64 puro, assume image/jpeg. (Nao logamos o conteudo.)
+    private String comoDataUrl(String imagem) {
+        String s = imagem.trim();
+        if (s.startsWith("data:")) return s;
+        return "data:image/jpeg;base64," + s;
+    }
+
+    /** Nome do modelo de visao em uso (para diagnostico; nunca expoe a chave). */
+    public String getModeloVisao() { return modeloVisao; }
 }
