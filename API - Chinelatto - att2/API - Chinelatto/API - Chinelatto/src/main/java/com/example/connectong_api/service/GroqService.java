@@ -37,9 +37,10 @@ import java.util.Optional;
  * app.ia.groq.modelo. URL trocavel por app.ia.groq.url (permite apontar para
  * outro endpoint compativel com OpenAI).
  *
- * Modelo de VISAO (multimodal, tambem gratuito): meta-llama/llama-4-maverick-
- * 17b-128e-instruct — usado quando o doador envia uma FOTO do que quer doar.
- * Trocavel por app.ia.groq.modelo-visao. (NAO usar o "scout", ja deprecado.)
+ * Modelo de VISAO (multimodal, tambem gratuito): meta-llama/llama-4-scout-17b-
+ * 16e-instruct — usado quando o doador envia uma FOTO do que quer doar. E o
+ * unico modelo de visao disponivel no free tier (o "maverick" da 404 na chave
+ * real). Trocavel por app.ia.groq.modelo-visao se a Groq trocar o modelo.
  * ============================================================================
  */
 @Service
@@ -51,7 +52,7 @@ public class GroqService implements ProvedorIA {
     @Value("${app.ia.groq.modelo:llama-3.1-8b-instant}")
     private String modelo;
 
-    @Value("${app.ia.groq.modelo-visao:meta-llama/llama-4-maverick-17b-128e-instruct}")
+    @Value("${app.ia.groq.modelo-visao:meta-llama/llama-4-scout-17b-16e-instruct}")
     private String modeloVisao;
 
     @Value("${app.ia.groq.url:https://api.groq.com/openai/v1/chat/completions}")
