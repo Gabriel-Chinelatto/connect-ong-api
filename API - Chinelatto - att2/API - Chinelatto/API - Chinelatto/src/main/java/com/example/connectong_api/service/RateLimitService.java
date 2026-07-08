@@ -108,6 +108,15 @@ public class RateLimitService {
      * janela foi excedido (o chamador deve responder 429).
      */
     public boolean excedeuSolicitacoes(String escopo) {
+        return excedeuSolicitacoes(escopo, maxSolicitacoes);
+    }
+
+    /**
+     * Variante com limite CUSTOMIZADO por escopo (mesma janela). Usada pelo
+     * assistente de IA, que precisa de um teto proprio (mais alto que o de
+     * cadastro) para nao travar uma conversa, mas ainda proteger a cota da IA.
+     */
+    public boolean excedeuSolicitacoes(String escopo, int maxPersonalizado) {
         limparExpirados();
         Janela j = janelas.compute(chave(escopo, ipDaRequisicao()), (k, v) -> {
             Instant agora = Instant.now();
@@ -118,7 +127,7 @@ public class RateLimitService {
             v.contagem++;
             return v;
         });
-        return j.contagem > maxSolicitacoes;
+        return j.contagem > maxPersonalizado;
     }
 
     // =========================

@@ -86,6 +86,10 @@ public class SecurityConfig {
                             ).permitAll()
                             .requestMatchers(HttpMethod.POST, "/usuarios", "/usuarios/login", "/usuarios/registro").permitAll()
                             .requestMatchers(HttpMethod.POST, "/ongs/registro").permitAll()
+                            // Assistente de doacao: PUBLICO (funciona sem login; se
+                            // houver token, o filtro JWT ainda o le e o service usa a
+                            // cidade do perfil). Protegido por rate limiting proprio.
+                            .requestMatchers(HttpMethod.POST, "/assistente").permitAll()
                             // Perfil publico do DOADOR e suas avaliacoes: leitura
                             // livre (reputacao publica, como o perfil da ONG). O
                             // service nunca expoe email/telefone/valores.

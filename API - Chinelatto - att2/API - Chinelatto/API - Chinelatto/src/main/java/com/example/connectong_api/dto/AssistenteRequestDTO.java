@@ -1,0 +1,63 @@
+package com.example.connectong_api.dto;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+
+import java.util.List;
+
+/**
+ * Corpo de POST /assistente (chatbot que ajuda o DOADOR a decidir para quem doar).
+ *
+ * Contrato com os frontends:
+ * {
+ *   "mensagem": "tenho roupas pra doar em Limeira",   (obrigatorio)
+ *   "historico": [ {"papel":"user|assistente","texto":"..."} ],  (opcional)
+ *   "cidade": "Limeira"                                (opcional; se ausente e o
+ *                                                       usuario estiver logado,
+ *                                                       usamos a cidade do perfil)
+ * }
+ *
+ * A mensagem tem tamanho limitado (@Size) para nao estourar tokens da IA nem
+ * abrir espaco para abuso. O historico e truncado no service (ultimas ~6 trocas).
+ */
+public class AssistenteRequestDTO {
+
+    @NotBlank(message = "A mensagem é obrigatória")
+    @Size(max = 1000, message = "A mensagem é muito longa (máx. 1000 caracteres)")
+    private String mensagem;
+
+    // Historico da conversa (para dar contexto a IA). Opcional.
+    private List<MensagemHistorico> historico;
+
+    // Cidade do doador (opcional). Prioriza ONGs/necessidades proximas.
+    @Size(max = 60, message = "Cidade muito longa")
+    private String cidade;
+
+    public String getMensagem() { return mensagem; }
+    public void setMensagem(String mensagem) { this.mensagem = mensagem; }
+
+    public List<MensagemHistorico> getHistorico() { return historico; }
+    public void setHistorico(List<MensagemHistorico> historico) { this.historico = historico; }
+
+    public String getCidade() { return cidade; }
+    public void setCidade(String cidade) { this.cidade = cidade; }
+
+    /** Uma troca do historico: papel = "user" ou "assistente"; texto = conteudo. */
+    public static class MensagemHistorico {
+        private String papel;
+        private String texto;
+
+        public MensagemHistorico() {}
+
+        public MensagemHistorico(String papel, String texto) {
+            this.papel = papel;
+            this.texto = texto;
+        }
+
+        public String getPapel() { return papel; }
+        public void setPapel(String papel) { this.papel = papel; }
+
+        public String getTexto() { return texto; }
+        public void setTexto(String texto) { this.texto = texto; }
+    }
+}
