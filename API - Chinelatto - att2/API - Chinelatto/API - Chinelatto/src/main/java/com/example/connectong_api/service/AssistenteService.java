@@ -200,6 +200,89 @@ public class AssistenteService {
     }
 
     // ================================================================
+    // SUGESTOES PROATIVAS (POST /assistente/sugestoes) — SEM mensagem de chat.
+    // ================================================================
+    /**
+     * (6) Sugestoes PROATIVAS para o doador: sem mensagem de chat, usa o token (se
+     * houver) para pegar a CIDADE e o HISTORICO de categorias do doador logado e
+     * devolve as melhores necessidades/ONGs para ele — com uma frase curta ("Perto
+     * de voce" / "Com base no que voce costuma doar"). Anonimo ou sem historico =>
+     * panorama geral (necessidades urgentes/recentes). Reusa AssistenteResponseDTO
+     * (o app reaproveita os mesmos cards). Sempre funciona sem chave (modo "regras").
+     */
+    public ResponseEntity<?> sugerirParaDoador() {
+        List<Ong> ongsAtivas = carregarOngsAtivas();
+        List<Necessidade> necessidadesAbertas = carregarNecessidadesAbertas();
+
+        // Localizacao e categorias vem SO do perfil/historico do doador logado
+        // (nao ha mensagem de chat aqui). Anonimo => ambos vazios.
+        String cidade = cidadeDoUsuarioLogado();
+        Set<String> categoriasDoador = categoriasDoDoadorLogado();
+
+        // Prioriza por cidade + categorias que o doador costuma doar (grounding).
+        Contexto ctx = montarContexto(cidade, categoriasDoador, ongsAtivas, necessidadesAbertas);
+
+        // Cards: as necessidades ja vem ordenadas por relevancia (cidade+categoria);
+        // se nao houver necessidades, cai para ONGs proximas.
+        List<Sugestao> sugestoes = new ArrayList<>();
+        for (Necessidade n : limitar(ctx.necessidades, MAX_SUGESTOES)) {
+            sugestoes.add(cardNecessidade(n));
+        }
+        if (sugestoes.isEmpty()) {
+            sugestoes = cardsOngsProximas(cidade, ctx);
+        }
+
+        // Frase curta conforme o sinal mais forte disponivel.
+        String frase;
+        String titulo;
+        if (temTexto(cidade)) {
+            frase = "Perto de voce, em " + cidade + ", estas doacoes estao precisando:";
+            titulo = "Perto de voce";
+        } else if (!categoriasDoador.isEmpty()) {
+            frase = "Com base no que voce costuma doar, separei estas opcoes:";
+            titulo = "Para voce";
+        } else {
+            frase = "Estas necessidades estao em destaque agora — comece por aqui:";
+            titulo = "Em destaque";
+        }
+        if (sugestoes.isEmpty()) {
+            frase = "Ainda nao ha necessidades abertas na plataforma. Volte em breve!";
+        }
+
+        AssistenteResponseDTO dto = new AssistenteResponseDTO(frase, sugestoes, titulo, "regras");
+        return ResponseEntity.ok(sanitizar(dto));
+    }
+
+    // Cidade do perfil do doador logado (sem body de chat). null se anonimo/sem cidade.
+    private String cidadeDoUsuarioLogado() {
+        UsuarioAutenticado atual = security.atual();
+        if (atual != null && atual.getId() != null) {
+            Usuario u = usuarioRepository.findById(atual.getId()).orElse(null);
+            if (u != null && u.getDataExclusao() == null && temTexto(u.getCidade())) {
+                return u.getCidade().trim();
+            }
+        }
+        return null;
+    }
+
+    // Categorias que o doador logado ja doou (matches CONCLUIDOS). Vazio p/ anonimo,
+    // ONG logada ou sem historico. Usadas so para priorizar as sugestoes proativas.
+    private Set<String> categoriasDoDoadorLogado() {
+        Set<String> categorias = new LinkedHashSet<>();
+        UsuarioAutenticado atual = security.atual();
+        if (atual == null || atual.getId() == null) return categorias;
+        if (atual.getTipo() != null && !"DOADOR".equalsIgnoreCase(atual.getTipo())) return categorias;
+        for (Interesse i : interesseRepository.findByDoadorId(atual.getId())) {
+            if (!"CONCLUIDO".equalsIgnoreCase(i.getStatus())) continue;
+            Necessidade n = i.getNecessidade();
+            if (n != null && temTexto(n.getCategoria())) {
+                categorias.add(Categorias.normalizar(n.getCategoria()));
+            }
+        }
+        return categorias;
+    }
+
+    // ================================================================
     // CAMINHO DA IA
     // ================================================================
     private AssistenteResponseDTO tentarIa(AssistenteRequestDTO dto, String mensagem,

@@ -89,7 +89,14 @@ public class SecurityConfig {
                             // Assistente de doacao: PUBLICO (funciona sem login; se
                             // houver token, o filtro JWT ainda o le e o service usa a
                             // cidade do perfil). Protegido por rate limiting proprio.
-                            .requestMatchers(HttpMethod.POST, "/assistente").permitAll()
+                            // Inclui /assistente e /assistente/sugestoes (proativas).
+                            .requestMatchers(HttpMethod.POST, "/assistente", "/assistente/sugestoes").permitAll()
+                            // Estimativa de frete de doacoes: PUBLICO, rate limit proprio.
+                            .requestMatchers(HttpMethod.POST, "/frete/estimar").permitAll()
+                            // Apoios de IA (com fallback por regras): redacao da necessidade
+                            // (painel da ONG) e resumo de impacto (doador). PUBLICOS, rate
+                            // limit proprio cada.
+                            .requestMatchers(HttpMethod.POST, "/ia/redacao", "/ia/resumo-impacto").permitAll()
                             // Perfil publico do DOADOR e suas avaliacoes: leitura
                             // livre (reputacao publica, como o perfil da ONG). O
                             // service nunca expoe email/telefone/valores.
