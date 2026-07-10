@@ -21,6 +21,10 @@ public interface InteresseRepository extends JpaRepository<Interesse, Long> {
     // Total de matches num determinado status (ex.: "ACEITO")
     long countByStatus(String status);
 
+    // Todos os interesses num status (ex.: "PENDENTE") — usado pelo job diario
+    // que avisa a ONG de doadores esperando ha muito tempo.
+    List<Interesse> findByStatus(String status);
+
     // Matches de um doador num determinado status (ex.: "CONCLUIDO")
     long countByDoadorIdAndStatus(Long doadorId, String status);
 

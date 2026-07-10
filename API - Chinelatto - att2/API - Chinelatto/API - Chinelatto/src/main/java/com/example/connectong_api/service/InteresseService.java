@@ -16,6 +16,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -225,6 +226,23 @@ public class InteresseService {
         return ResponseEntity.ok(toDTO(salvo));
     }
 
+    // Aviso ao doador quando a ONG o recusa: antes o doador so via um selo
+    // passivo "Recusado". Agora recebe notificacao e sabe que pode tentar de
+    // novo (o backend nao bloqueia re-interesse apos RECUSADO).
+    private void notificarRecusa(Interesse interesse) {
+        if (interesse.getDoador() == null) return;
+        String tituloNec = interesse.getNecessidade() != null
+                ? interesse.getNecessidade().getTitulo()
+                : "uma necessidade";
+        notificacaoService.criar(
+                interesse.getDoador().getId(),
+                "Interesse recusado",
+                "A ONG não pôde aceitar seu interesse em \"" + tituloNec
+                        + "\" desta vez. Você pode demonstrar interesse novamente"
+                        + " ou apoiar outra ONG.",
+                "MATCH");
+    }
+
     private ResponseEntity<?> mudarStatus(Long id, String novoStatus) {
         Interesse interesse = repository.findById(id).orElse(null);
         if (interesse == null) {
@@ -266,6 +284,10 @@ public class InteresseService {
                     ongNome);
         }
 
+        if ("RECUSADO".equals(novoStatus)) {
+            notificarRecusa(interesse);
+        }
+
         return ResponseEntity.ok(toDTO(salvo));
     }
 
@@ -277,7 +299,7 @@ public class InteresseService {
         Long ongId = (n != null && n.getOng() != null) ? n.getOng().getId() : null;
         String ongNome = (n != null && n.getOng() != null) ? n.getOng().getNome() : null;
 
-        return new InteresseResponseDTO(
+        InteresseResponseDTO dto = new InteresseResponseDTO(
                 i.getId(),
                 i.getStatus(),
                 i.getDataCriacao(),
@@ -289,6 +311,14 @@ public class InteresseService {
                 ongId,
                 ongNome
         );
+
+        // Dias de espera: so faz sentido enquanto PENDENTE (aguardando o aceite).
+        if ("PENDENTE".equals(i.getStatus()) && i.getDataCriacao() != null) {
+            long dias = ChronoUnit.DAYS.between(i.getDataCriacao(), LocalDateTime.now());
+            dto.setDiasEsperando((int) Math.max(0, dias));
+        }
+
+        return dto;
     }
 
     private ResponseEntity<?> erro(String mensagem) {

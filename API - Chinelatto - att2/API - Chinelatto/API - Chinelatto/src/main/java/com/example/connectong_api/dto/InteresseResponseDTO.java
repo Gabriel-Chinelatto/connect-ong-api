@@ -28,6 +28,11 @@ public class InteresseResponseDTO {
     // mas o app usa este campo para desabilitar o chat.
     private boolean bloqueadoPelaOng;
 
+    // Ha quantos dias o doador espera o aceite (so preenchido em PENDENTE;
+    // null nos demais status). Calculado on-read a partir da dataCriacao — o
+    // painel da ONG mostra "ha N dias esperando".
+    private Integer diasEsperando;
+
     public InteresseResponseDTO(
             Long id,
             String status,
@@ -65,4 +70,7 @@ public class InteresseResponseDTO {
 
     public boolean isBloqueadoPelaOng() { return bloqueadoPelaOng; }
     public void setBloqueadoPelaOng(boolean v) { this.bloqueadoPelaOng = v; }
+
+    public Integer getDiasEsperando() { return diasEsperando; }
+    public void setDiasEsperando(Integer v) { this.diasEsperando = v; }
 }

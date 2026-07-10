@@ -61,6 +61,7 @@ class ContratosFeiraTest {
     @Autowired private DoacaoFinanceiraRepository doacaoFinanceiraRepository;
     @Autowired private AvaliacaoDoadorRepository avaliacaoDoadorRepository;
     @Autowired private NotificacaoRepository notificacaoRepository;
+    @Autowired private com.example.connectong_api.service.EsperaMatchScheduler esperaMatchScheduler;
 
     private static final AtomicLong SEQ = new AtomicLong(1);
 
@@ -533,6 +534,64 @@ class ContratosFeiraTest {
                                 + ",\"nota\":5,\"comentario\":\"Otima\"}"))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.nota").value(5));
+    }
+
+    // ===================== E) Espera do match + recusa =====================
+
+    @Test
+    void recusar_notificaODoador() throws Exception {
+        Ong ong = criarOng("ONG Que Recusa");
+        Usuario contaOng = criarContaOng(ong);
+        Usuario doador = criarDoador("DoadorRecusado");
+        Interesse interesse = criarInteresse(
+                criarNecessidade(ong, "Colchoes"), doador, "PENDENTE");
+
+        mockMvc.perform(put("/interesses/" + interesse.getId() + "/recusar")
+                        .header("Authorization", "Bearer " + token(contaOng)))
+                .andExpect(status().isOk());
+
+        boolean avisado = notificacaoRepository
+                .findByUsuarioIdOrderByDataCriacaoDesc(doador.getId()).stream()
+                .anyMatch(n -> "Interesse recusado".equals(n.getTitulo()));
+        assertTrue(avisado, "o doador deve ser notificado da recusa");
+    }
+
+    @Test
+    void interessePendente_exibeDiasEsperando() throws Exception {
+        Ong ong = criarOng("ONG Espera");
+        Usuario contaOng = criarContaOng(ong);
+        Usuario doador = criarDoador("DoadorNaFila");
+        Interesse pend = criarInteresse(
+                criarNecessidade(ong, "Agasalhos"), doador, "PENDENTE");
+        // 12 dias e 1h de margem (evita flakiness de fronteira de dia).
+        pend.setDataCriacao(LocalDateTime.now().minusDays(12).minusHours(1));
+        interesseRepository.save(pend);
+
+        mockMvc.perform(get("/interesses?ongId=" + ong.getId())
+                        .header("Authorization", "Bearer " + token(contaOng)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.id == " + pend.getId()
+                        + ")].diasEsperando", hasItem(12)));
+    }
+
+    @Test
+    void schedulerEspera_avisaAOngNoDiaLimite() throws Exception {
+        Ong ong = criarOng("ONG Avisada Espera");
+        Usuario contaOng = criarContaOng(ong);
+        Usuario doador = criarDoador("DoadorHa10Dias");
+        Interesse pend = criarInteresse(
+                criarNecessidade(ong, "Livros didaticos"), doador, "PENDENTE");
+        pend.setDataCriacao(LocalDateTime.now().minusDays(10).minusHours(1));
+        interesseRepository.save(pend);
+
+        // dispara o job manualmente (no ar roda 1x/dia via cron)
+        esperaMatchScheduler.avisarEsperaLonga();
+
+        boolean avisada = notificacaoRepository
+                .findByUsuarioIdOrderByDataCriacaoDesc(contaOng.getId()).stream()
+                .anyMatch(n -> n.getMensagem() != null
+                        && n.getMensagem().contains("10 dias esperando"));
+        assertTrue(avisada, "a ONG deve ser avisada do doador esperando ha 10 dias");
     }
 
     @Test

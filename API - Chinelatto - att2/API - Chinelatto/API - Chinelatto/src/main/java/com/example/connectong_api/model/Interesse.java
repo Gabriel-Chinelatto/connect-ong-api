@@ -56,6 +56,9 @@ public class Interesse {
     public void setStatus(String status) { this.status = status; }
 
     public LocalDateTime getDataCriacao() { return dataCriacao; }
+    // Setter usado em testes para simular um interesse antigo (dias de espera).
+    // No fluxo real a dataCriacao e definida uma vez no @PrePersist.
+    public void setDataCriacao(LocalDateTime dataCriacao) { this.dataCriacao = dataCriacao; }
 
     public LocalDateTime getDataConclusao() { return dataConclusao; }
     public void setDataConclusao(LocalDateTime dataConclusao) { this.dataConclusao = dataConclusao; }
