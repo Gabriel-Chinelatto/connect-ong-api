@@ -34,6 +34,11 @@ public class Interesse {
     @Column(name = "data_conclusao")
     private LocalDateTime dataConclusao;
 
+    // Momento da ULTIMA mudanca de status (aceite/recusa/conclusao). Permite ao
+    // painel mostrar "recusado em ..." / "aceito em ...". Null enquanto PENDENTE.
+    @Column(name = "data_status")
+    private LocalDateTime dataStatus;
+
     public Interesse() {}
 
     @PrePersist
@@ -62,4 +67,7 @@ public class Interesse {
 
     public LocalDateTime getDataConclusao() { return dataConclusao; }
     public void setDataConclusao(LocalDateTime dataConclusao) { this.dataConclusao = dataConclusao; }
+
+    public LocalDateTime getDataStatus() { return dataStatus; }
+    public void setDataStatus(LocalDateTime dataStatus) { this.dataStatus = dataStatus; }
 }

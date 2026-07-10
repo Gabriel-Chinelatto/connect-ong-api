@@ -1317,3 +1317,26 @@ databaseChangeLog:
             columns:
               - column:
                   name: avaliacao_doador_id
+
+  # =====================================================================
+  # Data da ultima mudanca de status do interesse (aceite/recusa/conclusao):
+  # o painel mostra "recusado em ..." / "aceito em ...". Coluna nullable
+  # (interesses antigos ficam sem data ate a proxima mudanca). Idempotente.
+  # =====================================================================
+  - changeSet:
+      id: interesse-data-status
+      author: connect-ong
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: interesse
+                columnName: data_status
+      changes:
+        - addColumn:
+            tableName: interesse
+            columns:
+              - column:
+                  name: data_status
+                  type: datetime

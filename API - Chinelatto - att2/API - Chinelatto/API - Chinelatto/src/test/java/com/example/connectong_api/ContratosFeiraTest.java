@@ -578,6 +578,11 @@ class ContratosFeiraTest {
                 .findByUsuarioIdOrderByDataCriacaoDesc(doador.getId()).stream()
                 .anyMatch(n -> "Interesse recusado".equals(n.getTitulo()));
         assertTrue(avisado, "o doador deve ser notificado da recusa");
+
+        // registra QUANDO foi recusado (o painel mostra a data/hora)
+        assertNotNull(interesseRepository.findById(interesse.getId())
+                .orElseThrow().getDataStatus(),
+                "a recusa deve gravar a data da mudanca de status");
     }
 
     @Test

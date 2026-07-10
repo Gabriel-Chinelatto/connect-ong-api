@@ -194,8 +194,10 @@ public class InteresseService {
             return erro("Só um match ACEITO pode ser marcado como concluído");
         }
 
+        LocalDateTime agora = LocalDateTime.now();
         interesse.setStatus("CONCLUIDO");
-        interesse.setDataConclusao(LocalDateTime.now());
+        interesse.setDataConclusao(agora);
+        interesse.setDataStatus(agora);
         Interesse salvo = repository.save(interesse);
 
         String tituloNec = interesse.getNecessidade() != null
@@ -259,6 +261,7 @@ public class InteresseService {
         security.exigirOng(ongDonaId);
 
         interesse.setStatus(novoStatus);
+        interesse.setDataStatus(LocalDateTime.now());
         Interesse salvo = repository.save(interesse);
 
         // notifica o doador quando o match e aceito
@@ -317,6 +320,7 @@ public class InteresseService {
             long dias = ChronoUnit.DAYS.between(i.getDataCriacao(), LocalDateTime.now());
             dto.setDiasEsperando((int) Math.max(0, dias));
         }
+        dto.setDataStatus(i.getDataStatus());
 
         return dto;
     }

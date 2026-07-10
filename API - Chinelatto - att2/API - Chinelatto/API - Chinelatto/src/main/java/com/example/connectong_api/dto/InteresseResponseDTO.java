@@ -33,6 +33,10 @@ public class InteresseResponseDTO {
     // painel da ONG mostra "ha N dias esperando".
     private Integer diasEsperando;
 
+    // Momento da ultima mudanca de status (aceite/recusa/conclusao); null
+    // enquanto PENDENTE. O painel mostra "recusado em ..." / "aceito em ...".
+    private LocalDateTime dataStatus;
+
     public InteresseResponseDTO(
             Long id,
             String status,
@@ -73,4 +77,7 @@ public class InteresseResponseDTO {
 
     public Integer getDiasEsperando() { return diasEsperando; }
     public void setDiasEsperando(Integer v) { this.diasEsperando = v; }
+
+    public LocalDateTime getDataStatus() { return dataStatus; }
+    public void setDataStatus(LocalDateTime v) { this.dataStatus = v; }
 }
