@@ -1,12 +1,12 @@
 package com.example.connectong_api.service;
 
-import jakarta.servlet.http.HttpServletRequest;
+import com.example.connectong_api.security.ClientIpResolver;
+
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-import org.springframework.web.context.request.RequestContextHolder;
-import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -53,6 +53,9 @@ public class RateLimitService {
 
     @Value("${app.ratelimit.janela-minutos:15}")
     private long janelaMinutos;
+
+    @Autowired
+    private ClientIpResolver clientIpResolver;
 
     private static class Falhas {
         int consecutivas;
@@ -141,21 +144,16 @@ public class RateLimitService {
         return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(erro);
     }
 
-    /** IP do cliente (mesmo criterio do AuditService: X-Forwarded-For > remoteAddr). */
+    /**
+     * IP do cliente para as chaves de rate limiting. Delega ao ClientIpResolver
+     * (ponto unico): por padrao usa o IP real da conexao (getRemoteAddr), NAO o
+     * X-Forwarded-For — senao o cliente forjaria o header e variaria o "IP" a
+     * cada request, burlando todos os limites por IP. Fallback "desconhecido"
+     * agrupa as requisicoes sem contexto HTTP numa unica chave (nunca abre o limite).
+     */
     public String ipDaRequisicao() {
-        try {
-            ServletRequestAttributes attrs =
-                    (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
-            if (attrs == null) return "desconhecido";
-            HttpServletRequest req = attrs.getRequest();
-            String forwarded = req.getHeader("X-Forwarded-For");
-            if (forwarded != null && !forwarded.isBlank()) {
-                return forwarded.split(",")[0].trim();
-            }
-            return req.getRemoteAddr();
-        } catch (Exception e) {
-            return "desconhecido";
-        }
+        String ip = clientIpResolver.resolve();
+        return ip != null ? ip : "desconhecido";
     }
 
     private String chave(String escopo, String identificador) {

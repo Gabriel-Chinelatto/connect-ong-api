@@ -2,7 +2,6 @@ package com.example.connectong_api.controller;
 
 import com.example.connectong_api.dto.OngRegistroDTO;
 import com.example.connectong_api.dto.OngUpdateDTO;
-import com.example.connectong_api.model.Ong;
 import com.example.connectong_api.service.ONGService;
 import com.example.connectong_api.service.TransparenciaService;
 
@@ -71,15 +70,6 @@ public class ONGController {
     @Operation(summary = "Indice de transparencia da ONG (score 0-100 + nivel bronze/prata/ouro)")
     public ResponseEntity<?> transparencia(@PathVariable Long id) {
         return transparenciaService.transparencia(id);
-    }
-
-    @PostMapping
-    @Operation(summary = "Cadastrar uma nova ONG")
-    public ResponseEntity<?> criar(
-            @RequestBody Ong ong
-    ) {
-
-        return service.criar(ong);
     }
 
     @PutMapping("/{id}")

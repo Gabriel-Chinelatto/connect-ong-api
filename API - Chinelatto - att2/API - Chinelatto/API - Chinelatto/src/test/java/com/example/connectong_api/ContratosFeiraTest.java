@@ -338,10 +338,16 @@ class ContratosFeiraTest {
         Usuario contaOng = criarContaOng(ong);
         Usuario doador = criarDoador("DoadorPendencias");
 
-        // pendencia recente (dentro do prazo)
+        // pendencia recente (dentro do prazo). Usamos 2 dias MENOS 1 hora de
+        // margem de proposito: com exatamente minusDays(2), a conclusao fica na
+        // FRONTEIRA de 48h e o ChronoUnit.DAYS.between (que conta dias inteiros)
+        // ora dava 2, ora 1 — dependendo dos milissegundos entre o now() do teste
+        // e o now() do service e da truncacao do timestamp no H2 —, deixando
+        // diasRestantes flaky entre 8 e 9. A margem de 1h garante 2 dias inteiros
+        // decorridos de forma deterministica (restantes = 8) sem mudar a semantica.
         Interesse recente = criarInteresse(
                 criarNecessidade(ong, "Pendencia Recente"), doador, "CONCLUIDO");
-        recente.setDataConclusao(LocalDateTime.now().minusDays(2));
+        recente.setDataConclusao(LocalDateTime.now().minusDays(2).minusHours(1));
         interesseRepository.save(recente);
 
         // pendencia estourada (definitiva)

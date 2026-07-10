@@ -1,5 +1,6 @@
 package com.example.connectong_api.dto;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
@@ -31,7 +32,12 @@ public class AssistenteRequestDTO {
     @Size(max = 1000, message = "A mensagem é muito longa (máx. 1000 caracteres)")
     private String mensagem;
 
-    // Historico da conversa (para dar contexto a IA). Opcional.
+    // Historico da conversa (para dar contexto a IA). Opcional. Endpoint publico:
+    // limitamos o TAMANHO da lista (o service so usa as ultimas ~6 trocas) e
+    // validamos cada item em cascata (@Valid), para um chamador anonimo nao
+    // enviar um historico gigante que pressiona memoria e tokens da IA.
+    @Valid
+    @Size(max = 20, message = "Histórico muito longo")
     private List<MensagemHistorico> historico;
 
     // Cidade do doador (opcional). Prioriza ONGs/necessidades proximas.
@@ -59,7 +65,10 @@ public class AssistenteRequestDTO {
 
     /** Uma troca do historico: papel = "user" ou "assistente"; texto = conteudo. */
     public static class MensagemHistorico {
+        @Size(max = 20, message = "Papel inválido")
         private String papel;
+
+        @Size(max = 1000, message = "Mensagem do histórico muito longa")
         private String texto;
 
         public MensagemHistorico() {}

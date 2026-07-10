@@ -4,6 +4,7 @@ import com.example.connectong_api.dto.CampanhaRequestDTO;
 import com.example.connectong_api.dto.CampanhaResponseDTO;
 import com.example.connectong_api.model.Campanha;
 import com.example.connectong_api.model.Ong;
+import com.example.connectong_api.model.Usuario;
 import com.example.connectong_api.repository.CampanhaRepository;
 import com.example.connectong_api.repository.ONGRepository;
 import com.example.connectong_api.repository.UsuarioRepository;
@@ -36,9 +37,17 @@ public class CampanhaService {
     @Autowired private AtividadeService atividadeService;
     @Autowired private SecurityUtils security;
     @Autowired private BloqueioService bloqueioService;
+    @Autowired private RateLimitService rateLimitService;
 
     // Teto por contribuicao (mesmo limite da doacao financeira via DTO).
     private static final double VALOR_MAXIMO_CONTRIBUICAO = 1_000_000.00;
+
+    // Teto GENEROSO de contribuicoes por IP na janela do rate limiting: nao
+    // atrapalha a demonstracao da feira, mas impede um script de inflar/encerrar
+    // campanhas com dezenas de contribuicoes simuladas. Configuravel para os
+    // testes (que compartilham o IP 127.0.0.1) desligarem o limite.
+    @org.springframework.beans.factory.annotation.Value("${app.ratelimit.max-contribuicoes:30}")
+    private int maxContribuicoes;
 
     // =========================
     // LISTAR
@@ -114,17 +123,35 @@ public class CampanhaService {
     // =========================
     // CONTRIBUIR (incrementa o arrecadado; encerra ao bater a meta)
     // =========================
-    public ResponseEntity<?> contribuir(Long id, Double valor, String doadorNome) {
+    public ResponseEntity<?> contribuir(Long id, Double valor, String doadorNomeIgnorado) {
         if (valor == null || valor <= 0) return erro("O valor deve ser maior que zero");
         if (valor > VALOR_MAXIMO_CONTRIBUICAO) return erro("Valor acima do limite permitido");
+
+        // Anti-spam por IP (teto generoso): impede inflar/encerrar campanhas em massa.
+        if (rateLimitService.excedeuSolicitacoes("contribuir", maxContribuicoes)) {
+            return RateLimitService.resposta429();
+        }
 
         Campanha c = repository.findById(id).orElse(null);
         if (c == null) return ResponseEntity.notFound().build();
         if (c.getEncerrada()) return erro("Esta campanha ja foi encerrada");
 
+        // O nome exibido na notificacao da ONG vem da IDENTIDADE DO TOKEN, nao do
+        // corpo: antes o "doadorNome" chegava do cliente e era spoofavel (dava
+        // para se passar por outra pessoa na notificacao). O corpo agora e ignorado.
+        String doadorNome = nomeDoAutenticado();
+
         Campanha salva = registrarContribuicao(c, valor, doadorNome);
 
         return ResponseEntity.ok(new CampanhaResponseDTO(salva));
+    }
+
+    // Nome do usuario autenticado (para a notificacao), resolvido pelo id do
+    // token — nunca por dado vindo do cliente. Null cai em "Alguem" no texto.
+    private String nomeDoAutenticado() {
+        Long uid = security.usuarioId();
+        if (uid == null) return null;
+        return usuarioRepository.findById(uid).map(Usuario::getNome).orElse(null);
     }
 
     // Nucleo da contribuicao, tambem reaproveitado pela doacao PIX vinculada a

@@ -276,43 +276,6 @@ public class ONGService {
     }
 
     // =========================
-    // CRIAR
-    // =========================
-    public ResponseEntity<?> criar(
-            Ong ong
-    ) {
-
-        // valida nome
-        if (ong.getNome() == null ||
-                ong.getNome().isEmpty()) {
-
-            return erro(
-                    "Nome da ONG é obrigatório"
-            );
-        }
-
-        // valida email
-        if (ong.getEmail() == null ||
-                ong.getEmail().isEmpty()) {
-
-            return erro(
-                    "Email é obrigatório"
-            );
-        }
-
-        // Anti mass-assignment: campos de confianca/agregados NUNCA vem do cliente.
-        // (o id ja e ignorado por nao ter setter; aqui zeramos o resto por seguranca)
-        ong.setVerificada(false);
-        ong.setNotaMedia(0.0);
-        ong.setTotalAvaliacoes(0);
-
-        Ong nova =
-                repository.save(ong);
-
-        return ResponseEntity.ok(toDTO(nova));
-    }
-
-    // =========================
     // BUSCAR POR ID (perfil completo, com capa/endereco/fotos do local)
     // =========================
     public ResponseEntity<?> obterPorId(Long id) {

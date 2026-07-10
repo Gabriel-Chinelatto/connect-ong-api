@@ -61,6 +61,17 @@ public class DoacaoFinanceiraService {
     @Autowired
     private AtividadeService atividadeService;
 
+    @Autowired
+    private RateLimitService rateLimitService;
+
+    // Teto GENEROSO de doacoes simuladas por IP na janela do rate limiting: nao
+    // atrapalha a feira, mas impede que um doador use o PIX SIMULADO (sem
+    // pagamento real) como um segundo caminho para inflar/encerrar em massa a
+    // campanha de qualquer ONG (mesma logica de /campanhas/{id}/contribuir).
+    // Configuravel para os testes (IP 127.0.0.1 compartilhado) desligarem o limite.
+    @org.springframework.beans.factory.annotation.Value("${app.ratelimit.max-doacoes:30}")
+    private int maxDoacoes;
+
     public List<DoacaoFinanceiraResponseDTO> listarPorDoador(Long doadorId) {
         return repository.findByDoadorIdOrderByDataCriacaoDesc(doadorId)
                 .stream().map(this::toDTO).collect(Collectors.toList());
@@ -93,6 +104,12 @@ public class DoacaoFinanceiraService {
         }
         if (dto.getValor() == null || dto.getValor() <= 0) {
             return erro("O valor deve ser maior que zero");
+        }
+
+        // Anti-spam por IP (teto generoso): impede usar o PIX simulado para
+        // inflar/encerrar campanhas alheias em massa (ver MAX_DOACOES_JANELA).
+        if (rateLimitService.excedeuSolicitacoes("doacao-financeira", maxDoacoes)) {
+            return RateLimitService.resposta429();
         }
 
         Ong ong = ongRepository.findById(dto.getOngId()).orElse(null);
