@@ -4,8 +4,10 @@ import com.example.connectong_api.dto.AvaliacaoDoadorRequestDTO;
 import com.example.connectong_api.dto.AvaliacaoDoadorResponseDTO;
 import com.example.connectong_api.exception.AcessoNegadoException;
 import com.example.connectong_api.model.AvaliacaoDoador;
+import com.example.connectong_api.model.AvaliacaoDoadorFoto;
 import com.example.connectong_api.model.Ong;
 import com.example.connectong_api.model.Usuario;
+import com.example.connectong_api.repository.AvaliacaoDoadorFotoRepository;
 import com.example.connectong_api.repository.AvaliacaoDoadorRepository;
 import com.example.connectong_api.repository.InteresseRepository;
 import com.example.connectong_api.repository.ONGRepository;
@@ -54,11 +56,30 @@ public class AvaliacaoDoadorService {
     @Autowired
     private InteresseRepository interesseRepository;
 
-    // Lista PUBLICA das avaliacoes recebidas por um doador.
+    @Autowired
+    private AvaliacaoDoadorFotoRepository fotoRepository;
+
+    // Teto por foto (base64): mesmo criterio das prestacoes (~2.8MB).
+    private static final int MAX_FOTO_CHARS = 2_900_000;
+
+    // Lista PUBLICA das avaliacoes recebidas por um doador (com as fotos da
+    // doacao). Fotos carregadas em UMA query (evita N+1).
     public List<AvaliacaoDoadorResponseDTO> listar(Long doadorId) {
-        return repository.findByDoadorIdOrderByCriadoEmDesc(doadorId)
-                .stream()
-                .map(this::toDTO)
+        List<AvaliacaoDoador> avals =
+                repository.findByDoadorIdOrderByCriadoEmDesc(doadorId);
+        if (avals.isEmpty()) return List.of();
+
+        List<Long> ids = avals.stream()
+                .map(AvaliacaoDoador::getId).collect(Collectors.toList());
+        Map<Long, List<String>> fotosPorAval = fotoRepository
+                .findByAvaliacaoDoadorIdInOrderByIdAsc(ids).stream()
+                .collect(Collectors.groupingBy(
+                        AvaliacaoDoadorFoto::getAvaliacaoDoadorId,
+                        Collectors.mapping(AvaliacaoDoadorFoto::getFoto,
+                                Collectors.toList())));
+
+        return avals.stream()
+                .map(a -> toDTO(a, fotosPorAval.getOrDefault(a.getId(), List.of())))
                 .collect(Collectors.toList());
     }
 
@@ -77,6 +98,16 @@ public class AvaliacaoDoadorService {
         }
         if (dto.getNota() == null || dto.getNota() < 1 || dto.getNota() > 5) {
             return erro("A nota deve ser de 1 a 5");
+        }
+        if (dto.getFotos() != null) {
+            if (dto.getFotos().size() > 3) {
+                return erro("No máximo 3 fotos por avaliação");
+            }
+            for (String f : dto.getFotos()) {
+                if (f != null && f.length() > MAX_FOTO_CHARS) {
+                    return erro("Uma das fotos é muito grande");
+                }
+            }
         }
 
         Usuario doador = usuarioRepository.findById(dto.getDoadorId()).orElse(null);
@@ -104,6 +135,19 @@ public class AvaliacaoDoadorService {
 
         AvaliacaoDoador salva = repository.save(avaliacao);
 
+        // Fotos (opcional): a lista enviada SUBSTITUI as atuais. Null = nao mexe
+        // (permite reavaliar a nota sem reenviar as fotos).
+        if (dto.getFotos() != null) {
+            fotoRepository.deleteByAvaliacaoDoadorId(salva.getId());
+            for (String f : dto.getFotos()) {
+                if (f == null || f.isBlank()) continue;
+                AvaliacaoDoadorFoto foto = new AvaliacaoDoadorFoto();
+                foto.setAvaliacaoDoadorId(salva.getId());
+                foto.setFoto(f);
+                fotoRepository.save(foto);
+            }
+        }
+
         recalcularMedia(doador);
 
         // Notifica o doador avaliado.
@@ -116,7 +160,14 @@ public class AvaliacaoDoadorService {
                         + dto.getNota() + " estrelas",
                 "MATCH");
 
-        return ResponseEntity.status(HttpStatus.CREATED).body(toDTO(salva));
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(toDTO(salva, fotosDaAvaliacao(salva.getId())));
+    }
+
+    private List<String> fotosDaAvaliacao(Long avaliacaoId) {
+        return fotoRepository.findByAvaliacaoDoadorIdOrderByIdAsc(avaliacaoId)
+                .stream().map(AvaliacaoDoadorFoto::getFoto)
+                .collect(Collectors.toList());
     }
 
     // Recalcula os agregados denormalizados no Usuario (mesmo padrao da Ong).
@@ -135,13 +186,14 @@ public class AvaliacaoDoadorService {
         usuarioRepository.save(doador);
     }
 
-    private AvaliacaoDoadorResponseDTO toDTO(AvaliacaoDoador a) {
+    private AvaliacaoDoadorResponseDTO toDTO(AvaliacaoDoador a, List<String> fotos) {
         String ongNome = ongRepository.findById(a.getOngId())
                 .map(Ong::getNome).orElse(null);
         return new AvaliacaoDoadorResponseDTO(
                 ongNome,
                 a.getNota(),
                 a.getComentario(),
+                fotos,
                 a.getCriadoEm()
         );
     }

@@ -6,9 +6,11 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 
+import java.util.List;
+
 /**
- * Dados de entrada para uma ONG avaliar um DOADOR (nota 1-5 + comentario).
- * A ONG avaliadora vem do TOKEN (nunca do corpo).
+ * Dados de entrada para uma ONG avaliar um DOADOR (nota 1-5 + comentario +
+ * fotos opcionais da doacao recebida). A ONG avaliadora vem do TOKEN.
  */
 public class AvaliacaoDoadorRequestDTO {
 
@@ -24,6 +26,11 @@ public class AvaliacaoDoadorRequestDTO {
     @Size(max = 500, message = "O comentario deve ter no maximo 500 caracteres")
     private String comentario;
 
+    // Fotos opcionais (base64) da doacao recebida. No maximo 3; o tamanho de
+    // cada uma e validado no service (mesmo teto das prestacoes).
+    @Size(max = 3, message = "No maximo 3 fotos por avaliacao")
+    private List<String> fotos;
+
     public Long getDoadorId() { return doadorId; }
     public void setDoadorId(Long doadorId) { this.doadorId = doadorId; }
 
@@ -32,4 +39,7 @@ public class AvaliacaoDoadorRequestDTO {
 
     public String getComentario() { return comentario; }
     public void setComentario(String comentario) { this.comentario = comentario; }
+
+    public List<String> getFotos() { return fotos; }
+    public void setFotos(List<String> fotos) { this.fotos = fotos; }
 }

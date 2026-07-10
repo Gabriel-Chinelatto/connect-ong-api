@@ -1262,3 +1262,58 @@ databaseChangeLog:
             columns:
               - column:
                   name: usuario_id
+
+  # =====================================================================
+  # Avaliacao de doador com FOTO: a ONG anexa fotos da doacao recebida ao
+  # avaliar o doador (mesmo padrao de prestacao_foto). Tabela separada; base64
+  # em mediumtext. Idempotente (not tableExists) — seguro no MySQL 5.6.
+  # =====================================================================
+
+  - changeSet:
+      id: avaliacao-doador-foto-create-table
+      author: connect-ong
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: avaliacao_doador_foto
+      changes:
+        - createTable:
+            tableName: avaliacao_doador_foto
+            columns:
+              - column:
+                  name: id
+                  type: bigint
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: avaliacao_doador_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: foto
+                  type: mediumtext
+              - column:
+                  name: criado_em
+                  type: datetime
+
+  - changeSet:
+      id: avaliacao-doador-foto-idx
+      author: connect-ong
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: MARK_RAN
+        - not:
+            - indexExists:
+                indexName: idx_avaliacao_doador_foto_avaliacao
+      changes:
+        - createIndex:
+            indexName: idx_avaliacao_doador_foto_avaliacao
+            tableName: avaliacao_doador_foto
+            columns:
+              - column:
+                  name: avaliacao_doador_id

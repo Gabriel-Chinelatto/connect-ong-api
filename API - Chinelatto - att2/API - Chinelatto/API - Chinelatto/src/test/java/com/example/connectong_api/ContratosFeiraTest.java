@@ -536,6 +536,30 @@ class ContratosFeiraTest {
                 .andExpect(jsonPath("$.nota").value(5));
     }
 
+    @Test
+    void avaliacaoDoador_comFotos_apareceNoPerfilPublico() throws Exception {
+        Ong ong = criarOng("ONG Com Foto");
+        Usuario contaOng = criarContaOng(ong);
+        Usuario doador = criarDoador("DoadorComFoto");
+        // lastro: match concluido entre os dois
+        criarInteresse(criarNecessidade(ong, "Cobertores"), doador, "CONCLUIDO");
+
+        mockMvc.perform(post("/avaliacoes-doador")
+                        .header("Authorization", "Bearer " + token(contaOng))
+                        .contentType("application/json")
+                        .content("{\"doadorId\":" + doador.getId()
+                                + ",\"nota\":5,\"comentario\":\"Doacao linda\""
+                                + ",\"fotos\":[\"FOTO_A\",\"FOTO_B\"]}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.fotos", hasSize(2)));
+
+        // GET publico (sem token) do perfil do doador expoe as fotos da avaliacao
+        mockMvc.perform(get("/avaliacoes-doador?doadorId=" + doador.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].fotos", hasSize(2)))
+                .andExpect(jsonPath("$[0].fotos[0]").value("FOTO_A"));
+    }
+
     // ===================== E) Espera do match + recusa =====================
 
     @Test
