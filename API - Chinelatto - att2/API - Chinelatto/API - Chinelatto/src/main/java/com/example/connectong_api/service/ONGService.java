@@ -142,26 +142,38 @@ public class ONGService {
      * ONG legada sem conta de login vinculada: mantem o perfil como esta.
      */
     private void aplicarPrivacidade(PerfilPublicoOngDTO dto, Long ongId) {
+        boolean[] p = privacidadeDaOng(ongId);
+        if (!p[0]) {
+            dto.setEmail(null);
+        }
+        if (!p[1]) {
+            dto.setTelefone(null);
+        }
+    }
+
+    /**
+     * Resolve os toggles de contato da conta-ONG dona: [exibirEmail, exibirTelefone].
+     * Sem conta vinculada (ONG legada) OU sem registro de Preferencia recai nos
+     * MESMOS defaults de Preferencia.padrao(): email OCULTO, telefone VISIVEL.
+     * Campo null no registro (coluna criada depois) tambem recai nesses defaults.
+     * Unico ponto de verdade da privacidade de contato — usado no perfil publico,
+     * na listagem GET /ongs e no detalhe GET /ongs/{id}, para nunca se contradizerem.
+     */
+    private boolean[] privacidadeDaOng(Long ongId) {
         Usuario conta = usuarioRepository.findByOngId(ongId).orElse(null);
         if (conta == null) {
-            return;
+            // ONG legada sem conta de login: aplica os defaults seguros mesmo assim
+            // (email oculto, telefone visivel) em vez de expor tudo.
+            return new boolean[] { false, true };
         }
         Preferencia prefs = preferenciaRepository.findByUsuarioId(conta.getId())
                 .orElseGet(() -> Preferencia.padrao(conta.getId()));
 
-        // Campo null no registro (linha antiga, coluna criada depois) recai nos
-        // defaults do padrao(): email oculto, telefone visivel.
         boolean exibirEmail = prefs.getMostrarEmail() != null
                 ? prefs.getMostrarEmail() : false;
         boolean exibirTelefone = prefs.getMostrarTelefone() != null
                 ? prefs.getMostrarTelefone() : true;
-
-        if (!exibirEmail) {
-            dto.setEmail(null);
-        }
-        if (!exibirTelefone) {
-            dto.setTelefone(null);
-        }
+        return new boolean[] { exibirEmail, exibirTelefone };
     }
 
     // =========================
@@ -418,11 +430,17 @@ public class ONGService {
     }
 
     private OngResponseDTO toDTO(Ong o) {
+        // PRIVACIDADE REAL: a listagem GET /ongs e o detalhe GET /ongs/{id}
+        // respeitam os MESMOS toggles mostrarEmail/mostrarTelefone do perfil
+        // publico. Antes esses 2 caminhos devolviam contato de qualquer ONG a
+        // qualquer autenticado, ignorando as configuracoes (o perfil publico ja
+        // respeitava). Agora o contato so aparece quando a ONG dona o liberou.
+        boolean[] p = privacidadeDaOng(o.getId());
         return new OngResponseDTO(
                 o.getId(),
                 o.getNome(),
-                o.getEmail(),
-                o.getTelefone(),
+                p[0] ? o.getEmail() : null,
+                p[1] ? o.getTelefone() : null,
                 o.getCidade(),
                 o.getDescricao(),
                 o.getCnpj(),

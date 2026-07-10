@@ -58,7 +58,7 @@ public class SenhaResetService {
     @Autowired private AuditService auditService;
     @Autowired private RateLimitService rateLimitService;
 
-    @Value("${app.demo.enabled:true}")
+    @Value("${app.demo.enabled:false}")
     private boolean demoEnabled;
 
     // =========================

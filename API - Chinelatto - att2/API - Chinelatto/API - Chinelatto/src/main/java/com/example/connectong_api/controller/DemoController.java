@@ -17,8 +17,8 @@ import java.util.Map;
  *
  * O seed cria contas de demonstracao com senha fixa (demo123), inclusive uma ONG
  * "verificada". E util na feira, mas um risco em producao. Fica atras do
- * interruptor "app.demo.enabled" (default true): em producao basta definir
- * APP_DEMO_ENABLED=false para desativar sem recompilar. Continua exigindo
+ * interruptor "app.demo.enabled" (default FALSE, seguro): na maquina da feira
+ * defina APP_DEMO_ENABLED=true para ligar sem recompilar. Continua exigindo
  * autenticacao (o desktop chama pelo painel da ONG).
  */
 @RestController
@@ -29,7 +29,7 @@ public class DemoController {
     @Autowired
     private DemoService demoService;
 
-    @Value("${app.demo.enabled:true}")
+    @Value("${app.demo.enabled:false}")
     private boolean demoEnabled;
 
     @PostMapping("/seed")

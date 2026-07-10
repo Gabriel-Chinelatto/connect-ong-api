@@ -103,6 +103,13 @@ public class AuthController {
                 return erro(HttpStatus.UNAUTHORIZED, "Usuario do token nao existe mais");
             }
 
+            // Conta excluida (soft-delete) nao pode renovar o access token: sem
+            // isso, uma conta excluida seguiria emitindo tokens por 7 dias via
+            // refresh. Login/2FA/reset ja barram soft-delete; aqui fechamos o refresh.
+            if (usuario.get().getDataExclusao() != null) {
+                return erro(HttpStatus.UNAUTHORIZED, "Conta desativada");
+            }
+
             Map<String, String> resposta = new HashMap<>();
             resposta.put("accessToken", jwtService.gerarAccessToken(usuario.get()));
             return ResponseEntity.ok(resposta);

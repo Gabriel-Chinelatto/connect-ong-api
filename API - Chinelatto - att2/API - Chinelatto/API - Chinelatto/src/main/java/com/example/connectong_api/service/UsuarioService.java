@@ -54,7 +54,7 @@ public class UsuarioService {
 
     // Simulacao de envio (feira): quando ligado, a resposta que exige 2FA traz
     // o codigo em codigoDemo (mesmo precedente do esqueci-senha e do PIX).
-    @Value("${app.demo.enabled:true}")
+    @Value("${app.demo.enabled:false}")
     private boolean demoEnabled;
 
     // =========================
