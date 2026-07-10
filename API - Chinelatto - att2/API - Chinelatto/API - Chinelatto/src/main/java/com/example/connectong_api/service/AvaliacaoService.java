@@ -2,10 +2,12 @@ package com.example.connectong_api.service;
 
 import com.example.connectong_api.dto.AvaliacaoRequestDTO;
 import com.example.connectong_api.dto.AvaliacaoResponseDTO;
+import com.example.connectong_api.exception.AcessoNegadoException;
 import com.example.connectong_api.model.Avaliacao;
 import com.example.connectong_api.model.Ong;
 import com.example.connectong_api.model.Usuario;
 import com.example.connectong_api.repository.AvaliacaoRepository;
+import com.example.connectong_api.repository.InteresseRepository;
 import com.example.connectong_api.repository.ONGRepository;
 import com.example.connectong_api.repository.UsuarioRepository;
 
@@ -40,6 +42,9 @@ public class AvaliacaoService {
     @Autowired
     private AtividadeService atividadeService;
 
+    @Autowired
+    private InteresseRepository interesseRepository;
+
     public List<AvaliacaoResponseDTO> listar(Long ongId) {
         return repository.findByOngIdOrderByDataCriacaoDesc(ongId)
                 .stream()
@@ -63,6 +68,15 @@ public class AvaliacaoService {
         Usuario doador = usuarioRepository.findById(dto.getDoadorId()).orElse(null);
         if (doador == null) {
             return erro("Doador não encontrado");
+        }
+
+        // AVALIACAO COM LASTRO: so avalia a ONG quem concluiu uma doacao com ela
+        // (existe um match CONCLUIDO entre os dois). Fecha o "review bombing" —
+        // dar nota a uma ONG com quem nunca se interagiu. Os apps ja so oferecem
+        // o botao em match concluido; aqui o servidor GARANTE a regra (403).
+        if (!interesseRepository.existeConcluidoEntre(dto.getDoadorId(), dto.getOngId())) {
+            throw new AcessoNegadoException(
+                    "Você só pode avaliar uma ONG após concluir uma doação com ela.");
         }
 
         Avaliacao avaliacao = repository

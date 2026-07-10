@@ -36,4 +36,14 @@ public interface InteresseRepository extends JpaRepository<Interesse, Long> {
     @Query("SELECT i FROM Interesse i WHERE i.status = 'CONCLUIDO' "
             + "AND NOT EXISTS (SELECT p FROM Prestacao p WHERE p.interesse = i)")
     List<Interesse> concluidosSemPrestacao();
+
+    // Existe um match CONCLUIDO entre este doador e esta ONG? E o LASTRO que
+    // habilita a avaliacao nos dois sentidos (doador->ONG e ONG->doador): so
+    // avalia quem de fato concluiu uma doacao com o outro lado — evita "review
+    // bombing" (nota sem relacao real) na reputacao publica.
+    @Query("SELECT COUNT(i) > 0 FROM Interesse i "
+            + "WHERE i.doador.id = :doadorId AND i.necessidade.ong.id = :ongId "
+            + "AND i.status = 'CONCLUIDO'")
+    boolean existeConcluidoEntre(@Param("doadorId") Long doadorId,
+                                 @Param("ongId") Long ongId);
 }

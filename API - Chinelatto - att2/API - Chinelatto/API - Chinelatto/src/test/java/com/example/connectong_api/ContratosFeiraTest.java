@@ -423,6 +423,11 @@ class ContratosFeiraTest {
         Usuario conta2 = criarContaOng(ong2);
         Usuario doador = criarDoador("DoadorAvaliado");
 
+        // LASTRO: a ONG so avalia um doador com quem concluiu uma doacao. Cada
+        // ONG precisa de um match CONCLUIDO com este doador antes de avaliar.
+        criarInteresse(criarNecessidade(ong1, "Doacao 1"), doador, "CONCLUIDO");
+        criarInteresse(criarNecessidade(ong2, "Doacao 2"), doador, "CONCLUIDO");
+
         // ONG1 avalia com 4
         mockMvc.perform(post("/avaliacoes-doador")
                         .header("Authorization", "Bearer " + token(conta1))
@@ -486,6 +491,48 @@ class ContratosFeiraTest {
                         .contentType("application/json")
                         .content("{\"doadorId\":" + alvo.getId() + ",\"nota\":5}"))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void avaliacaoDoador_semMatchConcluido_403() throws Exception {
+        // A ONG nunca concluiu doacao com este doador -> nao pode avalia-lo
+        // (avaliacao exige lastro; anti "review bombing").
+        Ong ong = criarOng("ONG Sem Lastro Doador");
+        Usuario contaOng = criarContaOng(ong);
+        Usuario doador = criarDoador("DoadorSemMatchConcluido");
+
+        mockMvc.perform(post("/avaliacoes-doador")
+                        .header("Authorization", "Bearer " + token(contaOng))
+                        .contentType("application/json")
+                        .content("{\"doadorId\":" + doador.getId() + ",\"nota\":5}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void avaliacaoOng_exigeMatchConcluido_403semLastro_201aposConcluir() throws Exception {
+        Ong ong = criarOng("ONG Avaliada Pelo Doador");
+        criarContaOng(ong);
+        Usuario doador = criarDoador("DoadorQueAvaliaOng");
+
+        // sem match concluido com a ONG -> 403
+        mockMvc.perform(post("/avaliacoes")
+                        .header("Authorization", "Bearer " + token(doador))
+                        .contentType("application/json")
+                        .content("{\"ongId\":" + ong.getId()
+                                + ",\"doadorId\":" + doador.getId()
+                                + ",\"nota\":5,\"comentario\":\"Otima\"}"))
+                .andExpect(status().isForbidden());
+
+        // apos concluir uma doacao com a ONG -> pode avaliar (201)
+        criarInteresse(criarNecessidade(ong, "Cestas basicas"), doador, "CONCLUIDO");
+        mockMvc.perform(post("/avaliacoes")
+                        .header("Authorization", "Bearer " + token(doador))
+                        .contentType("application/json")
+                        .content("{\"ongId\":" + ong.getId()
+                                + ",\"doadorId\":" + doador.getId()
+                                + ",\"nota\":5,\"comentario\":\"Otima\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.nota").value(5));
     }
 
     @Test

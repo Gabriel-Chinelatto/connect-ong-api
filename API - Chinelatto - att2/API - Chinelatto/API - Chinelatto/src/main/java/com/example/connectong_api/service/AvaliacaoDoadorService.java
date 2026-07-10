@@ -7,6 +7,7 @@ import com.example.connectong_api.model.AvaliacaoDoador;
 import com.example.connectong_api.model.Ong;
 import com.example.connectong_api.model.Usuario;
 import com.example.connectong_api.repository.AvaliacaoDoadorRepository;
+import com.example.connectong_api.repository.InteresseRepository;
 import com.example.connectong_api.repository.ONGRepository;
 import com.example.connectong_api.repository.UsuarioRepository;
 import com.example.connectong_api.security.SecurityUtils;
@@ -50,6 +51,9 @@ public class AvaliacaoDoadorService {
     @Autowired
     private SecurityUtils security;
 
+    @Autowired
+    private InteresseRepository interesseRepository;
+
     // Lista PUBLICA das avaliacoes recebidas por um doador.
     public List<AvaliacaoDoadorResponseDTO> listar(Long doadorId) {
         return repository.findByDoadorIdOrderByCriadoEmDesc(doadorId)
@@ -79,6 +83,14 @@ public class AvaliacaoDoadorService {
         if (doador == null || doador.getDataExclusao() != null
                 || !"DOADOR".equals(doador.getTipo())) {
             return erro("Doador não encontrado");
+        }
+
+        // AVALIACAO COM LASTRO: a ONG so avalia um doador com quem concluiu uma
+        // doacao (existe um match CONCLUIDO entre os dois). Espelha a regra da
+        // avaliacao de ONG e fecha o "review bombing" na reputacao do doador.
+        if (!interesseRepository.existeConcluidoEntre(dto.getDoadorId(), ongId)) {
+            throw new AcessoNegadoException(
+                    "Você só pode avaliar um doador após concluir uma doação com ele.");
         }
 
         AvaliacaoDoador avaliacao = repository
