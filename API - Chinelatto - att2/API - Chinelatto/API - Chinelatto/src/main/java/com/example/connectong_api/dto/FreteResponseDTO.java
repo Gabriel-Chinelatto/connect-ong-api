@@ -12,7 +12,8 @@ import java.util.List;
  *   "distanciaKm": 380,
  *   "pesoKg": 15.0,
  *   "pesoEstimado": true,          (true quando o peso veio do ItemIaService)
- *   "categoria": "Roupas",
+ *   "categoria": "Roupas",         (a ESCOLHIDA pelo usuario, quando houver; senao a deduzida)
+ *   "categoriaDetectada": "Alimentos", (o que o TEXTO do item sugere; null se indeterminado)
  *   "itemResumo": "10x cobertores",
  *   "modalidades": [ {"nome":"...","valor":0.0,"prazoDias":0,"detalhe":"..."} ],
  *   "aviso": "Valores estimados por distância e peso — não são cotação oficial.",
@@ -30,6 +31,10 @@ public class FreteResponseDTO {
     private Double pesoKg;
     private boolean pesoEstimado;
     private String categoria;
+    // Categoria que o TEXTO do item sugere (independente da escolhida). O app
+    // compara com "categoria" e avisa (sem bloquear) quando divergem. null =
+    // nao deu para inferir pelo texto.
+    private String categoriaDetectada;
     private String itemResumo;
     private List<Modalidade> modalidades = new ArrayList<>();
     private String aviso;
@@ -54,6 +59,9 @@ public class FreteResponseDTO {
 
     public String getCategoria() { return categoria; }
     public void setCategoria(String categoria) { this.categoria = categoria; }
+
+    public String getCategoriaDetectada() { return categoriaDetectada; }
+    public void setCategoriaDetectada(String categoriaDetectada) { this.categoriaDetectada = categoriaDetectada; }
 
     public String getItemResumo() { return itemResumo; }
     public void setItemResumo(String itemResumo) { this.itemResumo = itemResumo; }

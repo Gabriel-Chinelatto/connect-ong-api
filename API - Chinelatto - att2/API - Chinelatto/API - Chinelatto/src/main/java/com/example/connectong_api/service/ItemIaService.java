@@ -153,6 +153,23 @@ public class ItemIaService {
         return porRegras(desc, quantidade, catHint);
     }
 
+    /**
+     * Categoria que o TEXTO do item SUGERE, de forma DETERMINISTICA (palavras-chave,
+     * 100% offline), INDEPENDENTE de qualquer categoria escolhida pelo usuario. Serve
+     * para o app COMPARAR com a categoria escolhida e mostrar um aviso gentil quando
+     * elas divergem (ex.: item "10 sacos de feijao" com categoria "Roupas"). NAO altera
+     * nem bloqueia nada.
+     *
+     * Retorna null quando nao da para inferir (texto vazio ou sem palavra-chave
+     * reconhecida — o que resultaria em "Outros"). Usa regras (nao a IA) de proposito:
+     * e instantaneo, sempre disponivel (sem chave) e previsivel para o aviso da UI.
+     */
+    public String categoriaDoTexto(String texto) {
+        if (texto == null || texto.isBlank()) return null;
+        String cat = detectarCategoria(normalizar(texto));
+        return "Outros".equals(cat) ? null : cat;
+    }
+
     // ================================================================
     // CAMINHO DA IA
     // ================================================================
@@ -160,10 +177,12 @@ public class ItemIaService {
         String sistema = "Voce estima peso e categoria de itens de DOACAO a partir de "
                 + "uma descricao em portugues do Brasil. Considere a quantidade e o item "
                 + "para estimar o peso TOTAL em quilogramas (ex.: '10 sacos de arroz de 1kg' "
-                + "-> pesoKg 10). Categorias validas: Alimentos, Roupas, Higiene, Brinquedos, "
-                + "Educacao, Saude, Outros. Responda EXCLUSIVAMENTE com um JSON valido, sem "
-                + "texto fora dele, no formato: {\"pesoKg\": numero, \"categoria\": \"...\", "
-                + "\"resumo\": \"texto curto\"}. Nao invente dados alem do que a descricao diz.";
+                + "-> pesoKg 10). A categoria DEVE ser exatamente uma destas (nao invente "
+                + "outras): Alimentos, Roupas, Higiene, Brinquedos, Educacao, Saude, Outros. "
+                + "Responda EXCLUSIVAMENTE com um JSON valido em UMA linha, sem markdown, sem "
+                + "cercas de codigo e sem texto fora dele, no formato exato: {\"pesoKg\": "
+                + "numero, \"categoria\": \"...\", \"resumo\": \"texto curto\"}. O campo pesoKg "
+                + "e um numero (ponto decimal). Nao invente dados alem do que a descricao diz.";
 
         StringBuilder u = new StringBuilder();
         u.append("Descricao do item: ").append(texto);
@@ -181,7 +200,10 @@ public class ItemIaService {
                 new ProvedorIA.MensagemIA("system", sistema),
                 new ProvedorIA.MensagemIA("user", u.toString()));
 
-        Optional<String> saida = provedorIA.completar(mensagens);
+        // EXTRACAO estruturada: temperatura BAIXA (determinismo, menos alucinacao)
+        // e teto pequeno de tokens (o JSON de saida e curto).
+        Optional<String> saida = provedorIA.completar(mensagens,
+                ProvedorIA.OpcoesIA.de(0.15, 200));
         if (saida.isEmpty()) return null;
         return parsearJson(saida.get(), texto, quantidade, catHint);
     }

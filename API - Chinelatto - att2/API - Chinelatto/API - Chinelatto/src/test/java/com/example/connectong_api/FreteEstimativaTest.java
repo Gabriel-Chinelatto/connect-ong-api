@@ -162,6 +162,50 @@ class FreteEstimativaTest {
     }
 
     // ---------------------------------------------------------------
+    // VERIFICACAO NAO-BLOQUEANTE: categoria ESCOLHIDA diverge do que o TEXTO
+    // do item sugere. A escolhida ("Roupas") e honrada em "categoria"; o campo
+    // "categoriaDetectada" expõe o que o texto sugere ("Alimentos") p/ o app avisar.
+    // ---------------------------------------------------------------
+    @Test
+    void frete_categoriaDivergente_exponeCategoriaDetectada() {
+        FreteRequestDTO req = new FreteRequestDTO();
+        req.setOrigemCidade("Limeira");
+        req.setOrigemUf("SP");
+        req.setDestinoCidade("Rio de Janeiro");
+        req.setDestinoUf("RJ");
+        req.setItem("10 sacos de feijao");
+        req.setCategoria("Roupas");
+
+        FreteResponseDTO resp = freteService.estimar(req);
+
+        // A escolhida e honrada (nao bloqueia, nao troca).
+        assertEquals("Roupas", resp.getCategoria());
+        // O texto ("feijao") sugere Alimentos -> divergencia sinalizada ao app.
+        assertEquals("Alimentos", resp.getCategoriaDetectada());
+    }
+
+    // ---------------------------------------------------------------
+    // categoriaDetectada = null quando o texto nao permite inferir (item
+    // desconhecido) e quando nao ha texto de item.
+    // ---------------------------------------------------------------
+    @Test
+    void frete_categoriaDetectada_nullQuandoIndeterminada() {
+        FreteRequestDTO semTexto = new FreteRequestDTO();
+        semTexto.setOrigemCidade("Limeira");
+        semTexto.setDestinoCidade("Rio de Janeiro");
+        semTexto.setPesoKg(5.0);
+        assertNull(freteService.estimar(semTexto).getCategoriaDetectada(),
+                "sem item -> sem categoria detectada");
+
+        FreteRequestDTO desconhecido = new FreteRequestDTO();
+        desconhecido.setOrigemCidade("Limeira");
+        desconhecido.setDestinoCidade("Rio de Janeiro");
+        desconhecido.setItem("uma coisa qualquer");
+        assertNull(freteService.estimar(desconhecido).getCategoriaDetectada(),
+                "item sem palavra-chave -> categoria detectada indeterminada (null)");
+    }
+
+    // ---------------------------------------------------------------
     // Sem peso informado: a categoria escolhida ("Alimentos") e honrada
     // mesmo que o item ("morango") sozinho seria classificado como "Outros".
     // ---------------------------------------------------------------

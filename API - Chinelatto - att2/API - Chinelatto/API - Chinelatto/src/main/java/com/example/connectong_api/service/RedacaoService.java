@@ -67,7 +67,10 @@ public class RedacaoService {
                 new ProvedorIA.MensagemIA("system", sistema),
                 new ProvedorIA.MensagemIA("user", u.toString()));
 
-        Optional<String> saida = provedorIA.completar(mensagens);
+        // ESCRITA natural, mas ancorada no rascunho: temperatura media e teto de
+        // tokens suficiente para titulo + 2-4 frases (JSON curto).
+        Optional<String> saida = provedorIA.completar(mensagens,
+                ProvedorIA.OpcoesIA.de(0.55, 300));
         if (saida.isEmpty()) return null;
         return parsearJson(saida.get());
     }

@@ -148,7 +148,7 @@ class AssistenteTest {
         Mockito.when(provedorIA.disponivel()).thenReturn(true);
         String json = "{\"resposta\":\"Que legal! A Lar Viva precisa de cobertores.\","
                 + "\"sugestoes\":[{\"tipo\":\"NECESSIDADE\",\"id\":" + necessidadeRoupasId + "}]}";
-        Mockito.when(provedorIA.completar(Mockito.anyList()))
+        Mockito.when(provedorIA.completar(Mockito.anyList(), Mockito.any()))
                 .thenReturn(Optional.of("Aqui esta: " + json));
 
         mockMvc.perform(post("/assistente")
@@ -170,7 +170,7 @@ class AssistenteTest {
     @Test
     void comIa_textoPuro_usaTextoComoRespostaEDerivaSugestoes() throws Exception {
         Mockito.when(provedorIA.disponivel()).thenReturn(true);
-        Mockito.when(provedorIA.completar(Mockito.anyList()))
+        Mockito.when(provedorIA.completar(Mockito.anyList(), Mockito.any()))
                 .thenReturn(Optional.of("Voce pode doar suas roupas para quem mais precisa!"));
 
         mockMvc.perform(post("/assistente")
@@ -191,7 +191,7 @@ class AssistenteTest {
     @Test
     void comIa_masFalha_caiNoFallbackRegras() throws Exception {
         Mockito.when(provedorIA.disponivel()).thenReturn(true);
-        Mockito.when(provedorIA.completar(Mockito.anyList()))
+        Mockito.when(provedorIA.completar(Mockito.anyList(), Mockito.any()))
                 .thenReturn(Optional.empty()); // simula timeout/429
 
         mockMvc.perform(post("/assistente")
@@ -249,7 +249,7 @@ class AssistenteTest {
         Mockito.when(provedorIA.disponivel()).thenReturn(true);
         String json = "{\"resposta\":\"A [id=5] Casa Renascer precisa de cobertores id=5.\","
                 + "\"sugestoes\":[{\"tipo\":\"NECESSIDADE\",\"id\":" + necessidadeRoupasId + "}]}";
-        Mockito.when(provedorIA.completar(Mockito.anyList()))
+        Mockito.when(provedorIA.completar(Mockito.anyList(), Mockito.any()))
                 .thenReturn(Optional.of(json));
 
         mockMvc.perform(post("/assistente")
@@ -303,6 +303,7 @@ class AssistenteTest {
         // roteou para a VISAO (modelo multimodal), NAO para o completar de texto
         Mockito.verify(provedorIA).completarComImagem(Mockito.anyList(), Mockito.anyString());
         Mockito.verify(provedorIA, Mockito.never()).completar(Mockito.anyList());
+        Mockito.verify(provedorIA, Mockito.never()).completar(Mockito.anyList(), Mockito.any());
     }
 
     // ---------------------------------------------------------------
@@ -368,7 +369,7 @@ class AssistenteTest {
     @Test
     void perguntaGeral_comIa_sugestoesVaziasSaoRespeitadas() throws Exception {
         Mockito.when(provedorIA.disponivel()).thenReturn(true);
-        Mockito.when(provedorIA.completar(Mockito.anyList()))
+        Mockito.when(provedorIA.completar(Mockito.anyList(), Mockito.any()))
                 .thenReturn(Optional.of("{\"resposta\":\"A capital da Franca e Paris!\","
                         + "\"sugestoes\":[],\"titulo\":\"Capital da Franca\"}"));
 
@@ -421,7 +422,7 @@ class AssistenteTest {
     @SuppressWarnings("unchecked")
     void usuarioAutenticadoComHistorico_injetaResumoNoPrompt() throws Exception {
         Mockito.when(provedorIA.disponivel()).thenReturn(true);
-        Mockito.when(provedorIA.completar(Mockito.anyList()))
+        Mockito.when(provedorIA.completar(Mockito.anyList(), Mockito.any()))
                 .thenReturn(Optional.of("{\"resposta\":\"Voce costuma ajudar por aqui!\","
                         + "\"sugestoes\":[],\"titulo\":\"Meu historico\"}"));
 
@@ -452,7 +453,7 @@ class AssistenteTest {
 
         // O system prompt deve conter o resumo do doador (categoria Roupas + doador).
         ArgumentCaptor<List<ProvedorIA.MensagemIA>> captor = ArgumentCaptor.forClass(List.class);
-        Mockito.verify(provedorIA).completar(captor.capture());
+        Mockito.verify(provedorIA).completar(captor.capture(), Mockito.any());
         String system = captor.getValue().stream()
                 .filter(m -> "system".equals(m.papel()))
                 .map(ProvedorIA.MensagemIA::conteudo)

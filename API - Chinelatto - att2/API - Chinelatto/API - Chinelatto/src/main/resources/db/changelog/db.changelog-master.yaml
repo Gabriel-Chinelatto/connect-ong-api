@@ -1340,3 +1340,25 @@ databaseChangeLog:
               - column:
                   name: data_status
                   type: datetime
+
+  # =====================================================================
+  # Descricao/"Sobre" da ONG ampliada de VARCHAR(255) para VARCHAR(1000): o
+  # SobreOngService (IA) gera textos de ~400-600 chars que estouravam o limite
+  # antigo ("tamanho deve ser entre 0 e 255") ao salvar o perfil. Idempotente
+  # (a coluna ja existe desde o baseline do ddl-auto=update); modifyDataType
+  # so aumenta o tamanho — seguro no MySQL 5.6/5.7.
+  # =====================================================================
+  - changeSet:
+      id: ong-descricao-varchar-1000
+      author: connect-ong
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: MARK_RAN
+        - columnExists:
+            tableName: ong
+            columnName: descricao
+      changes:
+        - modifyDataType:
+            tableName: ong
+            columnName: descricao
+            newDataType: varchar(1000)

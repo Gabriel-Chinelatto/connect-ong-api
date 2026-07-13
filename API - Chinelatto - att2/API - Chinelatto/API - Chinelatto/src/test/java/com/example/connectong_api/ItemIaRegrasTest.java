@@ -82,4 +82,22 @@ class ItemIaRegrasTest {
         ItemIaService.ItemInfo info = itemIaService.estimar("morango", 5, "Alimento");
         assertEquals("Alimentos", info.categoria());
     }
+
+    // ---------------------------------------------------------------
+    // categoriaDoTexto: infere a categoria SO pelo texto (para o aviso de
+    // divergencia do frete), INDEPENDENTE de qualquer categoria escolhida.
+    // ---------------------------------------------------------------
+    @Test
+    void categoriaDoTexto_infereAlimentos_deFeijao() {
+        assertEquals("Alimentos", itemIaService.categoriaDoTexto("10 sacos de feijao"));
+        assertEquals("Roupas", itemIaService.categoriaDoTexto("5 cobertores"));
+    }
+
+    @Test
+    void categoriaDoTexto_nullQuandoIndeterminado() {
+        assertNull(itemIaService.categoriaDoTexto("uma coisa qualquer"),
+                "sem palavra-chave -> null (nao 'Outros')");
+        assertNull(itemIaService.categoriaDoTexto(""), "texto vazio -> null");
+        assertNull(itemIaService.categoriaDoTexto(null), "null -> null");
+    }
 }

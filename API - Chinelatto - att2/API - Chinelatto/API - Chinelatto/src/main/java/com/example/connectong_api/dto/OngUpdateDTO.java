@@ -22,7 +22,8 @@ public class OngUpdateDTO {
     @Size(max = 50)
     private String cidade;
 
-    @Size(max = 255)
+    // Ate 1000 chars: acomoda o "Sobre" gerado pela IA (SobreOngService, ~600).
+    @Size(max = 1000)
     private String descricao;
 
     // Capa em base64 (mesmo teto ~2.8MB do PerfilDTO). So sobrescreve quando

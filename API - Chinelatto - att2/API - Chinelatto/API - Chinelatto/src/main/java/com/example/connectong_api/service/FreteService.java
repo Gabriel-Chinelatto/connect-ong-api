@@ -93,6 +93,10 @@ public class FreteService {
         resp.setPesoKg(peso);
         resp.setPesoEstimado(pesoEstimado);
         resp.setCategoria(categoria);
+        // Categoria que o TEXTO do item sugere, independente da escolhida. NAO
+        // altera o calculo: o app compara com "categoria" e avisa se divergirem.
+        // null quando nao ha texto de item ou nao da para inferir.
+        resp.setCategoriaDetectada(itemIaService.categoriaDoTexto(req.getItem()));
         resp.setItemResumo(itemResumo);
         resp.setModo(modo);
 

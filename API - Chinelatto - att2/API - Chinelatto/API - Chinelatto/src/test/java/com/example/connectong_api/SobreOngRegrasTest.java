@@ -101,6 +101,30 @@ class SobreOngRegrasTest {
                 "com 'mais curto' o texto nao deveria crescer");
     }
 
+    // ---------------------------------------------------------------
+    // A descricao da ONG agora aceita ate 1000 chars (era 255). Um "Sobre"
+    // longo (~600 chars, como o gerado pela IA) persiste sem estourar a coluna.
+    // ---------------------------------------------------------------
+    @Test
+    void descricaoLonga_ate1000_persisteSemEstourar() {
+        Ong ong = criarOngComNecessidade();
+
+        // ~600 chars (folgado dentro do novo limite de 1000, alem do antigo 255).
+        String frase = "A Casa do Sol e uma organizacao social que atende familias em "
+                + "situacao de vulnerabilidade, oferecendo acolhimento, alimentacao e "
+                + "apoio educacional para criancas e idosos da comunidade. ";
+        String longa = frase.repeat(3).trim();
+        assertTrue(longa.length() > 255 && longa.length() <= 1000,
+                "o cenario precisa de um texto entre 256 e 1000 chars: " + longa.length());
+
+        ong.setDescricao(longa);
+        Ong salva = ongRepository.saveAndFlush(ong);
+
+        Ong recarregada = ongRepository.findById(salva.getId()).orElseThrow();
+        assertEquals(longa, recarregada.getDescricao(),
+                "a descricao longa deveria persistir integra (coluna VARCHAR(1000))");
+    }
+
     @Test
     void sobre_ongInexistente_devolveTextoGenerico_naoQuebra() {
         SobreOngRequestDTO req = new SobreOngRequestDTO();

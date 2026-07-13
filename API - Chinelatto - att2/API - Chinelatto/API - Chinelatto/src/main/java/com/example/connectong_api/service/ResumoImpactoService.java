@@ -134,7 +134,10 @@ public class ResumoImpactoService {
                 new ProvedorIA.MensagemIA("system", sistema),
                 new ProvedorIA.MensagemIA("user", u.toString()));
 
-        Optional<String> saida = provedorIA.completar(mensagens);
+        // ESCRITA curta ancorada em numeros reais: temperatura media e teto de
+        // tokens para 2-3 frases.
+        Optional<String> saida = provedorIA.completar(mensagens,
+                ProvedorIA.OpcoesIA.de(0.5, 260));
         if (saida.isEmpty()) return null;
 
         String resumo = extrairResumo(saida.get());

@@ -81,7 +81,12 @@ public class GroqService implements ProvedorIA {
 
     @Override
     public Optional<String> completar(List<MensagemIA> mensagens) {
-        return chamar(mensagens, null);
+        return chamar(mensagens, null, null);
+    }
+
+    @Override
+    public Optional<String> completar(List<MensagemIA> mensagens, OpcoesIA opcoes) {
+        return chamar(mensagens, null, opcoes);
     }
 
     @Override
@@ -90,18 +95,19 @@ public class GroqService implements ProvedorIA {
             // Sem imagem: cai no fluxo de texto normal.
             return completar(mensagens);
         }
-        return chamar(mensagens, imagemBase64);
+        return chamar(mensagens, imagemBase64, null);
     }
 
     // Faz a chamada HTTP. imagemBase64 == null => texto (modelo de texto);
     // != null => visao (modelo multimodal, imagem anexada a ultima msg do usuario).
-    private Optional<String> chamar(List<MensagemIA> mensagens, String imagemBase64) {
+    // opcoes == null => usa os defaults (temperatura configurada, sem teto de tokens).
+    private Optional<String> chamar(List<MensagemIA> mensagens, String imagemBase64, OpcoesIA opcoes) {
         if (!disponivel() || mensagens == null || mensagens.isEmpty()) {
             return Optional.empty();
         }
 
         try {
-            String corpo = montarCorpo(mensagens, imagemBase64);
+            String corpo = montarCorpo(mensagens, imagemBase64, opcoes);
 
             HttpRequest req = HttpRequest.newBuilder()
                     .uri(URI.create(url))
@@ -137,12 +143,22 @@ public class GroqService implements ProvedorIA {
     // Monta o JSON do chat/completions no formato OpenAI. Quando imagemBase64 != null,
     // usa o modelo de VISAO e anexa a imagem a ULTIMA mensagem "user" (content array
     // com {type:image_url}). As demais mensagens seguem como content string simples.
-    private String montarCorpo(List<MensagemIA> mensagens, String imagemBase64) throws Exception {
+    private String montarCorpo(List<MensagemIA> mensagens, String imagemBase64, OpcoesIA opcoes) throws Exception {
         boolean comImagem = imagemBase64 != null && !imagemBase64.isBlank();
 
         ObjectNode raiz = objectMapper.createObjectNode();
         raiz.put("model", comImagem ? modeloVisao : modelo);
-        raiz.put("temperature", temperatura);
+
+        // Temperatura: a da chamada (por tarefa) quando informada; senao o default.
+        double temp = (opcoes != null && opcoes.temperatura() != null)
+                ? opcoes.temperatura() : temperatura;
+        raiz.put("temperature", temp);
+
+        // Teto de tokens da resposta: so quando o chamador pede (>0). Limita
+        // latencia/custo e evita respostas longas demais para a UI.
+        if (opcoes != null && opcoes.maxTokens() != null && opcoes.maxTokens() > 0) {
+            raiz.put("max_tokens", opcoes.maxTokens());
+        }
 
         // Indice da ultima mensagem do usuario (onde a imagem sera anexada).
         int idxUltimoUser = -1;

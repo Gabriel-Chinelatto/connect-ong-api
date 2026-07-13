@@ -289,7 +289,10 @@ public class AssistenteService {
                                            String cidade, Contexto ctx) {
         List<ProvedorIA.MensagemIA> mensagens = montarMensagens(dto, mensagem, cidade, ctx, false);
 
-        Optional<String> saida = provedorIA.completar(mensagens);
+        // Dora (conversa): temperatura moderada (equilibra recomendar dados REAIS
+        // com um tom acolhedor) e teto de tokens para a resposta + o JSON de cards.
+        Optional<String> saida = provedorIA.completar(mensagens,
+                ProvedorIA.OpcoesIA.de(0.4, 600));
         if (saida.isEmpty()) {
             return null; // IA indisponivel/falhou -> fallback
         }

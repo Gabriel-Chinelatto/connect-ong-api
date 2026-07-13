@@ -146,7 +146,10 @@ public class SobreOngService {
                 new ProvedorIA.MensagemIA("system", sistema),
                 new ProvedorIA.MensagemIA("user", u.toString()));
 
-        Optional<String> saida = provedorIA.completar(mensagens);
+        // ESCRITA institucional (2-4 frases, ate ~600 chars): temperatura media e
+        // teto de tokens folgado para o texto completo.
+        Optional<String> saida = provedorIA.completar(mensagens,
+                ProvedorIA.OpcoesIA.de(0.55, 320));
         if (saida.isEmpty()) return null;
 
         String descricao = extrairDescricao(saida.get());

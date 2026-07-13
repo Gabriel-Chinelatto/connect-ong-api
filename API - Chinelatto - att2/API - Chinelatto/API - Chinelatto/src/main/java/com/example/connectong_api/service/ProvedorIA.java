@@ -29,6 +29,19 @@ public interface ProvedorIA {
     Optional<String> completar(List<MensagemIA> mensagens);
 
     /**
+     * Igual a {@link #completar(List)}, mas permite o chamador ajustar os
+     * parametros da chamada por TAREFA (ver {@link OpcoesIA}): temperatura mais
+     * baixa para EXTRACAO/determinismo (menos alucinacao) ou mais alta para
+     * ESCRITA, e um teto de {@code max_tokens} para limitar latencia/custo.
+     * {@code opcoes == null} (ou campos null dentro dele) usa os defaults do
+     * provedor. Implementacao padrao: ignora as opcoes (compatibilidade); o
+     * {@link GroqService} as aplica de fato.
+     */
+    default Optional<String> completar(List<MensagemIA> mensagens, OpcoesIA opcoes) {
+        return completar(mensagens);
+    }
+
+    /**
      * true quando o provedor de VISAO (multimodal) esta configurado. Hoje usa a
      * mesma chave do texto; separado para o chamador poder decidir o roteamento.
      */
@@ -49,4 +62,18 @@ public interface ProvedorIA {
      * (record = imutavel; sem dependencia nova.)
      */
     record MensagemIA(String papel, String conteudo) {}
+
+    /**
+     * Opcoes de UMA chamada (override dos defaults do provedor). Campos null =
+     * usa o default do provedor.
+     *   - {@code temperatura}: 0.0-1.0. Baixa (~0.15) para EXTRACAO estruturada
+     *     (menos alucinacao); media/alta (~0.5-0.6) para ESCRITA natural.
+     *   - {@code maxTokens}: teto de tokens da RESPOSTA (limita latencia/custo).
+     */
+    record OpcoesIA(Double temperatura, Integer maxTokens) {
+        /** Fabrica curta para os dois campos preenchidos. */
+        public static OpcoesIA de(double temperatura, int maxTokens) {
+            return new OpcoesIA(temperatura, maxTokens);
+        }
+    }
 }

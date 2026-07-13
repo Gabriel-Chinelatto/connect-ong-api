@@ -38,7 +38,11 @@ public class Ong {
     @Size(max = 50)
     private String cidade;
 
-    @Size(max = 255)
+    // Descricao/"Sobre" institucional: ate 1000 chars (o SobreOngService gera
+    // textos de ~400-600 chars pela IA; VARCHAR(1000) no banco via changeset
+    // Liquibase ong-descricao-varchar-1000). Antes era 255 e cortava o texto.
+    @Size(max = 1000)
+    @Column(length = 1000)
     private String descricao;
 
     // Verificacao (selo de confianca)
