@@ -77,9 +77,14 @@ public class FreteService {
             itemResumo = temTexto(req.getItem()) ? req.getItem().trim() : null;
             modo = "regras";
         } else {
-            ItemIaService.ItemInfo info = itemIaService.estimar(req.getItem(), req.getQuantidade());
+            // Passa a categoria ESCOLHIDA pelo usuario (se houver) como dica: o
+            // ItemIaService a honra na resposta e a usa para calibrar o peso.
+            String categoriaHint = temTexto(req.getCategoria()) ? req.getCategoria().trim() : null;
+            ItemIaService.ItemInfo info =
+                    itemIaService.estimar(req.getItem(), req.getQuantidade(), categoriaHint);
             peso = arredondar(info.pesoKg());
             pesoEstimado = true;
+            // Categoria final = a escolhida pelo usuario; senao a deduzida pelo item.
             categoria = temTexto(req.getCategoria())
                     ? Categorias.normalizar(req.getCategoria().trim()) : info.categoria();
             itemResumo = info.resumo();

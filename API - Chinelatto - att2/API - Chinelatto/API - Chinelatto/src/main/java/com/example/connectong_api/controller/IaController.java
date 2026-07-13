@@ -2,9 +2,11 @@ package com.example.connectong_api.controller;
 
 import com.example.connectong_api.dto.RedacaoRequestDTO;
 import com.example.connectong_api.dto.ResumoImpactoRequestDTO;
+import com.example.connectong_api.dto.SobreOngRequestDTO;
 import com.example.connectong_api.service.RateLimitService;
 import com.example.connectong_api.service.RedacaoService;
 import com.example.connectong_api.service.ResumoImpactoService;
+import com.example.connectong_api.service.SobreOngService;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -24,14 +26,16 @@ import org.springframework.web.bind.annotation.RestController;
  *
  *  - POST /ia/redacao        : reescreve a necessidade de uma ONG (painel da ONG).
  *  - POST /ia/resumo-impacto : resume o impacto de uma ONG para o doador.
+ *  - POST /ia/sobre-ong      : escreve/refina o "Sobre" institucional da ONG (loop de ajuste).
  */
 @RestController
 @RequestMapping("/ia")
-@Tag(name = "IA", description = "Apoios de IA (redacao, resumo de impacto) com fallback por regras")
+@Tag(name = "IA", description = "Apoios de IA (redacao, resumo de impacto, sobre da ONG) com fallback por regras")
 public class IaController {
 
     @Autowired private RedacaoService redacaoService;
     @Autowired private ResumoImpactoService resumoImpactoService;
+    @Autowired private SobreOngService sobreOngService;
     @Autowired private RateLimitService rateLimitService;
 
     @Value("${app.ia.redacao.ratelimit.max:30}")
@@ -39,6 +43,9 @@ public class IaController {
 
     @Value("${app.ia.resumo.ratelimit.max:30}")
     private int maxResumo;
+
+    @Value("${app.ia.sobre.ratelimit.max:30}")
+    private int maxSobre;
 
     @PostMapping("/redacao")
     @Operation(summary = "Reescrever uma necessidade da ONG (publico)")
@@ -63,5 +70,14 @@ public class IaController {
             return RateLimitService.resposta429();
         }
         return ResponseEntity.ok(resumoImpactoService.resumir(req.getOngId()));
+    }
+
+    @PostMapping("/sobre-ong")
+    @Operation(summary = "Escrever/refinar o 'Sobre' institucional da ONG, com loop de ajuste (publico)")
+    public ResponseEntity<?> sobreOng(@Valid @RequestBody SobreOngRequestDTO req) {
+        if (rateLimitService.excedeuSolicitacoes("sobre", maxSobre)) {
+            return RateLimitService.resposta429();
+        }
+        return ResponseEntity.ok(sobreOngService.gerar(req));
     }
 }

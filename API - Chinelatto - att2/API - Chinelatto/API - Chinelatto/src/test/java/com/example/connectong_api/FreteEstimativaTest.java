@@ -135,4 +135,52 @@ class FreteEstimativaTest {
         assertEquals("Roupas", resp.getCategoria());
         assertEquals("regras", resp.getModo());
     }
+
+    // ---------------------------------------------------------------
+    // A categoria ESCOLHIDA pelo usuario e honrada, mesmo quando o item
+    // ("morango") nao casa nenhuma palavra-chave (que daria "Outros").
+    // Peso ~100kg vem do peso INFORMADO; a categoria continua a escolhida.
+    // ---------------------------------------------------------------
+    @Test
+    void frete_categoriaEscolhida_ehHonrada_comPesoInformado() {
+        FreteRequestDTO req = new FreteRequestDTO();
+        req.setOrigemCidade("Limeira");
+        req.setOrigemUf("SP");
+        req.setDestinoCidade("Rio de Janeiro");
+        req.setDestinoUf("RJ");
+        req.setItem("10 caixas de 10 kg de morango");
+        req.setQuantidade(10);
+        req.setCategoria("Alimentos");
+        req.setPesoKg(100.0);
+
+        FreteResponseDTO resp = freteService.estimar(req);
+
+        assertEquals(100.0, resp.getPesoKg(), "peso informado deve ser refletido (~100kg)");
+        assertFalse(resp.isPesoEstimado());
+        assertEquals("Alimentos", resp.getCategoria(),
+                "categoria escolhida deve ser honrada, nao deduzida do item");
+    }
+
+    // ---------------------------------------------------------------
+    // Sem peso informado: a categoria escolhida ("Alimentos") e honrada
+    // mesmo que o item ("morango") sozinho seria classificado como "Outros".
+    // ---------------------------------------------------------------
+    @Test
+    void frete_categoriaEscolhida_ehHonrada_comPesoEstimado() {
+        FreteRequestDTO req = new FreteRequestDTO();
+        req.setOrigemCidade("Limeira");
+        req.setOrigemUf("SP");
+        req.setDestinoCidade("Sao Paulo");
+        req.setDestinoUf("SP");
+        req.setItem("morango");
+        req.setQuantidade(5);
+        req.setCategoria("Alimentos");
+
+        FreteResponseDTO resp = freteService.estimar(req);
+
+        assertTrue(resp.isPesoEstimado());
+        assertEquals("Alimentos", resp.getCategoria());
+        assertTrue(resp.getPesoKg() > 0);
+        assertEquals("regras", resp.getModo());
+    }
 }

@@ -96,7 +96,7 @@ public class SecurityConfig {
                             // Apoios de IA (com fallback por regras): redacao da necessidade
                             // (painel da ONG) e resumo de impacto (doador). PUBLICOS, rate
                             // limit proprio cada.
-                            .requestMatchers(HttpMethod.POST, "/ia/redacao", "/ia/resumo-impacto").permitAll()
+                            .requestMatchers(HttpMethod.POST, "/ia/redacao", "/ia/resumo-impacto", "/ia/sobre-ong").permitAll()
                             // Perfil publico do DOADOR e suas avaliacoes: leitura
                             // livre (reputacao publica, como o perfil da ONG). O
                             // service nunca expoe email/telefone/valores.

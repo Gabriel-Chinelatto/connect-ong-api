@@ -125,21 +125,38 @@ public class ItemIaService {
     /**
      * Estima peso total (kg), categoria e resumo de um item. Nunca lanca; sempre
      * devolve um ItemInfo (piso de 1 kg). Usa a IA quando ha chave; senao regras.
+     *
+     * Sobrecarga sem dica de categoria: a IA/regra deduzem a categoria pelo texto.
      */
     public ItemInfo estimar(String texto, Integer quantidade) {
+        return estimar(texto, quantidade, null);
+    }
+
+    /**
+     * Igual ao {@link #estimar(String, Integer)}, mas HONRANDO a categoria que o
+     * usuario escolheu (categoriaHint). Quando ela vem preenchida:
+     *   - vira a categoria FINAL da resposta (a IA/regra NAO a sobrescreve);
+     *   - e informada ao prompt da IA e a tabela de pesos do fallback para melhorar
+     *     a estimativa de PESO (ex.: "morango" com categoria Alimentos nao vira Higiene).
+     * Quando categoriaHint e null/vazia, comportamento identico a sobrecarga antiga.
+     */
+    public ItemInfo estimar(String texto, Integer quantidade, String categoriaHint) {
         String desc = texto == null ? "" : texto.trim();
+        // Categoria escolhida pelo usuario (canonizada). null => IA/regra deduzem.
+        String catHint = (categoriaHint != null && !categoriaHint.isBlank())
+                ? Categorias.normalizar(categoriaHint.trim()) : null;
 
         if (provedorIA.disponivel() && !desc.isBlank()) {
-            ItemInfo viaIa = tentarIa(desc, quantidade);
+            ItemInfo viaIa = tentarIa(desc, quantidade, catHint);
             if (viaIa != null) return viaIa;
         }
-        return porRegras(desc, quantidade);
+        return porRegras(desc, quantidade, catHint);
     }
 
     // ================================================================
     // CAMINHO DA IA
     // ================================================================
-    private ItemInfo tentarIa(String texto, Integer quantidade) {
+    private ItemInfo tentarIa(String texto, Integer quantidade, String catHint) {
         String sistema = "Voce estima peso e categoria de itens de DOACAO a partir de "
                 + "uma descricao em portugues do Brasil. Considere a quantidade e o item "
                 + "para estimar o peso TOTAL em quilogramas (ex.: '10 sacos de arroz de 1kg' "
@@ -153,6 +170,12 @@ public class ItemIaService {
         if (quantidade != null && quantidade > 0) {
             u.append("\nQuantidade informada separadamente: ").append(quantidade);
         }
+        if (catHint != null) {
+            // A categoria ja foi ESCOLHIDA pelo usuario: informe-a para calibrar o
+            // peso, mas a IA nao deve muda-la (o parse forca essa categoria).
+            u.append("\nCategoria JA definida pelo usuario (use-a como referencia para "
+                    + "estimar o peso; nao mude a categoria): ").append(catHint);
+        }
 
         List<ProvedorIA.MensagemIA> mensagens = List.of(
                 new ProvedorIA.MensagemIA("system", sistema),
@@ -160,10 +183,10 @@ public class ItemIaService {
 
         Optional<String> saida = provedorIA.completar(mensagens);
         if (saida.isEmpty()) return null;
-        return parsearJson(saida.get(), texto, quantidade);
+        return parsearJson(saida.get(), texto, quantidade, catHint);
     }
 
-    private ItemInfo parsearJson(String resposta, String texto, Integer quantidade) {
+    private ItemInfo parsearJson(String resposta, String texto, Integer quantidade, String catHint) {
         try {
             int ini = resposta.indexOf('{');
             int fim = resposta.lastIndexOf('}');
@@ -173,8 +196,10 @@ public class ItemIaService {
             double pesoKg = raiz.path("pesoKg").asDouble(0);
             if (pesoKg <= 0) return null; // peso invalido -> fallback por regras
 
-            String categoria = raiz.path("categoria").asText("").trim();
-            categoria = normalizarCategoria(categoria, texto);
+            // Categoria escolhida pelo usuario vence; senao a que a IA deduziu.
+            String categoria = catHint != null
+                    ? catHint
+                    : normalizarCategoria(raiz.path("categoria").asText("").trim(), texto);
             String resumo = raiz.path("resumo").asText("").trim();
             if (resumo.isBlank()) resumo = resumoPadrao(texto, quantidade);
 
@@ -188,11 +213,12 @@ public class ItemIaService {
     // ================================================================
     // FALLBACK POR REGRAS
     // ================================================================
-    private ItemInfo porRegras(String texto, Integer quantidade) {
+    private ItemInfo porRegras(String texto, Integer quantidade, String catHint) {
         String norm = normalizar(texto);
 
-        // Peso unitario base: 1a palavra-chave que casar. Default 1 kg (item generico).
-        double pesoUnitario = 1.0;
+        // Peso unitario base: 1a palavra-chave que casar. Sem match, usamos o peso
+        // TIPICO da categoria escolhida (catHint) quando houver; senao 1 kg generico.
+        double pesoUnitario = catHint != null ? pesoTipicoCategoria(catHint) : 1.0;
         for (Map.Entry<String, Double> e : PESO_POR_PALAVRA.entrySet()) {
             if (norm.contains(e.getKey())) {
                 pesoUnitario = e.getValue();
@@ -212,9 +238,26 @@ public class ItemIaService {
         double peso = Math.max(PISO_KG, pesoUnitario * qtd);
         peso = Math.round(peso * 100.0) / 100.0;
 
-        String categoria = detectarCategoria(norm);
+        // Categoria escolhida pelo usuario vence; senao detecta pelo texto.
+        String categoria = catHint != null ? catHint : detectarCategoria(norm);
         String resumo = resumoPadrao(texto, quantidade);
         return new ItemInfo(peso, categoria, resumo, "regras");
+    }
+
+    // Peso unitario TIPICO (kg) por categoria canonica — usado no fallback quando o
+    // texto nao casa nenhuma palavra-chave, mas a categoria foi escolhida. Calibra a
+    // estimativa melhor do que o generico de 1 kg.
+    private double pesoTipicoCategoria(String categoria) {
+        if (categoria == null) return 1.0;
+        switch (Categorias.normalizar(categoria)) {
+            case "Alimentos":  return 1.0;
+            case "Roupas":     return 0.5;
+            case "Higiene":    return 0.4;
+            case "Brinquedos": return 0.5;
+            case "Educacao":   return 0.4;
+            case "Saude":      return 0.2;
+            default:           return 1.0;
+        }
     }
 
     // Extrai o 1o numero inteiro do texto (ex.: "10 cobertores" -> 10). null se nao houver.

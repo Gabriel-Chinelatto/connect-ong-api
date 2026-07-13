@@ -58,4 +58,28 @@ class ItemIaRegrasTest {
         assertNotNull(info.categoria());
         assertEquals("regras", info.modo());
     }
+
+    // ---------------------------------------------------------------
+    // Categoria ESCOLHIDA pelo usuario (categoriaHint) e HONRADA e nao
+    // sobrescrita pela deducao por palavras-chave.
+    // ---------------------------------------------------------------
+    @Test
+    void categoriaHint_ehHonrada_naoSobrescreveComOutros() {
+        // "morango" nao casa nenhuma palavra-chave -> sem hint viraria "Outros".
+        ItemIaService.ItemInfo semHint = itemIaService.estimar("morango", 10, null);
+        assertEquals("Outros", semHint.categoria());
+
+        // Com a categoria escolhida "Alimentos", a resposta a honra.
+        ItemIaService.ItemInfo comHint = itemIaService.estimar("morango", 10, "Alimentos");
+        assertEquals("Alimentos", comHint.categoria());
+        assertEquals("regras", comHint.modo());
+        assertTrue(comHint.pesoKg() >= 1.0);
+    }
+
+    @Test
+    void categoriaHint_variante_ehCanonizada() {
+        // "Alimento" (singular) -> canonizada para "Alimentos".
+        ItemIaService.ItemInfo info = itemIaService.estimar("morango", 5, "Alimento");
+        assertEquals("Alimentos", info.categoria());
+    }
 }
