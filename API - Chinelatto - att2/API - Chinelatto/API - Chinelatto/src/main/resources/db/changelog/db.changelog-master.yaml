@@ -1362,3 +1362,18 @@ databaseChangeLog:
             tableName: ong
             columnName: descricao
             newDataType: varchar(1000)
+
+  # REFORCO: o changeset acima pode ter sido MARK_RAN pela precondicao
+  # (columnExists com onError: MARK_RAN) SEM executar o ALTER, deixando a coluna
+  # em VARCHAR(255) no MySQL real — o que causa erro 500 ("Could not commit JPA
+  # transaction") ao salvar a descricao longa gerada pela IA. Este roda o ALTER
+  # direto, sem precondicao. Idempotente: MODIFY para o mesmo tipo e no-op.
+  # Escopado ao MySQL (nos testes com H2 o Liquibase nem roda; o schema vem do
+  # @Column(length=1000) da entidade).
+  - changeSet:
+      id: ong-descricao-varchar-1000-forcar
+      author: connect-ong
+      changes:
+        - sql:
+            dbms: mysql
+            sql: ALTER TABLE ong MODIFY descricao VARCHAR(1000)
