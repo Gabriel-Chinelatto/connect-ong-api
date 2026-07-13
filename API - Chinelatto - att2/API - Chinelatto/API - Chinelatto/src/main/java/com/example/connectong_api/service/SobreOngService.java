@@ -115,7 +115,12 @@ public class SobreOngService {
                 + "perfil dela, em portugues do Brasil, 2 a 4 frases, caloroso e especifico, "
                 + "SEM inventar dados — use apenas o rascunho e os dados reais fornecidos. "
                 + "Nunca invente contato, CNPJ, valores nem numeros que nao estejam nos dados. "
-                + "Pode responder em JSON {\"descricao\":\"...\"} ou apenas o texto.";
+                + "O texto e escrito na 1a pessoa do plural (ex.: 'Somos...', 'Atendemos...') ou "
+                + "de forma neutra, como aparecera no perfil publico. "
+                + "Responda EXCLUSIVAMENTE com um JSON valido no formato "
+                + "{\"descricao\":\"o texto do Sobre\"} e NADA fora dele. NAO inclua titulo, "
+                + "markdown, asteriscos, aspas ao redor, nem frases como 'Aqui esta' ou "
+                + "'Segue uma sugestao' — apenas o JSON com o texto final, direto.";
 
         StringBuilder u = new StringBuilder();
         u.append("Dados reais da ONG (use como base, nao invente):\n");
@@ -149,20 +154,78 @@ public class SobreOngService {
         return new SobreOngResponseDTO(descricao, "ia");
     }
 
-    // Aceita JSON {"descricao":"..."} OU texto puro.
+    // Aceita JSON {"descricao":"..."} OU texto puro; sempre LIMPA o resultado
+    // (remove preambulo, markdown, titulo e aspas) e limita o tamanho.
     private String extrairDescricao(String texto) {
+        String bruto = texto;
         try {
             int ini = texto.indexOf('{');
             int fim = texto.lastIndexOf('}');
             if (ini >= 0 && fim > ini) {
                 JsonNode raiz = objectMapper.readTree(texto.substring(ini, fim + 1));
                 String desc = raiz.path("descricao").asText("").trim();
-                if (!desc.isBlank()) return desc;
+                if (!desc.isBlank()) bruto = desc;
             }
         } catch (Exception ignored) {
-            // nao era JSON: usa o texto puro abaixo.
+            // nao era JSON: limpa o texto puro abaixo.
         }
-        return texto.trim();
+        return limparDescricaoIa(bruto);
+    }
+
+    /**
+     * Deixa o texto pronto para o perfil, mesmo quando a IA "enfeita" a resposta:
+     * remove markdown (**, *, #, `), linhas de titulo ("Sobre a X"), preambulos
+     * ("Aqui esta uma sugestao:", "Segue...", "Claro!"), aspas ao redor, colapsa
+     * quebras/espacos e limita a ~600 chars cortando na ultima frase.
+     */
+    private String limparDescricaoIa(String texto) {
+        if (texto == null) return "";
+        String s = texto.trim();
+
+        // Tira cercas de codigo e markdown inline.
+        s = s.replaceAll("```+[a-zA-Z]*", " ")
+             .replace("`", "")
+             .replaceAll("[*_#]+", "");
+
+        // Remove um preambulo do tipo "Aqui esta ... :" ou "Segue ... :" no inicio
+        // (ate o primeiro ':' seguido de espaco/quebra), se houver.
+        String semAcento = normalizar(s);
+        if (semAcento.startsWith("aqui esta") || semAcento.startsWith("segue")
+                || semAcento.startsWith("claro") || semAcento.startsWith("perfeito")
+                || semAcento.startsWith("com certeza")) {
+            int dp = s.indexOf(':');
+            if (dp >= 0 && dp < 120) s = s.substring(dp + 1).trim();
+        }
+
+        // Processa linha a linha: descarta linhas de titulo curtas ("Sobre a X").
+        String[] linhas = s.split("\\r?\\n");
+        StringBuilder sb = new StringBuilder();
+        for (String ln : linhas) {
+            String l = ln.trim();
+            if (l.isEmpty()) continue;
+            String ln2 = normalizar(l);
+            boolean titulo = (ln2.startsWith("sobre") && l.length() <= 40 && !l.endsWith("."));
+            if (titulo) continue;
+            if (sb.length() > 0) sb.append(' ');
+            sb.append(l);
+        }
+        s = sb.length() > 0 ? sb.toString() : s;
+
+        // Colapsa espacos e remove aspas ao redor (retas ou tipograficas).
+        s = s.replaceAll("\\s{2,}", " ").trim();
+        s = s.replaceAll("^[\"'\\u201C\\u201D\\u2018\\u2019]+", "")
+             .replaceAll("[\"'\\u201C\\u201D\\u2018\\u2019]+$", "")
+             .trim();
+
+        // Limita o tamanho, cortando na ultima frase completa antes de 600 chars.
+        final int max = 600;
+        if (s.length() > max) {
+            String corte = s.substring(0, max);
+            int ult = Math.max(corte.lastIndexOf('.'),
+                      Math.max(corte.lastIndexOf('!'), corte.lastIndexOf('?')));
+            s = (ult > 100 ? corte.substring(0, ult + 1) : corte).trim();
+        }
+        return s;
     }
 
     // ================================================================

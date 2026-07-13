@@ -23,7 +23,9 @@ public class SobreOngRequestDTO {
     @NotNull(message = "O id da ONG é obrigatório")
     private Long ongId;
 
-    @Size(max = 600, message = "Rascunho muito longo (máx. 600 caracteres)")
+    // Folgado: no loop de refino a ONG reenvia o texto ja sugerido pela IA como
+    // rascunho, entao o limite precisa comportar um "Sobre" completo + margem.
+    @Size(max = 1500, message = "Rascunho muito longo (máx. 1500 caracteres)")
     private String rascunho;
 
     @Size(max = 300, message = "Ajuste muito longo (máx. 300 caracteres)")
