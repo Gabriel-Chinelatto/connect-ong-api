@@ -91,6 +91,10 @@ public class SecurityConfig {
                             // cidade do perfil). Protegido por rate limiting proprio.
                             // Inclui /assistente e /assistente/sugestoes (proativas).
                             .requestMatchers(HttpMethod.POST, "/assistente", "/assistente/sugestoes").permitAll()
+                            // Assistente "Sobre o Desenvolvimento": explica COMO o
+                            // projeto foi feito (grounding num doc curado). PUBLICO
+                            // (aparece na tela Sobre, com/sem login). Rate limit proprio.
+                            .requestMatchers(HttpMethod.POST, "/assistente-dev").permitAll()
                             // Estimativa de frete de doacoes: PUBLICO, rate limit proprio.
                             .requestMatchers(HttpMethod.POST, "/frete/estimar").permitAll()
                             // Apoios de IA (com fallback por regras): redacao da necessidade
