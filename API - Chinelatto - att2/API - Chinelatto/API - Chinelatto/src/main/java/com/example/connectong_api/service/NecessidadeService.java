@@ -57,12 +57,15 @@ public class NecessidadeService {
 
         List<Necessidade> lista;
 
+        // PERFORMANCE: variantes com JOIN FETCH da ONG. Sem elas o Hibernate
+        // dispara 1 consulta por ONG para preencher n.getOng() (usado no toDTO)
+        // = ~10 idas ao banco; com o banco longe do servidor isso custava ~3,9s.
         if (ongId != null) {
-            lista = repository.findByOngId(ongId);
+            lista = repository.findByOngIdComOng(ongId);
         } else if (status != null && !status.isBlank()) {
-            lista = repository.findByStatus(status);
+            lista = repository.findByStatusComOng(status);
         } else {
-            lista = repository.findAll();
+            lista = repository.findAllComOng();
         }
 
         // BLOQUEIO: para um DOADOR autenticado, as ONGs que o bloquearam somem
