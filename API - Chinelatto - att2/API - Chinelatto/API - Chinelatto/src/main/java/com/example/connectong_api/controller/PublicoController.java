@@ -1,7 +1,7 @@
 package com.example.connectong_api.controller;
 
 import com.example.connectong_api.dto.EstatisticasPublicasDTO;
-import com.example.connectong_api.repository.*;
+import com.example.connectong_api.service.EstatisticasService;
 import com.example.connectong_api.service.TransparenciaService;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -19,27 +19,16 @@ import org.springframework.web.bind.annotation.*;
 @Tag(name = "Publico", description = "Dados publicos para o portal institucional (transparencia)")
 public class PublicoController {
 
-    @Autowired private ONGRepository ongRepository;
-    @Autowired private UsuarioRepository usuarioRepository;
-    @Autowired private NecessidadeRepository necessidadeRepository;
-    @Autowired private InteresseRepository interesseRepository;
-    @Autowired private DoacaoFinanceiraRepository doacaoFinanceiraRepository;
-    @Autowired private PrestacaoRepository prestacaoRepository;
+    @Autowired private EstatisticasService estatisticasService;
     @Autowired private TransparenciaService transparenciaService;
 
     @GetMapping("/estatisticas")
     @Operation(summary = "Numeros publicos da plataforma (transparencia / impacto)")
     public EstatisticasPublicasDTO estatisticas() {
-        EstatisticasPublicasDTO dto = new EstatisticasPublicasDTO();
-        // Conta so ONGs/doadores ATIVOS (nao excluidos por soft-delete).
-        dto.setTotalOngs(ongRepository.countByDataExclusaoIsNull());
-        dto.setTotalDoadores(usuarioRepository.countByTipoAndDataExclusaoIsNull("DOADOR"));
-        dto.setTotalNecessidades(necessidadeRepository.count());
-        dto.setTotalMatches(interesseRepository.countByStatus("ACEITO"));
-        dto.setTotalDoacoesFinanceiras(doacaoFinanceiraRepository.count());
-        dto.setValorTotalDoado(doacaoFinanceiraRepository.somarValores());
-        dto.setTotalPrestacoes(prestacaoRepository.count());
-        return dto;
+        // Delegado ao service, que traz os 7 numeros em UMA consulta so.
+        // (Antes eram 7 chamadas separadas = 7 idas ao banco; com o banco longe
+        // do servidor isso custava ~4,8s. Ver EstatisticasService.)
+        return estatisticasService.publicas();
     }
 
     @GetMapping("/ranking")
