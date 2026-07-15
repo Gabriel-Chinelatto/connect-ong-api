@@ -50,4 +50,33 @@ public interface InteresseRepository extends JpaRepository<Interesse, Long> {
             + "AND i.status = 'CONCLUIDO'")
     boolean existeConcluidoEntre(@Param("doadorId") Long doadorId,
                                  @Param("ongId") Long ongId);
+
+    // -------------------------------------------------------------------------
+    // Variantes com JOIN FETCH (contra N+1). Interesse tem DUAS relacoes
+    // @ManyToOne (EAGER): necessidade e doador — e necessidade->ong e uma
+    // terceira, em cadeia. Sem o fetch, cada interesse podia disparar varias
+    // consultas para preencher o DTO (titulo da necessidade, nome da ONG, nome
+    // do doador). Com o banco longe do servidor (~600ms por ida) a tela de
+    // Matches custava ~2,9s. Aqui vem tudo numa consulta so.
+    //
+    // LEFT de proposito: interesse com necessidade/doador orfaos continua
+    // aparecendo, como antes (o toDTO ja trata null).
+    // -------------------------------------------------------------------------
+
+    @Query("SELECT i FROM Interesse i "
+            + "LEFT JOIN FETCH i.necessidade n LEFT JOIN FETCH n.ong "
+            + "LEFT JOIN FETCH i.doador "
+            + "WHERE i.doador.id = :doadorId")
+    List<Interesse> findByDoadorIdCompleto(@Param("doadorId") Long doadorId);
+
+    @Query("SELECT i FROM Interesse i "
+            + "LEFT JOIN FETCH i.necessidade n LEFT JOIN FETCH n.ong o "
+            + "LEFT JOIN FETCH i.doador "
+            + "WHERE o.id = :ongId")
+    List<Interesse> findByNecessidadeOngIdCompleto(@Param("ongId") Long ongId);
+
+    @Query("SELECT i FROM Interesse i "
+            + "LEFT JOIN FETCH i.necessidade n LEFT JOIN FETCH n.ong "
+            + "LEFT JOIN FETCH i.doador")
+    List<Interesse> findAllCompleto();
 }

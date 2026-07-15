@@ -54,12 +54,15 @@ public class CampanhaService {
     // =========================
     public List<CampanhaResponseDTO> listar(Long ongId, boolean somenteAbertas, String categoria) {
         List<Campanha> lista;
+        // PERFORMANCE: variantes com JOIN FETCH da ONG — sem elas o Hibernate
+        // dispara 1 consulta por ONG para preencher c.getOng() (usado no DTO),
+        // o que custava ~2,9s com o banco longe do servidor. Mesma ordenacao.
         if (ongId != null) {
-            lista = repository.findByOngIdOrderByIdDesc(ongId);
+            lista = repository.findByOngIdComOng(ongId);
         } else if (somenteAbertas) {
-            lista = repository.findByEncerradaFalseOrderByIdDesc();
+            lista = repository.findAbertasComOng();
         } else {
-            lista = repository.findAll();
+            lista = repository.findAllComOng();
         }
         // BLOQUEIO: para um DOADOR autenticado, campanhas de ONGs que o
         // bloquearam somem do feed (anonimo/ONG = conjunto vazio, nao filtra).

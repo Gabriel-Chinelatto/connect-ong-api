@@ -126,12 +126,16 @@ public class InteresseService {
 
         List<Interesse> lista;
 
+        // PERFORMANCE: variantes com JOIN FETCH (necessidade + ong + doador).
+        // Interesse tem 2 relacoes @ManyToOne EAGER e necessidade->ong e uma 3a
+        // em cadeia: sem o fetch, cada item disparava consultas extras para o
+        // toDTO (titulo, nome da ONG, nome do doador) — ~2,9s com o banco longe.
         if (doadorId != null) {
-            lista = repository.findByDoadorId(doadorId);
+            lista = repository.findByDoadorIdCompleto(doadorId);
         } else if (ongId != null) {
-            lista = repository.findByNecessidadeOngId(ongId);
+            lista = repository.findByNecessidadeOngIdCompleto(ongId);
         } else {
-            lista = repository.findAll();
+            lista = repository.findAllCompleto();
         }
 
         // BLOQUEIO: matches com ONG bloqueadora continuam listados (historico),
