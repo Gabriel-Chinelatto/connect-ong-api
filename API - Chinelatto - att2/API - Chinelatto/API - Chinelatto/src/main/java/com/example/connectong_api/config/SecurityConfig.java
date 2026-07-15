@@ -41,8 +41,12 @@ public class SecurityConfig {
     private boolean enforce;
 
     // Origens permitidas para CORS (separadas por virgula). Default cobre o
-    // desenvolvimento local (apps Flutter web/desktop e Swagger).
-    @Value("${app.cors.allowed-origins:http://localhost:*,http://127.0.0.1:*}")
+    // desenvolvimento local (apps Flutter web/desktop e Swagger) E a WEB EM
+    // PRODUCAO (Netlify). O proxy do Netlify repassa o header Origin do
+    // navegador para ca; sem o dominio nesta lista o Spring responde
+    // "Invalid CORS request" (403) no login. Para outro dominio, defina a
+    // variavel de ambiente APP_CORS_ALLOWED_ORIGINS.
+    @Value("${app.cors.allowed-origins:http://localhost:*,http://127.0.0.1:*,https://connectong.netlify.app}")
     private String allowedOrigins;
 
     public SecurityConfig(JwtAuthFilter jwtAuthFilter) {
