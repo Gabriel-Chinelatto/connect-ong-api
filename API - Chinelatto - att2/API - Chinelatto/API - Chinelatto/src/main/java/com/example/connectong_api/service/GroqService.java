@@ -147,7 +147,16 @@ public class GroqService implements ProvedorIA {
         boolean comImagem = imagemBase64 != null && !imagemBase64.isBlank();
 
         ObjectNode raiz = objectMapper.createObjectNode();
-        raiz.put("model", comImagem ? modeloVisao : modelo);
+        String modeloUsado = comImagem ? modeloVisao : modelo;
+        raiz.put("model", modeloUsado);
+
+        // Modelos "pensantes" (Qwen3) devolvem o raciocinio no proprio texto e
+        // gastam o teto de tokens pensando (resposta chega vazia). reasoning_effort
+        // = "none" desliga isso e traz so a resposta final. So enviamos o parametro
+        // para esses modelos: os demais (ex.: llama-3.1) nao o reconhecem.
+        if (modeloUsado != null && modeloUsado.toLowerCase().contains("qwen3")) {
+            raiz.put("reasoning_effort", "none");
+        }
 
         // Temperatura: a da chamada (por tarefa) quando informada; senao o default.
         double temp = (opcoes != null && opcoes.temperatura() != null)
