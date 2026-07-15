@@ -268,11 +268,45 @@ public class ONGService {
         Set<Long> ongsBloqueadoras =
                 bloqueioService.ongIdsQueBloquearamDoadorAtual();
 
+        // PERFORMANCE: privacidade de TODAS as ONGs numa consulta so (antes cada
+        // ONG disparava 2 consultas dentro do toDTO = ~40 idas ao banco para 20
+        // ONGs; com o banco longe do servidor isso custava ~6,9s). Ver
+        // PreferenciaRepository.privacidadePorOng().
+        Map<Long, boolean[]> privacidades = privacidadesPorOng();
+
         return lista.stream()
                 .filter(o -> o.getDataExclusao() == null) // esconde ONGs excluidas
                 .filter(o -> !ongsBloqueadoras.contains(o.getId()))
-                .map(this::toDTO)
+                .map(o -> toDTO(o, privacidades.getOrDefault(o.getId(), PRIVACIDADE_PADRAO)))
                 .collect(Collectors.toList());
+    }
+
+    // Defaults seguros, iguais aos de privacidadeDaOng: email oculto, telefone visivel.
+    private static final boolean[] PRIVACIDADE_PADRAO = { false, true };
+
+    /** Mapa ongId -> {mostrarEmail, mostrarTelefone} carregado em UMA consulta. */
+    private Map<Long, boolean[]> privacidadesPorOng() {
+        Map<Long, boolean[]> mapa = new HashMap<>();
+        for (Object[] l : preferenciaRepository.privacidadePorOng()) {
+            if (l == null || l[0] == null) continue;
+            Long ongId = ((Number) l[0]).longValue();
+            Boolean email = paraBoolean(l[1]);
+            Boolean telefone = paraBoolean(l[2]);
+            // Sem linha de preferencia (NULL) => mesmos defaults de antes.
+            mapa.put(ongId, new boolean[] {
+                    email != null ? email : false,
+                    telefone != null ? telefone : true });
+        }
+        return mapa;
+    }
+
+    // O driver pode devolver BIT(1) como Boolean, Number ou byte[] — normaliza.
+    private static Boolean paraBoolean(Object v) {
+        if (v == null) return null;
+        if (v instanceof Boolean b) return b;
+        if (v instanceof Number n) return n.intValue() != 0;
+        if (v instanceof byte[] arr) return arr.length > 0 && arr[0] != 0;
+        return null;
     }
 
     // =========================
@@ -393,12 +427,20 @@ public class ONGService {
     }
 
     private OngResponseDTO toDTO(Ong o) {
+        // Caminho de UMA ONG (detalhe): busca a privacidade dela na hora.
+        return toDTO(o, privacidadeDaOng(o.getId()));
+    }
+
+    /**
+     * Igual ao {@link #toDTO(Ong)}, mas recebe a privacidade JA carregada — usado
+     * pela listagem, que traz a de todas as ONGs numa consulta so (evita N+1).
+     */
+    private OngResponseDTO toDTO(Ong o, boolean[] p) {
         // PRIVACIDADE REAL: a listagem GET /ongs e o detalhe GET /ongs/{id}
         // respeitam os MESMOS toggles mostrarEmail/mostrarTelefone do perfil
         // publico. Antes esses 2 caminhos devolviam contato de qualquer ONG a
         // qualquer autenticado, ignorando as configuracoes (o perfil publico ja
         // respeitava). Agora o contato so aparece quando a ONG dona o liberou.
-        boolean[] p = privacidadeDaOng(o.getId());
         return new OngResponseDTO(
                 o.getId(),
                 o.getNome(),
