@@ -70,6 +70,18 @@ public class Ong {
     @Size(max = 255)
     private String endereco;
 
+    // Coordenadas do endereco (preenchidas quando a ONG escolhe o endereco no
+    // autocomplete de mapa, no painel desktop). Permitem que o mapa do web
+    // aponte o LOCAL EXATO da ONG (nao so o centro da cidade) e que o link do
+    // Maps abra na coordenada certa. Sao OPCIONAIS: ONG antiga/sem coordenada
+    // cai no fallback por cidade. Colunas adicionadas pelo changeset Liquibase
+    // "feira-ong-lat-long".
+    @Column(name = "latitude")
+    private Double latitude;
+
+    @Column(name = "longitude")
+    private Double longitude;
+
     // ----- Streak do Top 1 do ranking de transparencia -----
     // top1Desde != null => esta ONG e a atual #1 (desde essa data).
     // ultimoReinadoDias = duracao (em dias) do ultimo reinado ja encerrado.
@@ -126,6 +138,12 @@ public class Ong {
 
     public String getEndereco() { return endereco; }
     public void setEndereco(String endereco) { this.endereco = endereco; }
+
+    public Double getLatitude() { return latitude; }
+    public void setLatitude(Double latitude) { this.latitude = latitude; }
+
+    public Double getLongitude() { return longitude; }
+    public void setLongitude(Double longitude) { this.longitude = longitude; }
 
     public LocalDateTime getTop1Desde() { return top1Desde; }
     public void setTop1Desde(LocalDateTime top1Desde) { this.top1Desde = top1Desde; }

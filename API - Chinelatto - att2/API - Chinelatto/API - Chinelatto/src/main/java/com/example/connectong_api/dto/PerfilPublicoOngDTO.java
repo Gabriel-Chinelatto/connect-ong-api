@@ -32,6 +32,8 @@ public class PerfilPublicoOngDTO {
     // Perfil rico (feira): capa em base64, endereco e fotos do local.
     private String capaBase64;
     private String endereco;
+    private Double latitude;
+    private Double longitude;
     private List<String> fotosLocal;
 
     // Streak do ranking: dias no topo (se for o atual #1) e duracao do ultimo
@@ -66,6 +68,8 @@ public class PerfilPublicoOngDTO {
 
         this.capaBase64 = o.getCapaBase64();
         this.endereco = o.getEndereco();
+        this.latitude = o.getLatitude();
+        this.longitude = o.getLongitude();
         this.ultimoReinadoDias = o.getUltimoReinadoDias();
 
         this.necessidades = necessidades;
@@ -101,6 +105,8 @@ public class PerfilPublicoOngDTO {
 
     public String getCapaBase64() { return capaBase64; }
     public String getEndereco() { return endereco; }
+    public Double getLatitude() { return latitude; }
+    public Double getLongitude() { return longitude; }
 
     public List<String> getFotosLocal() { return fotosLocal; }
     public void setFotosLocal(List<String> fotosLocal) { this.fotosLocal = fotosLocal; }

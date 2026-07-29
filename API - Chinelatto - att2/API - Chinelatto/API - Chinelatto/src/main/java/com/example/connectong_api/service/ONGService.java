@@ -355,6 +355,14 @@ public class ONGService {
                     if (dados.getEndereco() != null) {
                         ong.setEndereco(dados.getEndereco());
                     }
+                    // Coordenadas do endereco (opcionais): so sobrescrevem quando
+                    // enviadas E dentro de faixa geografica valida (evita gravar
+                    // lixo). Enviar 0/0 ou fora da faixa = ignora, mantem o atual.
+                    if (dados.getLatitude() != null && dados.getLongitude() != null
+                            && coordenadaValida(dados.getLatitude(), dados.getLongitude())) {
+                        ong.setLatitude(dados.getLatitude());
+                        ong.setLongitude(dados.getLongitude());
+                    }
 
                     Ong atualizada = repository.save(ong);
 
@@ -447,7 +455,7 @@ public class ONGService {
         // publico. Antes esses 2 caminhos devolviam contato de qualquer ONG a
         // qualquer autenticado, ignorando as configuracoes (o perfil publico ja
         // respeitava). Agora o contato so aparece quando a ONG dona o liberou.
-        return new OngResponseDTO(
+        OngResponseDTO dto = new OngResponseDTO(
                 o.getId(),
                 o.getNome(),
                 p[0] ? o.getEmail() : null,
@@ -459,6 +467,11 @@ public class ONGService {
                 o.getNotaMedia(),
                 o.getTotalAvaliacoes()
         );
+        // Coordenadas: leves (2 doubles), incluidas em TODOS os caminhos
+        // (listagem/detalhe/publico) para o mapa do web apontar o local exato.
+        dto.setLatitude(o.getLatitude());
+        dto.setLongitude(o.getLongitude());
+        return dto;
     }
 
     // Versao "rica" do DTO (GET /ongs/{id} e resposta do PUT): inclui capa,
@@ -477,6 +490,14 @@ public class ONGService {
         return ongFotoRepository.findByOngIdOrderByIdAsc(ongId).stream()
                 .map(OngFoto::getFoto)
                 .collect(Collectors.toList());
+    }
+
+    // Coordenada geografica dentro da faixa valida do planeta E nao exatamente
+    // 0/0 (a "Null Island" no Atlantico = tipico valor default/lixo). Evita
+    // gravar coordenada invalida vinda de um cliente com bug.
+    private boolean coordenadaValida(double lat, double lng) {
+        if (lat == 0.0 && lng == 0.0) return false;
+        return lat >= -90.0 && lat <= 90.0 && lng >= -180.0 && lng <= 180.0;
     }
 
     // Coalesce de campo opcional: null -> "" (para nao violar colunas NOT NULL).

@@ -1377,3 +1377,31 @@ databaseChangeLog:
         - sql:
             dbms: mysql
             sql: ALTER TABLE ong MODIFY descricao VARCHAR(1000)
+
+  # =====================================================================
+  # Coordenadas do endereco da ONG (feira): latitude/longitude para o mapa
+  # apontar o LOCAL EXATO (nao so o centro da cidade) e o link do Maps abrir
+  # na coordenada certa. ADITIVO e idempotente (precondicao not columnExists
+  # + MARK_RAN, compativel com MySQL 5.6). Colunas OPCIONAIS (NULL) — ONGs
+  # antigas continuam validas e caem no fallback por cidade no front.
+  # =====================================================================
+  - changeSet:
+      id: feira-ong-lat-long
+      author: connect-ong
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: ong
+                columnName: latitude
+      changes:
+        - addColumn:
+            tableName: ong
+            columns:
+              - column:
+                  name: latitude
+                  type: double
+              - column:
+                  name: longitude
+                  type: double

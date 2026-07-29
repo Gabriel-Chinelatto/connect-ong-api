@@ -34,6 +34,12 @@ public class OngUpdateDTO {
     @Size(max = 255)
     private String endereco;
 
+    // Coordenadas do endereco escolhido no autocomplete de mapa (opcionais).
+    // So sobrescrevem quando enviadas (null = mantem as atuais). Validadas em
+    // faixa geografica valida no service.
+    private Double latitude;
+    private Double longitude;
+
     // Fotos do local: quando presente, SUBSTITUI todas as existentes.
     @Size(max = 5, message = "No maximo 5 fotos do local")
     private List<@Size(max = 3_000_000, message = "Imagem muito grande") String> fotosLocal;
@@ -58,6 +64,12 @@ public class OngUpdateDTO {
 
     public String getEndereco() { return endereco; }
     public void setEndereco(String endereco) { this.endereco = endereco; }
+
+    public Double getLatitude() { return latitude; }
+    public void setLatitude(Double latitude) { this.latitude = latitude; }
+
+    public Double getLongitude() { return longitude; }
+    public void setLongitude(Double longitude) { this.longitude = longitude; }
 
     public List<String> getFotosLocal() { return fotosLocal; }
     public void setFotosLocal(List<String> fotosLocal) { this.fotosLocal = fotosLocal; }

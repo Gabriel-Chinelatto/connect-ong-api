@@ -30,6 +30,11 @@ public class OngResponseDTO {
     private String endereco;
     private List<String> fotosLocal;
 
+    // Coordenadas do endereco (leves: 2 doubles). Preenchidas TAMBEM na
+    // listagem para o mapa do web apontar o local exato de cada ONG.
+    private Double latitude;
+    private Double longitude;
+
     public OngResponseDTO(
             Long id,
             String nome,
@@ -103,4 +108,10 @@ public class OngResponseDTO {
 
     public List<String> getFotosLocal() { return fotosLocal; }
     public void setFotosLocal(List<String> fotosLocal) { this.fotosLocal = fotosLocal; }
+
+    public Double getLatitude() { return latitude; }
+    public void setLatitude(Double latitude) { this.latitude = latitude; }
+
+    public Double getLongitude() { return longitude; }
+    public void setLongitude(Double longitude) { this.longitude = longitude; }
 }
