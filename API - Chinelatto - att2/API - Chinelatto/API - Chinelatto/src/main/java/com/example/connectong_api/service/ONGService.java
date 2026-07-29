@@ -277,7 +277,13 @@ public class ONGService {
         return lista.stream()
                 .filter(o -> o.getDataExclusao() == null) // esconde ONGs excluidas
                 .filter(o -> !ongsBloqueadoras.contains(o.getId()))
-                .map(o -> toDTO(o, privacidades.getOrDefault(o.getId(), PRIVACIDADE_PADRAO)))
+                .map(o -> {
+                    OngResponseDTO dto = toDTO(o, privacidades.getOrDefault(o.getId(), PRIVACIDADE_PADRAO));
+                    // Capa (miniatura do card na web). Incluida SO na listagem;
+                    // as fotos do local (mais pesadas) ficam so no perfil detalhado.
+                    dto.setCapaBase64(o.getCapaBase64());
+                    return dto;
+                })
                 .collect(Collectors.toList());
     }
 
