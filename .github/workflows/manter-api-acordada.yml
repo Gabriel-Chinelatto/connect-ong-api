@@ -1,0 +1,58 @@
+name: Manter API acordada
+
+# Por que isto existe:
+# A API roda no plano GRATUITO do Render, que DESLIGA o servico depois de ~15
+# minutos sem nenhum acesso. A primeira chamada depois disso precisa esperar o
+# servidor subir do zero — medido em 2026-08-03: 95 segundos. Na pratica, quem
+# abrisse o site depois de um tempo parado via a tela travar.
+#
+# Este job faz uma chamada barata de tempos em tempos, entao o servidor nunca
+# fica ocioso o suficiente para hibernar.
+#
+# Observacoes:
+# - O agendamento do GitHub Actions NAO e exato: ele pode atrasar alguns
+#   minutos em horarios de pico. Por isso o intervalo e de 10 min (e nao 14),
+#   deixando folga para atrasos sem deixar o servidor dormir.
+# - Repositorio publico => minutos de Actions gratuitos e ilimitados.
+# - Isto NAO substitui reativar o servico quando ele cai de vez (como em
+#   2026-08-04, quando o Render ficou sem deploy ativo e devolveu 502): o ping
+#   so evita a HIBERNACAO por ociosidade.
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  # Permite disparar na mao pelo site do GitHub (util antes de uma
+  # apresentacao, para garantir que a API esta quente).
+  workflow_dispatch:
+
+# Sem permissao de escrita: o job so faz uma requisicao HTTP.
+permissions: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Acordar a API
+        run: |
+          URL="https://connect-ong-api.onrender.com/publico/estatisticas"
+
+          # --max-time 120: se o servidor estiver hibernando, a resposta pode
+          # demorar mais de um minuto. Esperar e justamente o objetivo.
+          status=$(curl -s -o /tmp/resposta.txt -w '%{http_code}' --max-time 120 "$URL" || echo "000")
+          tempo=$(cat /tmp/resposta.txt | head -c 200)
+
+          echo "Status HTTP: $status"
+          echo "Resposta: $tempo"
+
+          if [ "$status" = "200" ]; then
+            echo "API no ar."
+            exit 0
+          fi
+
+          # Falhar deixa o job VERMELHO no GitHub e dispara o e-mail de
+          # notificacao — e assim que voce fica sabendo que a API caiu, em vez
+          # de descobrir na frente da banca.
+          echo "::error::A API respondeu $status (esperado 200). Se for 502, o servico pode estar suspenso no Render — confira o dashboard."
+          exit 1
