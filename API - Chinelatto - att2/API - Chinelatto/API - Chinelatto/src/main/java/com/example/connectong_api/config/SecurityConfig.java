@@ -46,7 +46,11 @@ public class SecurityConfig {
     // navegador para ca; sem o dominio nesta lista o Spring responde
     // "Invalid CORS request" (403) no login. Para outro dominio, defina a
     // variavel de ambiente APP_CORS_ALLOWED_ORIGINS.
-    @Value("${app.cors.allowed-origins:http://localhost:*,http://127.0.0.1:*,https://connectong.netlify.app}")
+    // O app do doador e o painel da ONG tambem sao publicados como site
+    // estatico no GitHub Pages (github.io), para abrirem em qualquer maquina
+    // sem instalar Flutter. Os dois ficam sob o MESMO dominio
+    // (gabriel-chinelatto.github.io), que precisa constar aqui.
+    @Value("${app.cors.allowed-origins:http://localhost:*,http://127.0.0.1:*,https://connectong.netlify.app,https://gabriel-chinelatto.github.io}")
     private String allowedOrigins;
 
     public SecurityConfig(JwtAuthFilter jwtAuthFilter) {
