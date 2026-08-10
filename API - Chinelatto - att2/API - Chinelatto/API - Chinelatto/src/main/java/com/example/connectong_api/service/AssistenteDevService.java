@@ -35,6 +35,13 @@ public class AssistenteDevService {
     /** So as ultimas trocas do historico dao contexto (limita tokens/latencia). */
     private static final int MAX_HISTORICO = 6;
 
+    /**
+     * Relevancia minima para o fallback por regras devolver uma secao do
+     * documento. Abaixo disso tratamos como pergunta fora de escopo.
+     * (Titulo bate = +2, corpo bate = +1, por termo.)
+     */
+    private static final int ESCORE_MINIMO = 3;
+
     // Palavras muito comuns em PT-BR que nao ajudam a rankear secoes no fallback.
     private static final Set<String> STOP = Set.of(
             "como", "qual", "quais", "quando", "onde", "porque", "porquê", "por que", "para",
@@ -105,14 +112,24 @@ public class AssistenteDevService {
 
     private String systemPrompt() {
         return "Voce e o assistente \"Sobre o Desenvolvimento\" do Connect ONG. "
-                + "Responda perguntas sobre COMO o projeto foi feito: tecnologias, metodos, "
-                + "arquitetura, decisoes de projeto, seguranca, uso de IA, equipe e historico "
-                + "de versoes. Use EXCLUSIVAMENTE as informacoes do documento abaixo. Se a "
-                + "resposta nao estiver no documento, diga com honestidade que nao tem essa "
-                + "informacao e convide a pessoa a perguntar de outro jeito. Responda em "
-                + "portugues do Brasil, de forma clara, amigavel e concisa (no maximo uns 4 "
-                + "paragrafos curtos ou uma lista). NAO invente tecnologias, numeros, nomes ou "
-                + "datas. Responda em TEXTO PURO (nada de JSON).\n\n"
+                + "Seu UNICO assunto e como este projeto foi feito: arquitetura, "
+                + "tecnologias, implementacao de cada funcionalidade, como a API funciona "
+                + "por dentro, banco de dados, seguranca, IA, testes, hospedagem, decisoes "
+                + "de projeto, equipe e historico de versoes.\n\n"
+                + "REGRA 1 — FORA DE ESCOPO: se a pergunta nao tiver relacao com o "
+                + "desenvolvimento do Connect ONG (ex.: futebol, receitas, politica, "
+                + "celebridades, conselhos pessoais, duvidas gerais de programacao sem "
+                + "ligacao com o projeto), NAO responda o assunto. Diga, de forma simpatica e "
+                + "em UMA frase, que voce so fala sobre como o Connect ONG foi desenvolvido, "
+                + "e ofereca dois exemplos de pergunta. Nao invente uma ponte artificial com "
+                + "o projeto.\n"
+                + "REGRA 2 — FIDELIDADE: use EXCLUSIVAMENTE o documento abaixo. Se o "
+                + "documento nao cobrir o detalhe pedido, diga o que voce sabe sobre o tema e "
+                + "admita com honestidade a parte que nao esta documentada. NAO invente "
+                + "tecnologias, numeros, nomes, datas nem nomes de arquivos.\n"
+                + "REGRA 3 — FORMATO: portugues do Brasil, claro e direto, no maximo uns 4 "
+                + "paragrafos curtos ou uma lista. TEXTO PURO (nada de JSON ou markdown de "
+                + "codigo, a menos que a pergunta peca um exemplo de codigo).\n\n"
                 + "=== DOCUMENTO: COMO O CONNECT ONG FOI DESENVOLVIDO ===\n"
                 + conhecimento;
     }
@@ -136,15 +153,24 @@ public class AssistenteDevService {
             for (String t : termos) if (tituloLower.contains(t)) score += 2;
             if (score > melhorScore) { melhorScore = score; melhor = s; }
         }
-        if (melhor == null || melhorScore == 0) {
-            return "Posso te contar como o Connect ONG foi desenvolvido: as tecnologias "
-                    + "(Java/Spring Boot no backend, Flutter no mobile e no desktop, HTML/CSS/"
-                    + "JavaScript na web, MySQL no banco), os metodos, as decisoes de projeto e "
-                    + "o historico de versoes (da v1.0 a v2.0). Pergunte algo como: \"Qual e a "
-                    + "stack?\", \"Quando a IA foi adicionada?\" ou \"Por que a web foi feita em "
-                    + "HTML puro?\".";
+        // Exige uma relacao MINIMA com o documento. Com o limiar antigo (score
+        // > 0) bastava uma palavra qualquer coincidir para o assistente
+        // despejar uma secao inteira: "qual seu time de futebol favorito?"
+        // casava com "favoritos" e recebia o historico de versoes como
+        // resposta. Fora de escopo, o certo e dizer que nao e o assunto.
+        if (melhor == null || melhorScore < ESCORE_MINIMO) {
+            return foraDeEscopo();
         }
-        return melhor.corpo.trim();
+        return "Sobre isso, o que está documentado no projeto:\n\n" + melhor.corpo.trim();
+    }
+
+    /** Recusa educada para perguntas que nao sao sobre o projeto. */
+    private String foraDeEscopo() {
+        return "Eu só falo sobre como o Connect ONG foi desenvolvido — arquitetura, "
+                + "tecnologias, implementação das funcionalidades, banco de dados, "
+                + "segurança, IA, testes e histórico de versões.\n\n"
+                + "Pergunte algo como: \"Como funciona o match entre doador e ONG?\" ou "
+                + "\"Como a API protege os dados de cada usuário?\".";
     }
 
     private List<String> termos(String pergunta) {

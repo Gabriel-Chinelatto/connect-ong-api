@@ -341,11 +341,28 @@ public class ONGService {
         return repository.findById(id)
                 .map(ong -> {
 
-                    ong.setNome(dados.getNome());
-                    ong.setEmail(dados.getEmail());
-                    ong.setTelefone(dados.getTelefone());
-                    ong.setCidade(dados.getCidade());
-                    ong.setDescricao(dados.getDescricao());
+                    // Campos OBRIGATORIOS na entidade (@NotBlank): so sobrescrevem
+                    // quando vem preenchidos. Motivo real: o GET do perfil NAO
+                    // devolve o e-mail (privacidade), entao o painel da ONG o
+                    // carregava vazio e reenviava "" ao salvar — a validacao da
+                    // entidade estourava no flush e a resposta virava 500. Na
+                    // pratica, a ONG nao conseguia salvar NADA no perfil.
+                    if (naoVazio(dados.getNome())) {
+                        ong.setNome(dados.getNome());
+                    }
+                    if (naoVazio(dados.getEmail())) {
+                        ong.setEmail(dados.getEmail());
+                    }
+                    // Opcionais: null = nao mexe; vazio = a ONG limpou de fato.
+                    if (dados.getTelefone() != null) {
+                        ong.setTelefone(dados.getTelefone());
+                    }
+                    if (dados.getCidade() != null) {
+                        ong.setCidade(dados.getCidade());
+                    }
+                    if (dados.getDescricao() != null) {
+                        ong.setDescricao(dados.getDescricao());
+                    }
 
                     // Perfil rico: capa/endereco so sobrescrevem quando enviados
                     // (null = mantem o atual, igual a foto do PerfilService).
@@ -503,6 +520,11 @@ public class ONGService {
     // Coalesce de campo opcional: null -> "" (para nao violar colunas NOT NULL).
     private String naoNulo(String valor) {
         return valor != null ? valor : "";
+    }
+
+    // Texto realmente preenchido (nao null e nao so espacos).
+    private boolean naoVazio(String valor) {
+        return valor != null && !valor.isBlank();
     }
 
     private ResponseEntity<?> erro(
