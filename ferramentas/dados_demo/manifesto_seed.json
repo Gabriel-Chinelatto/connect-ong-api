@@ -1,0 +1,57 @@
+{
+  "criado_em": "2026-08-11T12:00:00",
+  "faixas": {
+    "ong": [
+      37,
+      2016
+    ],
+    "usuario": [
+      25,
+      1216
+    ],
+    "necessidade": [
+      20,
+      7075
+    ],
+    "campanha": [
+      9,
+      1484
+    ],
+    "interesse": [
+      29,
+      9994
+    ],
+    "mensagem": [
+      26,
+      20089
+    ],
+    "prestacao": [
+      7,
+      3257
+    ],
+    "avaliacao": [
+      4,
+      2653
+    ],
+    "avaliacao_doador": [
+      2,
+      1450
+    ],
+    "doacao_financeira": [
+      18,
+      32318
+    ],
+    "doacao": [
+      51,
+      1361
+    ],
+    "atividade": [
+      54,
+      853
+    ],
+    "notificacao": [
+      88,
+      94
+    ]
+  }
+}

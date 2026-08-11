@@ -1,7 +1,6 @@
 package com.example.connectong_api.service;
 
 import com.example.connectong_api.dto.TransparenciaDTO;
-import com.example.connectong_api.model.Interesse;
 import com.example.connectong_api.model.Ong;
 import com.example.connectong_api.repository.CampanhaRepository;
 import com.example.connectong_api.repository.InteresseRepository;
@@ -175,17 +174,13 @@ public class TransparenciaService {
                 ChronoUnit.DAYS.between(top1Desde, LocalDateTime.now()) + 1);
     }
 
-    // Pendencias definitivas agrupadas por ONG, resolvidas em memoria.
+    // Pendencias definitivas agrupadas por ONG — contadas pelo BANCO, numa
+    // consulta so. O corte de prazo (PRAZO_PRESTACAO_DIAS) vira uma data
+    // limite: "concluido ha 10 dias ou mais" = dataConclusao <= agora - 10d,
+    // exatamente o mesmo criterio de ehDefinitiva().
     private Map<Long, Long> pendenciasDefinitivasPorOng() {
-        Map<Long, Long> mapa = new HashMap<>();
-        for (Interesse i : interesseRepository.concluidosSemPrestacao()) {
-            if (!ehDefinitiva(i.getDataConclusao())) continue;
-            Long ongId = (i.getNecessidade() != null && i.getNecessidade().getOng() != null)
-                    ? i.getNecessidade().getOng().getId() : null;
-            if (ongId == null) continue;
-            mapa.merge(ongId, 1L, Long::sum);
-        }
-        return mapa;
+        LocalDateTime limite = LocalDateTime.now().minusDays(PRAZO_PRESTACAO_DIAS);
+        return paraMapa(interesseRepository.pendenciasDefinitivasPorOng(limite));
     }
 
     // Converte os pares [ongId, total] das queries agregadas em um Map.

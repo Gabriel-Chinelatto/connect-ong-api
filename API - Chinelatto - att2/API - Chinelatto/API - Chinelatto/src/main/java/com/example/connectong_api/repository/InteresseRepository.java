@@ -35,11 +35,23 @@ public interface InteresseRepository extends JpaRepository<Interesse, Long> {
             + "AND NOT EXISTS (SELECT p FROM Prestacao p WHERE p.interesse = i)")
     List<Interesse> concluidosSemPrestacaoPorOng(@Param("ongId") Long ongId);
 
-    // Todas as pendencias da plataforma (para a penalidade de transparencia
-    // no ranking, agrupadas por ONG em memoria).
-    @Query("SELECT i FROM Interesse i WHERE i.status = 'CONCLUIDO' "
-            + "AND NOT EXISTS (SELECT p FROM Prestacao p WHERE p.interesse = i)")
-    List<Interesse> concluidosSemPrestacao();
+    // Pendencias DEFINITIVAS da plataforma agrupadas por ONG (penalidade de
+    // transparencia no ranking): matches CONCLUIDOS ha mais tempo que o prazo
+    // e ainda sem nenhuma prestacao de contas. Devolve pares [ongId, total].
+    //
+    // PERFORMANCE: a versao anterior trazia as ENTIDADES Interesse e o service
+    // percorria a lista chamando i.getNecessidade().getOng().getId() — ou seja,
+    // duas consultas por pendencia (N+1). Com poucas pendencias no banco isso
+    // passava despercebido; com o banco cheio (mais de mil pendencias) o
+    // /publico/ranking passou de instantaneo para MINUTOS e estourava o
+    // timeout. Agora a contagem e o corte de prazo sao feitos no banco, numa
+    // consulta so.
+    @Query("SELECT i.necessidade.ong.id, COUNT(i) FROM Interesse i "
+            + "WHERE i.status = 'CONCLUIDO' "
+            + "AND i.dataConclusao IS NOT NULL AND i.dataConclusao <= :limite "
+            + "AND NOT EXISTS (SELECT p FROM Prestacao p WHERE p.interesse = i) "
+            + "GROUP BY i.necessidade.ong.id")
+    List<Object[]> pendenciasDefinitivasPorOng(@Param("limite") java.time.LocalDateTime limite);
 
     // Existe um match CONCLUIDO entre este doador e esta ONG? E o LASTRO que
     // habilita a avaliacao nos dois sentidos (doador->ONG e ONG->doador): so
