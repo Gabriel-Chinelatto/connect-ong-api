@@ -8,6 +8,7 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.transaction.TransactionSystemException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -112,13 +113,24 @@ public class GlobalExceptionHandler {
         return badRequest("Parametro obrigatorio '" + ex.getParameterName() + "' nao foi informado.");
     }
 
-    // Rota inexistente -> 404 (e nao 500). Ex.: chamar /usuarios/me quando o
-    // correto e /auth/me.
+    // Rota inexistente -> 404 (e nao 500).
     @ExceptionHandler({NoHandlerFoundException.class, NoResourceFoundException.class})
     public ResponseEntity<Map<String, String>> tratarRotaInexistente(Exception ex) {
         Map<String, String> corpo = new HashMap<>();
         corpo.put("erro", "Endereco nao encontrado nesta API.");
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(corpo);
+    }
+
+    // Metodo HTTP errado para uma rota que existe -> 405 (e nao 500).
+    // Ex.: GET /usuarios/me — o caminho /usuarios/{id} so aceita DELETE, e o
+    // GET caia no handler generico. Foi assim que uma chamada errada parecia
+    // servidor quebrado (achado na varredura de 10/08/2026).
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<Map<String, String>> tratarMetodoNaoSuportado(
+            HttpRequestMethodNotSupportedException ex) {
+        Map<String, String> corpo = new HashMap<>();
+        corpo.put("erro", "Metodo " + ex.getMethod() + " nao e aceito neste endereco.");
+        return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).body(corpo);
     }
 
     // Validacao da ENTIDADE que estoura no commit da transacao. O Spring

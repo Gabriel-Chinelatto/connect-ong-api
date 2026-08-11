@@ -44,6 +44,21 @@ class ErrosDeEntradaTest {
     }
 
     @Test
+    void metodoHttpErrado_devolve405() throws Exception {
+        // /usuarios/login existe, mas so aceita POST. Antes: 500.
+        mvc.perform(get("/usuarios/login"))
+                .andExpect(status().isMethodNotAllowed())
+                .andExpect(jsonPath("$.erro").value(
+                        org.hamcrest.Matchers.containsString("GET")));
+    }
+
+    @Test
+    void rotaInexistente_devolve404() throws Exception {
+        mvc.perform(get("/rota-que-nao-existe"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
     void nenhumErroDeEntrada_podeVirar500() throws Exception {
         // A mensagem generica de 500 nunca deve aparecer nestes casos.
         mvc.perform(get("/favoritos/ids"))
