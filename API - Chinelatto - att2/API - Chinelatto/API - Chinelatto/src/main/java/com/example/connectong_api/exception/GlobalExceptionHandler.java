@@ -5,11 +5,15 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.transaction.TransactionSystemException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.NoHandlerFoundException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -95,6 +99,45 @@ public class GlobalExceptionHandler {
         Map<String, String> corpo = new HashMap<>();
         corpo.put("erro", ex.getMessage());
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(corpo);
+    }
+
+    // Parametro de query OBRIGATORIO ausente (ex.: /favoritos/ids sem
+    // usuarioId) -> 400. Sem este handler a requisicao caia no generico e a API
+    // respondia 500 "erro inesperado no servidor" para um erro do CLIENTE:
+    // confunde quem consome a API e polui o monitoramento com falso alarme de
+    // servidor quebrado (achado na varredura de 10/08/2026).
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<Map<String, String>> tratarParametroAusente(
+            MissingServletRequestParameterException ex) {
+        return badRequest("Parametro obrigatorio '" + ex.getParameterName() + "' nao foi informado.");
+    }
+
+    // Rota inexistente -> 404 (e nao 500). Ex.: chamar /usuarios/me quando o
+    // correto e /auth/me.
+    @ExceptionHandler({NoHandlerFoundException.class, NoResourceFoundException.class})
+    public ResponseEntity<Map<String, String>> tratarRotaInexistente(Exception ex) {
+        Map<String, String> corpo = new HashMap<>();
+        corpo.put("erro", "Endereco nao encontrado nesta API.");
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(corpo);
+    }
+
+    // Validacao da ENTIDADE que estoura no commit da transacao. O Spring
+    // embrulha a ConstraintViolationException numa TransactionSystemException,
+    // que escapava do handler acima e virava 500 — foi assim que "salvar o
+    // perfil da ONG" respondia 500 ao enviar e-mail vazio.
+    @ExceptionHandler(TransactionSystemException.class)
+    public ResponseEntity<Map<String, String>> tratarErroDeTransacao(
+            TransactionSystemException ex) {
+        if (ex.getMostSpecificCause() instanceof ConstraintViolationException cve) {
+            String detalhe = cve.getConstraintViolations().stream()
+                    .findFirst()
+                    .map(v -> "Campo invalido: " + v.getPropertyPath() + " " + v.getMessage())
+                    .orElse("Dados invalidos.");
+            return badRequest(detalhe);
+        }
+        Map<String, String> corpo = new HashMap<>();
+        corpo.put("erro", "Ocorreu um erro inesperado no servidor.");
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(corpo);
     }
 
     // Qualquer outra excecao nao prevista -> 500 com mensagem generica (sem vazar detalhes)
