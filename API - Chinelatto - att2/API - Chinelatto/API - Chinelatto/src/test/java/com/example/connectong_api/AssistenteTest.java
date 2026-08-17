@@ -477,4 +477,85 @@ class AssistenteTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.titulo", not(emptyOrNullString())));
     }
+
+    // ===============================================================
+    // LUGAR NA MENSAGEM (correcoes de 13/08: o campo cidade das ONGs
+    // reais guarda "Cidade - UF" e o modo regras nao casava)
+    // ===============================================================
+
+    // (f) Bug visto na feira: "se eu estiver no rio de janeiro" devolvia ONGs
+    // aleatorias do Brasil, porque "rio de janeiro" nunca casava com o campo
+    // "Rio de Janeiro - RJ". Agora a parte-cidade e comparada em separado.
+    @Test
+    void semChave_cidadeComUfNoCampo_eEncontradaPelaMensagem() throws Exception {
+        Mockito.when(provedorIA.disponivel()).thenReturn(false);
+        long n = SEQ.getAndIncrement();
+        Ong rio = new Ong("Instituto Carioca " + n, "rio" + n + "@assist.test",
+                "2122223000", "Rio de Janeiro - RJ", "Apoia comunidades.");
+        rio.setVerificada(true);
+        rio = ongRepository.save(rio);
+
+        mockMvc.perform(post("/assistente")
+                        .contentType("application/json")
+                        .content("{\"mensagem\":\"se eu estiver no rio de janeiro, onde posso doar?\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.modo").value("regras"))
+                .andExpect(jsonPath("$.resposta", containsString("Rio de Janeiro")))
+                .andExpect(jsonPath("$.sugestoes[*].id", hasItem(rio.getId().intValue())));
+    }
+
+    // (f2) Mensagem que se APRESENTA com um lugar ("sou de campinas") e
+    // continuacao da conversa de doacao: responde com ONGs de la, nao com o
+    // "nao vou saber responder" conversacional.
+    @Test
+    void semChave_soCitarACidade_respondeComOngsDeLa() throws Exception {
+        Mockito.when(provedorIA.disponivel()).thenReturn(false);
+
+        mockMvc.perform(post("/assistente")
+                        .contentType("application/json")
+                        .content("{\"mensagem\":\"sou de campinas\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.modo").value("regras"))
+                .andExpect(jsonPath("$.resposta",
+                        not(containsString("nao vou saber responder"))))
+                .andExpect(jsonPath("$.sugestoes", not(empty())));
+    }
+
+    // (f3) Estado por extenso ("no parana") filtra pela UF do campo "Cidade - UF".
+    @Test
+    void semChave_estadoPorExtenso_filtraPelaUf() throws Exception {
+        Mockito.when(provedorIA.disponivel()).thenReturn(false);
+        long n = SEQ.getAndIncrement();
+        Ong curitiba = new Ong("Acao Curitibana " + n, "cwb" + n + "@assist.test",
+                "4133334000", "Curitiba - PR", "Apoio a familias.");
+        curitiba.setVerificada(true);
+        curitiba = ongRepository.save(curitiba);
+
+        mockMvc.perform(post("/assistente")
+                        .contentType("application/json")
+                        .content("{\"mensagem\":\"quero doar para quem esta no parana\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.modo").value("regras"))
+                .andExpect(jsonPath("$.resposta", containsString("Parana")))
+                .andExpect(jsonPath("$.sugestoes[*].id", hasItem(curitiba.getId().intValue())));
+    }
+
+    // (f4) Pergunta GERAL que por acaso contem nome de cidade ("qual a capital
+    // da Franca?" — existe Franca-SP) continua CONVERSACIONAL, sem cards: a
+    // resposta por lugar exige o marcador de localizacao ("sou de", "moro"...).
+    @Test
+    void semChave_perguntaGeralComNomeDeCidade_naoDespejaCards() throws Exception {
+        Mockito.when(provedorIA.disponivel()).thenReturn(false);
+        long n = SEQ.getAndIncrement();
+        Ong franca = new Ong("Solidariedade Francana " + n, "franca" + n + "@assist.test",
+                "1637223000", "Franca - SP", "Apoio local.");
+        ongRepository.save(franca);
+
+        mockMvc.perform(post("/assistente")
+                        .contentType("application/json")
+                        .content("{\"mensagem\":\"qual a capital da Franca?\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.modo").value("regras"))
+                .andExpect(jsonPath("$.sugestoes", empty()));
+    }
 }

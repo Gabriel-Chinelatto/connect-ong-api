@@ -130,6 +130,67 @@ public class AssistenteService {
         BAIRROS_CIDADE.put("universitario", "Uberaba");
     }
 
+    // Estados por extenso -> sigla (chaves normalizadas, ordem: nomes mais longos
+    // primeiro, para "mato grosso do sul" nao ser roubado por "mato grosso").
+    // "Para" fica FORA do mapa: normalizado colide com a preposicao "para" (tratado
+    // por regex com preposicao em detectarLocalizacaoNaMensagem).
+    private static final Map<String, String> ESTADO_SIGLA = new LinkedHashMap<>();
+    static {
+        ESTADO_SIGLA.put("rio grande do norte", "RN");
+        ESTADO_SIGLA.put("rio grande do sul", "RS");
+        ESTADO_SIGLA.put("mato grosso do sul", "MS");
+        ESTADO_SIGLA.put("distrito federal", "DF");
+        ESTADO_SIGLA.put("rio de janeiro", "RJ");
+        ESTADO_SIGLA.put("santa catarina", "SC");
+        ESTADO_SIGLA.put("espirito santo", "ES");
+        ESTADO_SIGLA.put("mato grosso", "MT");
+        ESTADO_SIGLA.put("minas gerais", "MG");
+        ESTADO_SIGLA.put("sao paulo", "SP");
+        ESTADO_SIGLA.put("pernambuco", "PE");
+        ESTADO_SIGLA.put("tocantins", "TO");
+        ESTADO_SIGLA.put("maranhao", "MA");
+        ESTADO_SIGLA.put("rondonia", "RO");
+        ESTADO_SIGLA.put("amazonas", "AM");
+        ESTADO_SIGLA.put("roraima", "RR");
+        ESTADO_SIGLA.put("alagoas", "AL");
+        ESTADO_SIGLA.put("paraiba", "PB");
+        ESTADO_SIGLA.put("parana", "PR");
+        ESTADO_SIGLA.put("sergipe", "SE");
+        ESTADO_SIGLA.put("goias", "GO");
+        ESTADO_SIGLA.put("ceara", "CE");
+        ESTADO_SIGLA.put("piaui", "PI");
+        ESTADO_SIGLA.put("bahia", "BA");
+        ESTADO_SIGLA.put("amapa", "AP");
+        ESTADO_SIGLA.put("acre", "AC");
+    }
+
+    // Sigla -> nome apresentavel (para exibir "Rio de Janeiro" e nao "UF:RJ").
+    private static final Map<String, String> SIGLA_ESTADO = new LinkedHashMap<>();
+    static {
+        SIGLA_ESTADO.put("AC", "Acre");            SIGLA_ESTADO.put("AL", "Alagoas");
+        SIGLA_ESTADO.put("AP", "Amapa");           SIGLA_ESTADO.put("AM", "Amazonas");
+        SIGLA_ESTADO.put("BA", "Bahia");           SIGLA_ESTADO.put("CE", "Ceara");
+        SIGLA_ESTADO.put("DF", "Distrito Federal");SIGLA_ESTADO.put("ES", "Espirito Santo");
+        SIGLA_ESTADO.put("GO", "Goias");           SIGLA_ESTADO.put("MA", "Maranhao");
+        SIGLA_ESTADO.put("MT", "Mato Grosso");     SIGLA_ESTADO.put("MS", "Mato Grosso do Sul");
+        SIGLA_ESTADO.put("MG", "Minas Gerais");    SIGLA_ESTADO.put("PA", "Para");
+        SIGLA_ESTADO.put("PB", "Paraiba");         SIGLA_ESTADO.put("PR", "Parana");
+        SIGLA_ESTADO.put("PE", "Pernambuco");      SIGLA_ESTADO.put("PI", "Piaui");
+        SIGLA_ESTADO.put("RJ", "Rio de Janeiro");  SIGLA_ESTADO.put("RN", "Rio Grande do Norte");
+        SIGLA_ESTADO.put("RS", "Rio Grande do Sul");SIGLA_ESTADO.put("RO", "Rondonia");
+        SIGLA_ESTADO.put("RR", "Roraima");         SIGLA_ESTADO.put("SC", "Santa Catarina");
+        SIGLA_ESTADO.put("SP", "Sao Paulo");       SIGLA_ESTADO.put("SE", "Sergipe");
+        SIGLA_ESTADO.put("TO", "Tocantins");
+    }
+
+    // Sigla de UF so vale depois de preposicao ("em sp", "no rj") — varias siglas
+    // sao palavras comuns do portugues (SE, MA, AM, PA, TO...).
+    private static final java.util.regex.Pattern SIGLA_APOS_PREPOSICAO =
+            java.util.regex.Pattern.compile("\\b(?:em|no|na|de|do|da|pra|para)\\s+([a-z]{2})\\b");
+    // "Para" (estado) so com preposicao tipica de lugar, para nao casar a preposicao.
+    private static final java.util.regex.Pattern ESTADO_PARA =
+            java.util.regex.Pattern.compile("\\b(?:no|do|em) para\\b");
+
     // (1) Gatilhos de INTENCAO DE DOACAO (fallback por regras). So montamos cards
     // quando a mensagem casa uma categoria, cita uma ONG, ou contem um destes.
     // Substrings (casam em qualquer parte da palavra).
@@ -196,7 +257,8 @@ public class AssistenteService {
         }
 
         // 2) FALLBACK por regras (sempre funciona, sem chave).
-        return ResponseEntity.ok(finalizar(responderPorRegras(mensagem, cidade, ctx, "regras"), mensagem));
+        return ResponseEntity.ok(finalizar(
+                responderPorRegras(mensagem, cidade, cidadeMensagem, ctx, "regras"), mensagem));
     }
 
     // ================================================================
@@ -351,7 +413,8 @@ public class AssistenteService {
         // em conversa geral, sugestoes ficam VAZIAS. Modo continua "ia".
         List<Sugestao> sugestoes = new ArrayList<>();
         if (intencaoDoacao(normalizar(mensagem), ctx)) {
-            sugestoes = responderPorRegras(mensagem, cidade, ctx, "ia").getSugestoes();
+            sugestoes = responderPorRegras(mensagem, cidade,
+                    detectarLocalizacaoNaMensagem(mensagem, ctx.ongs), ctx, "ia").getSugestoes();
         }
         return new AssistenteResponseDTO(texto.trim(), sugestoes, "ia");
     }
@@ -452,7 +515,7 @@ public class AssistenteService {
 
         if (cidade != null && !cidade.isBlank()) {
             sb.append("Localizacao de referencia (a que o doador indicou ou a do ")
-              .append("cadastro): ").append(cidade).append(".\n\n");
+              .append("cadastro): ").append(exibirLugar(cidade)).append(".\n\n");
         }
 
         sb.append("ONGs ativas (use SOMENTE estas ao recomendar):\n");
@@ -524,12 +587,27 @@ public class AssistenteService {
     // FALLBACK POR REGRAS
     // ================================================================
     private AssistenteResponseDTO responderPorRegras(String mensagem, String cidade,
+                                                     String cidadeMensagem,
                                                      Contexto ctx, String modo) {
         String norm = normalizar(mensagem);
 
         // (1) MODO CONVERSA no fallback: se NAO ha intencao clara de doacao, responde
         // curto e conversacional, SEM cards (nao despeja ONGs em pergunta geral).
+        // EXCECAO: mensagem que se APRESENTA com um lugar ("sou de campinas",
+        // "moro no rio") e continuacao util da conversa de doacao — responde com
+        // ONGs de la. Exige o marcador de localizacao: so o nome da cidade solto
+        // numa pergunta geral ("qual a capital da Franca?" casa com Franca-SP)
+        // NAO pode virar despejo de cards.
         if (!intencaoDoacao(norm, ctx)) {
+            boolean seApresentaComLugar = norm.contains("sou de") || norm.contains("moro")
+                    || norm.contains("estou em") || norm.contains("estou no")
+                    || norm.contains("estou na") || norm.contains("to em")
+                    || norm.contains("to no") || norm.contains("to na")
+                    || norm.contains("estiver") || norm.contains("minha cidade")
+                    || norm.contains("aqui em") || norm.contains("venho de");
+            if (cidadeMensagem != null && seApresentaComLugar) {
+                return respostaPorProximidade(cidade, ctx, modo);
+            }
             return respostaConversacional(modo);
         }
 
@@ -547,11 +625,13 @@ public class AssistenteService {
             return respostaPorCategoria(categorias, cidade, ctx, modo);
         }
 
-        // (B) Intencao de proximidade/cidade (sem categoria).
-        boolean querPerto = norm.contains("perto") || norm.contains("proxim")
+        // (B) Intencao de proximidade/cidade (sem categoria). Lugar citado NA
+        // MENSAGEM ("onde doar no rio de janeiro?") tambem conta como proximidade.
+        boolean querPerto = cidadeMensagem != null
+                || norm.contains("perto") || norm.contains("proxim")
                 || norm.contains("por perto") || norm.contains("minha cidade")
                 || norm.contains("aqui em") || norm.contains("na regiao")
-                || (temTexto(cidade) && norm.contains(normalizar(cidade)));
+                || (temTexto(cidade) && norm.contains(normalizar(parteCidade(cidade))));
         if (querPerto || ongCitada != null) {
             return respostaPorProximidade(cidade, ctx, modo);
         }
@@ -578,7 +658,7 @@ public class AssistenteService {
             sb.append("Que generosidade! Encontrei ")
               .append(casam.size() == 1 ? "uma necessidade" : "algumas necessidades")
               .append(" de ").append(catTexto);
-            if (temTexto(cidade)) sb.append(" perto de ").append(cidade);
+            if (temTexto(cidade)) sb.append(" perto de ").append(exibirLugar(cidade));
             sb.append(". Veja se alguma combina com o que voce tem para doar:");
             for (Necessidade n : limitar(casam, MAX_SUGESTOES)) {
                 sugestoes.add(cardNecessidade(n));
@@ -586,7 +666,7 @@ public class AssistenteService {
         } else {
             // Sem match exato: oferece ONGs proximas / necessidades recentes.
             sb.append("No momento nao achei uma necessidade aberta de ").append(catTexto);
-            if (temTexto(cidade)) sb.append(" em ").append(cidade);
+            if (temTexto(cidade)) sb.append(" em ").append(exibirLugar(cidade));
             sb.append(", mas estas ONGs recebem doacoes e podem se interessar:");
             sugestoes = cardsOngsProximas(cidade, ctx);
             if (sugestoes.isEmpty()) {
@@ -604,11 +684,11 @@ public class AssistenteService {
 
         if (!sugestoes.isEmpty()) {
             sb.append(temTexto(cidade)
-                    ? "Perto de " + cidade + ", estas ONGs estao recebendo doacoes:"
+                    ? "Perto de " + exibirLugar(cidade) + ", estas ONGs estao recebendo doacoes:"
                     : "Estas ONGs estao ativas e recebendo doacoes:");
         } else {
             sb.append("Ainda nao encontrei ONGs cadastradas");
-            if (temTexto(cidade)) sb.append(" em ").append(cidade);
+            if (temTexto(cidade)) sb.append(" em ").append(exibirLugar(cidade));
             sb.append(". Enquanto isso, veja necessidades abertas em outras cidades:");
             for (Necessidade n : limitar(ctx.necessidades, MAX_SUGESTOES)) {
                 sugestoes.add(cardNecessidade(n));
@@ -619,7 +699,9 @@ public class AssistenteService {
 
     private AssistenteResponseDTO respostaNecessidadesDaOng(Ong ong, Contexto ctx, String modo) {
         List<Necessidade> daOng = new ArrayList<>();
-        for (Necessidade n : ctx.necessidades) {
+        List<Necessidade> universo = ctx.todasNecessidades.isEmpty()
+                ? ctx.necessidades : ctx.todasNecessidades;
+        for (Necessidade n : universo) {
             if (n.getOng() != null && ong.getId().equals(n.getOng().getId())) {
                 daOng.add(n);
             }
@@ -887,7 +969,8 @@ public class AssistenteService {
     private Contexto montarContexto(String cidade, Set<String> categoriasQuery,
                                     List<Ong> ongsAtivas, List<Necessidade> necessidadesAbertas) {
         Contexto ctx = new Contexto();
-        String cid = normalizar(cidade);
+        ctx.todasOngs = ongsAtivas;
+        ctx.todasNecessidades = necessidadesAbertas;
 
         // Categorias que cada ONG pede, a partir de TODAS as necessidades abertas
         // (usado para pontuar a relevancia da ONG por categoria da pergunta).
@@ -902,7 +985,7 @@ public class AssistenteService {
         // Necessidades: relevancia (categoria+cidade) primeiro, depois urgente/recente.
         List<Necessidade> necessidades = new ArrayList<>(necessidadesAbertas);
         necessidades.sort(Comparator
-                .comparingInt((Necessidade n) -> -pontuacaoNecessidade(n, cid, categoriasQuery))
+                .comparingInt((Necessidade n) -> -pontuacaoNecessidade(n, cidade, categoriasQuery))
                 .thenComparing(n -> Boolean.TRUE.equals(n.getUrgente()) ? 0 : 1)
                 .thenComparing(n -> n.getDataCriacao() != null
                         ? n.getDataCriacao() : LocalDateTime.MIN, Comparator.reverseOrder()));
@@ -912,7 +995,7 @@ public class AssistenteService {
         // ONGs: relevancia (cidade+categoria) primeiro, depois verificada/nota.
         List<Ong> ongs = new ArrayList<>(ongsAtivas);
         ongs.sort(Comparator
-                .comparingInt((Ong o) -> -pontuacaoOng(o, cid, categoriasQuery, catsPorOngTodas))
+                .comparingInt((Ong o) -> -pontuacaoOng(o, cidade, categoriasQuery, catsPorOngTodas))
                 .thenComparing(o -> o.getVerificada() ? 0 : 1)
                 .thenComparing(Ong::getNotaMedia, Comparator.reverseOrder()));
         ctx.ongs = limitar(ongs, LIMITE_ONGS);
@@ -931,22 +1014,22 @@ public class AssistenteService {
     // Relevancia da necessidade p/ a pergunta: +2 se casa alguma categoria citada,
     // +1 se e da localizacao detectada. (Sem categoria/cidade na pergunta => 0,
     // degradando para o desempate por urgente/recente = comportamento antigo.)
-    private int pontuacaoNecessidade(Necessidade n, String cidadeNorm, Set<String> categoriasQuery) {
+    private int pontuacaoNecessidade(Necessidade n, String cidade, Set<String> categoriasQuery) {
         int p = 0;
         if (!categoriasQuery.isEmpty() && categoriasQuery.stream()
                 .anyMatch(c -> Categorias.iguais(n.getCategoria(), c))) {
             p += 2;
         }
-        if (mesmaCidadeNec(n, cidadeNorm)) p += 1;
+        if (mesmaCidadeNec(n, cidade)) p += 1;
         return p;
     }
 
     // Relevancia da ONG p/ a pergunta: +2 se e da localizacao detectada, +1 se
     // costuma pedir alguma categoria citada.
-    private int pontuacaoOng(Ong o, String cidadeNorm, Set<String> categoriasQuery,
+    private int pontuacaoOng(Ong o, String cidade, Set<String> categoriasQuery,
                              Map<Long, Set<String>> catsPorOng) {
         int p = 0;
-        if (temTexto(cidadeNorm) && cidadeNorm.equals(normalizar(o.getCidade()))) p += 2;
+        if (mesmoLugar(o.getCidade(), cidade)) p += 2;
         if (!categoriasQuery.isEmpty()) {
             Set<String> cats = catsPorOng.get(o.getId());
             if (cats != null && cats.stream()
@@ -962,26 +1045,23 @@ public class AssistenteService {
     // ================================================================
     // Necessidades: cidade do doador primeiro, depois urgentes, depois recentes.
     private void ordenarNecessidades(List<Necessidade> lista, String cidade) {
-        String cid = normalizar(cidade);
         lista.sort(Comparator
-                .comparing((Necessidade n) -> mesmaCidadeNec(n, cid) ? 0 : 1)
+                .comparing((Necessidade n) -> mesmaCidadeNec(n, cidade) ? 0 : 1)
                 .thenComparing(n -> Boolean.TRUE.equals(n.getUrgente()) ? 0 : 1)
                 .thenComparing(n -> n.getDataCriacao() != null
                         ? n.getDataCriacao() : LocalDateTime.MIN, Comparator.reverseOrder()));
     }
 
-    private boolean mesmaCidadeNec(Necessidade n, String cidadeNorm) {
-        if (!temTexto(cidadeNorm) || n.getOng() == null) return false;
-        return cidadeNorm.equals(normalizar(n.getOng().getCidade()));
+    private boolean mesmaCidadeNec(Necessidade n, String cidade) {
+        return n.getOng() != null && mesmoLugar(n.getOng().getCidade(), cidade);
     }
 
     private List<Sugestao> cardsOngsProximas(String cidade, Contexto ctx) {
-        String cid = normalizar(cidade);
         List<Sugestao> proximas = new ArrayList<>();
-        // Primeiro as da cidade (quando informada).
-        if (temTexto(cid)) {
+        // Primeiro as do lugar pedido (cidade ou estado), quando informado.
+        if (temTexto(cidade)) {
             for (Ong o : ctx.ongs) {
-                if (cid.equals(normalizar(o.getCidade()))) proximas.add(cardOng(o));
+                if (mesmoLugar(o.getCidade(), cidade)) proximas.add(cardOng(o));
                 if (proximas.size() >= MAX_SUGESTOES) return proximas;
             }
         }
@@ -1038,20 +1118,78 @@ public class AssistenteService {
             if (norm.contains(e.getKey())) return e.getValue();
         }
 
-        // 2) cidades reais das ONGs (do banco, ao vivo). Maior nome primeiro.
+        // 2) cidades reais das ONGs (do banco, ao vivo). O campo guarda
+        //    "Cidade - UF", mas a mensagem diz so a cidade ("moro em campinas"):
+        //    comparamos a PARTE-CIDADE. Maior nome primeiro (evita "sao jose"
+        //    roubar de "sao jose dos campos").
         List<Ong> ordenadas = new ArrayList<>(ongsAtivas);
         ordenadas.sort(Comparator.comparingInt(
-                (Ong o) -> o.getCidade() == null ? 0 : o.getCidade().length()).reversed());
+                (Ong o) -> parteCidade(o.getCidade()).length()).reversed());
         for (Ong o : ordenadas) {
-            String cidade = o.getCidade();
-            if (!temTexto(cidade)) continue;
-            String cidadeNorm = normalizar(cidade);
+            String soCidade = parteCidade(o.getCidade());
+            String cidadeNorm = normalizar(soCidade);
             // >= 3 chars e comparacao por palavra inteira (evita casar substrings).
             if (cidadeNorm.length() >= 3 && contemPalavra(norm, cidadeNorm)) {
-                return cidade.trim();
+                return o.getCidade().trim();
             }
         }
+
+        // 3) ESTADO por extenso ("se eu estiver no parana...") -> filtro por UF.
+        for (Map.Entry<String, String> e : ESTADO_SIGLA.entrySet()) {
+            if (contemPalavra(norm, e.getKey())) return "UF:" + e.getValue();
+        }
+        if (ESTADO_PARA.matcher(norm).find()) return "UF:PA";
+
+        // 4) Sigla de UF depois de preposicao ("em sp", "no rj").
+        java.util.regex.Matcher m = SIGLA_APOS_PREPOSICAO.matcher(norm);
+        while (m.find()) {
+            String sigla = m.group(1).toUpperCase();
+            if (SIGLA_ESTADO.containsKey(sigla)) return "UF:" + sigla;
+        }
         return null;
+    }
+
+    // ----------------------------------------------------------------
+    // O campo unico `cidade` das ONGs guarda "Cidade - UF" (nao existe coluna
+    // estado). Estes helpers separam as partes para comparar LUGAR sem depender
+    // do formato — era exatamente isso que fazia "rio de janeiro" nunca casar
+    // com "Rio de Janeiro - RJ" no modo por regras.
+    // ----------------------------------------------------------------
+    private static String parteCidade(String campo) {
+        if (campo == null) return "";
+        String t = campo.trim();
+        int i = t.lastIndexOf(" - ");
+        if (i > 0 && t.length() - (i + 3) == 2) return t.substring(0, i).trim();
+        return t;
+    }
+
+    private static String parteUf(String campo) {
+        if (campo == null) return "";
+        String t = campo.trim();
+        int i = t.lastIndexOf(" - ");
+        if (i > 0 && t.length() - (i + 3) == 2) return t.substring(i + 3).toUpperCase();
+        return "";
+    }
+
+    // `lugar` e o que foi detectado/resolvido: "Campinas - SP", "Limeira" ou o
+    // sentinel "UF:RJ" (estado). Casa cidade com cidade (ignorando a UF do campo)
+    // ou o campo inteiro com a UF pedida.
+    private boolean mesmoLugar(String cidadeCampoOng, String lugar) {
+        if (!temTexto(lugar) || !temTexto(cidadeCampoOng)) return false;
+        if (lugar.startsWith("UF:")) {
+            return lugar.substring(3).equalsIgnoreCase(parteUf(cidadeCampoOng));
+        }
+        return normalizar(parteCidade(lugar)).equals(normalizar(parteCidade(cidadeCampoOng)));
+    }
+
+    // Nome apresentavel do lugar (o sentinel "UF:RJ" vira "Rio de Janeiro").
+    private static String exibirLugar(String lugar) {
+        if (lugar == null) return null;
+        if (lugar.startsWith("UF:")) {
+            String nome = SIGLA_ESTADO.get(lugar.substring(3));
+            return nome != null ? nome : lugar.substring(3);
+        }
+        return lugar;
     }
 
     // true se `alvo` aparece em `texto` delimitado por inicio/fim ou nao-letras
@@ -1096,7 +1234,8 @@ public class AssistenteService {
     private Ong ongCitadaNaMensagem(String norm, Contexto ctx) {
         Ong melhor = null;
         int melhorTam = 0;
-        for (Ong o : ctx.ongs) {
+        List<Ong> universo = ctx.todasOngs.isEmpty() ? ctx.ongs : ctx.todasOngs;
+        for (Ong o : universo) {
             String nomeNorm = normalizar(o.getNome());
             // Evita casar nomes muito curtos (ruido). Exige >= 4 chars.
             if (nomeNorm.length() >= 4 && norm.contains(nomeNorm) && nomeNorm.length() > melhorTam) {
@@ -1133,6 +1272,11 @@ public class AssistenteService {
     private static class Contexto {
         List<Ong> ongs = new ArrayList<>();
         List<Necessidade> necessidades = new ArrayList<>();
+        // Listas COMPLETAS (sem o corte de relevancia): usadas para achar uma ONG
+        // citada pelo NOME e as necessidades dela — com 2.000 ONGs, a citada
+        // quase nunca esta no top-20 do recorte.
+        List<Ong> todasOngs = new ArrayList<>();
+        List<Necessidade> todasNecessidades = new ArrayList<>();
         Map<Long, Ong> ongPorId = new LinkedHashMap<>();
         Map<Long, Necessidade> necessidadePorId = new LinkedHashMap<>();
         Map<Long, List<String>> categoriasPorOng = new LinkedHashMap<>();
