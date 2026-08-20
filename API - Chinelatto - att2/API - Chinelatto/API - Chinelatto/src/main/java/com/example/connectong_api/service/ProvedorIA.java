@@ -57,6 +57,31 @@ public interface ProvedorIA {
      */
     Optional<String> completarComImagem(List<MensagemIA> mensagens, String imagemBase64);
 
+    // ---- Diagnostico (GET /ia/status) ---------------------------------------
+    // A IA cai no fallback por regras EM SILENCIO: sem chave, com modelo
+    // aposentado ou com a cota do minuto estourada, a tela mostra a mesma coisa
+    // ("Modo basico"). Estes metodos existem para conseguir enxergar isso de
+    // fora — inclusive no Render, do celular, antes de apresentar. NENHUM deles
+    // pode devolver a chave.
+
+    /** Modelos de texto configurados, na ordem em que sao tentados. */
+    default List<String> modelos() { return List.of(); }
+
+    /** Modelo multimodal usado quando o doador manda uma foto. */
+    default String modeloVisao() { return null; }
+
+    /** Ultimo modelo que respondeu com sucesso nesta execucao, ou null. */
+    default String ultimoModeloOk() { return null; }
+
+    /** Ultimo erro observado (status + modelo + motivo), ou null. Sem a chave. */
+    default String ultimoErro() { return null; }
+
+    /**
+     * Chamada minima de verdade, so para confirmar que a IA responde (chave
+     * valida + modelo vivo). Gasta pouquissimos tokens.
+     */
+    default boolean ping() { return disponivel(); }
+
     /**
      * Uma mensagem no formato do chat: papel = "system" | "user" | "assistant".
      * (record = imutavel; sem dependencia nova.)

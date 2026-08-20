@@ -36,6 +36,18 @@ public class AssistenteDevService {
     private static final int MAX_HISTORICO = 6;
 
     /**
+     * Quantas secoes do documento vao junto da pergunta.
+     *
+     * Antes mandavamos o documento INTEIRO (18 KB ~ 5.000 tokens) em toda
+     * pergunta. Como o tier gratuito da Groq da 8.000 tokens por MINUTO, a
+     * segunda pergunta seguida ja estourava a cota e caia no "Modo basico" —
+     * exatamente o que nao pode acontecer numa fila de feira. Mandando as
+     * secoes mais relevantes (+ o indice com o titulo de todas, para a IA saber
+     * o que existe e nao inventar), a pergunta cai para ~1.500 tokens.
+     */
+    private static final int MAX_SECOES_CONTEXTO = 4;
+
+    /**
      * Relevancia minima para o fallback por regras devolver uma secao do
      * documento. Abaixo disso tratamos como pergunta fora de escopo.
      * (Titulo bate = +2, corpo bate = +1, por termo.)
@@ -95,8 +107,24 @@ public class AssistenteDevService {
 
     private List<ProvedorIA.MensagemIA> montarMensagens(AssistenteRequestDTO dto, String pergunta) {
         List<ProvedorIA.MensagemIA> msgs = new ArrayList<>();
-        msgs.add(new ProvedorIA.MensagemIA("system", systemPrompt()));
         List<AssistenteRequestDTO.MensagemHistorico> hist = dto.getHistorico();
+
+        // Para escolher as secoes, a pergunta atual vale mais, mas a ULTIMA
+        // pergunta do historico tambem entra: numa continuacao ("e como isso e
+        // testado?") a frase sozinha nao tem nenhuma palavra do documento.
+        StringBuilder consulta = new StringBuilder(pergunta);
+        if (hist != null) {
+            for (int i = hist.size() - 1; i >= 0; i--) {
+                AssistenteRequestDTO.MensagemHistorico h = hist.get(i);
+                if (h != null && !"assistente".equalsIgnoreCase(h.getPapel())
+                        && h.getTexto() != null && !h.getTexto().isBlank()) {
+                    consulta.append(' ').append(h.getTexto());
+                    break;
+                }
+            }
+        }
+
+        msgs.add(new ProvedorIA.MensagemIA("system", systemPrompt(consulta.toString())));
         if (hist != null && !hist.isEmpty()) {
             int ini = Math.max(0, hist.size() - MAX_HISTORICO);
             for (int i = ini; i < hist.size(); i++) {
@@ -110,7 +138,7 @@ public class AssistenteDevService {
         return msgs;
     }
 
-    private String systemPrompt() {
+    private String systemPrompt(String consulta) {
         return "Voce e o assistente \"Sobre o Desenvolvimento\" do Connect ONG. "
                 + "Seu UNICO assunto e como este projeto foi feito: arquitetura, "
                 + "tecnologias, implementacao de cada funcionalidade, como a API funciona "
@@ -129,9 +157,85 @@ public class AssistenteDevService {
                 + "tecnologias, numeros, nomes, datas nem nomes de arquivos.\n"
                 + "REGRA 3 — FORMATO: portugues do Brasil, claro e direto, no maximo uns 4 "
                 + "paragrafos curtos ou uma lista. TEXTO PURO (nada de JSON ou markdown de "
-                + "codigo, a menos que a pergunta peca um exemplo de codigo).\n\n"
-                + "=== DOCUMENTO: COMO O CONNECT ONG FOI DESENVOLVIDO ===\n"
-                + conhecimento;
+                + "codigo, a menos que a pergunta peca um exemplo de codigo).\n"
+                + "REGRA 4 — ASSUNTO DOCUMENTADO MAS FORA DO TRECHO: o indice abaixo lista "
+                + "TODOS os assuntos que o projeto documenta. Se a pergunta for sobre um "
+                + "deles e o trecho recebido nao trouxer o detalhe, diga o que sabe e convide "
+                + "a pessoa a perguntar diretamente sobre aquele assunto — nao trate como "
+                + "fora de escopo.\n\n"
+                + "=== INDICE DOS ASSUNTOS DOCUMENTADOS ===\n"
+                + indiceDeSecoes()
+                + "\n=== TRECHOS RELEVANTES PARA ESTA PERGUNTA ===\n"
+                + trechosRelevantes(consulta);
+    }
+
+    /** Titulo de todas as secoes (barato em tokens; evita a IA achar que algo nao existe). */
+    private String indiceDeSecoes() {
+        StringBuilder sb = new StringBuilder();
+        for (Secao s : secoes) sb.append("- ").append(s.titulo).append('\n');
+        return sb.toString();
+    }
+
+    /**
+     * As {@value #MAX_SECOES_CONTEXTO} secoes mais relacionadas a pergunta. Se
+     * nada casar (pergunta fora de escopo, ou o doc nao tem secoes), manda as
+     * primeiras — a IA ainda precisa de algum contexto para responder a REGRA 1.
+     */
+    private String trechosRelevantes(String consulta) {
+        List<Secao> escolhidas = maisRelevantes(consulta, MAX_SECOES_CONTEXTO);
+        if (escolhidas.isEmpty()) {
+            return conhecimento.length() > 4000 ? conhecimento.substring(0, 4000) : conhecimento;
+        }
+        StringBuilder sb = new StringBuilder();
+        for (Secao s : escolhidas) sb.append(s.corpo.trim()).append("\n\n");
+        return sb.toString();
+    }
+
+    /** Secoes ordenadas por relevancia (score > 0), no maximo {@code limite}. */
+    private List<Secao> maisRelevantes(String consulta, int limite) {
+        List<String> termos = termos(consulta);
+        List<Secao> ordenadas = new ArrayList<>();
+        List<Integer> notas = new ArrayList<>();
+        for (Secao s : secoes) {
+            int score = pontuar(s, termos);
+            if (score <= 0) continue;
+            int pos = 0;
+            while (pos < notas.size() && notas.get(pos) >= score) pos++;
+            ordenadas.add(pos, s);
+            notas.add(pos, score);
+        }
+        return ordenadas.size() > limite ? new ArrayList<>(ordenadas.subList(0, limite)) : ordenadas;
+    }
+
+    /**
+     * Nota de uma secao para os termos da pergunta: titulo vale +2, corpo +1.
+     * Cada termo tambem e testado no SINGULAR: sem isso a pergunta "matches"
+     * nao casava com a secao "Como funciona o MATCH", tirava zero e o
+     * assistente respondia "isso esta fora do meu assunto" — sendo que match e
+     * literalmente o coracao do produto (bug visto na feira em 2026-08-20).
+     */
+    private int pontuar(Secao s, List<String> termos) {
+        String tituloLower = s.titulo.toLowerCase();
+        String alvo = (s.titulo + " " + s.corpo).toLowerCase();
+        int score = 0;
+        for (String t : termos) {
+            for (String var : variacoes(t)) {
+                if (alvo.contains(var)) { score++; break; }
+            }
+            for (String var : variacoes(t)) {
+                if (tituloLower.contains(var)) { score += 2; break; }
+            }
+        }
+        return score;
+    }
+
+    /** O termo como veio e, quando plural, a forma singular ("matches" -> "match"). */
+    private List<String> variacoes(String termo) {
+        List<String> vars = new ArrayList<>();
+        vars.add(termo);
+        if (termo.endsWith("es") && termo.length() > 4) vars.add(termo.substring(0, termo.length() - 2));
+        if (termo.endsWith("s") && termo.length() > 4) vars.add(termo.substring(0, termo.length() - 1));
+        return vars;
     }
 
     // ---- Fallback por regras: escolhe a secao mais relevante ----------------
@@ -145,12 +249,7 @@ public class AssistenteDevService {
         Secao melhor = null;
         int melhorScore = 0;
         for (Secao s : secoes) {
-            String alvo = (s.titulo + " " + s.corpo).toLowerCase();
-            int score = 0;
-            for (String t : termos) if (alvo.contains(t)) score++;
-            // Peso extra quando o termo aparece no titulo da secao.
-            String tituloLower = s.titulo.toLowerCase();
-            for (String t : termos) if (tituloLower.contains(t)) score += 2;
+            int score = pontuar(s, termos);
             if (score > melhorScore) { melhorScore = score; melhor = s; }
         }
         // Exige uma relacao MINIMA com o documento. Com o limiar antigo (score

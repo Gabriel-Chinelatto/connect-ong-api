@@ -109,6 +109,12 @@ public class SecurityConfig {
                             // (painel da ONG) e resumo de impacto (doador). PUBLICOS, rate
                             // limit proprio cada.
                             .requestMatchers(HttpMethod.POST, "/ia/redacao", "/ia/resumo-impacto", "/ia/sobre-ong").permitAll()
+                            // Diagnostico da IA (GET /ia/status): diz se a chave esta
+                            // configurada NAQUELE ambiente e qual foi o ultimo erro da
+                            // Groq. NAO expoe a chave — so um booleano e o nome dos
+                            // modelos. Publico de proposito: e o jeito de conferir a IA
+                            // no Render, do celular, minutos antes de apresentar.
+                            .requestMatchers(HttpMethod.GET, "/ia/status").permitAll()
                             // Perfil publico do DOADOR e suas avaliacoes: leitura
                             // livre (reputacao publica, como o perfil da ONG). O
                             // service nunca expoe email/telefone/valores.

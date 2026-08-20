@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -13,6 +15,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -33,14 +36,36 @@ import java.util.Optional;
  * Sem chave (o padrao) o assistente funciona 100% no modo REGRAS (fallback
  * local). NUNCA comite a chave. A chave nunca e logada.
  *
- * Modelo padrao (texto): llama-3.1-8b-instant (rapido e gratuito). Trocavel por
- * app.ia.groq.modelo. URL trocavel por app.ia.groq.url (permite apontar para
- * outro endpoint compativel com OpenAI).
+ * Modelo padrao (texto): ver app.ia.groq.modelo. URL trocavel por
+ * app.ia.groq.url (permite apontar para outro endpoint compativel com OpenAI).
  *
- * Modelo de VISAO (multimodal, tambem gratuito): meta-llama/llama-4-scout-17b-
- * 16e-instruct — usado quando o doador envia uma FOTO do que quer doar. E o
- * unico modelo de visao disponivel no free tier (o "maverick" da 404 na chave
- * real). Trocavel por app.ia.groq.modelo-visao se a Groq trocar o modelo.
+ * ---------------------------------------------------------------------------
+ * CADEIA DE MODELOS (app.ia.groq.modelos-reserva) — por que existe:
+ *
+ * Em 2026-08 a IA do projeto ficou SILENCIOSAMENTE morta: a Groq aposentou o
+ * "llama-3.1-8b-instant" e passou a devolver 404 model_not_found em TODA
+ * chamada. Como este service engole o erro e devolve Optional.empty(), os seis
+ * recursos de IA cairam no fallback por regras ("Modo basico") sem que nada
+ * aparecesse em lugar nenhum.
+ *
+ * Agora, quando o modelo principal responde um ERRO HTTP (404 = aposentado,
+ * 429 = cota do minuto, 503 = sobrecarga), tentamos os modelos de reserva na
+ * ordem. Isso resolve dois problemas de uma vez:
+ *   - modelo aposentado nao derruba mais a IA (o reserva atende);
+ *   - o free tier limita 8.000 tokens/MINUTO POR MODELO, e cada modelo tem o
+ *     seu proprio balde: com 3 modelos na cadeia a fila da feira aguenta ~3x
+ *     mais perguntas antes de cair no "Modo basico".
+ * Falha de REDE/timeout nao tenta o proximo (seria somar 15s a cada tentativa
+ * e deixar o usuario esperando); so erro HTTP, que volta em milissegundos.
+ * ---------------------------------------------------------------------------
+ *
+ * Modelo de VISAO (multimodal, tambem gratuito): qwen/qwen3.6-27b — usado
+ * quando o doador envia uma FOTO do que quer doar. E o unico do free tier que
+ * aceita imagem (os gpt-oss respondem 400 "content must be a string"), por isso
+ * a foto NAO usa a cadeia de reserva: se o modelo de visao falhar, repetimos
+ * algumas vezes (ele devolve 503 "over capacity" com frequencia) e, por fim,
+ * respondemos SEM a foto pelo caminho de texto — melhor uma resposta util sem
+ * a imagem do que nenhuma resposta.
  * ============================================================================
  */
 @Service
@@ -49,11 +74,19 @@ public class GroqService implements ProvedorIA {
     @Value("${app.ia.groq.key:}")
     private String chave;
 
-    @Value("${app.ia.groq.modelo:llama-3.1-8b-instant}")
+    @Value("${app.ia.groq.modelo:openai/gpt-oss-120b}")
     private String modelo;
 
-    @Value("${app.ia.groq.modelo-visao:meta-llama/llama-4-scout-17b-16e-instruct}")
+    /** Modelos tentados, na ordem, quando o principal devolve erro HTTP. */
+    @Value("${app.ia.groq.modelos-reserva:openai/gpt-oss-20b,qwen/qwen3.6-27b}")
+    private String modelosReserva;
+
+    @Value("${app.ia.groq.modelo-visao:qwen/qwen3.6-27b}")
     private String modeloVisao;
+
+    /** Tentativas no modelo de visao (ele devolve 503 "over capacity" com frequencia). */
+    @Value("${app.ia.groq.tentativas-visao:3}")
+    private int tentativasVisao;
 
     @Value("${app.ia.groq.url:https://api.groq.com/openai/v1/chat/completions}")
     private String url;
@@ -67,7 +100,15 @@ public class GroqService implements ProvedorIA {
     @Value("${app.ia.groq.timeout-segundos:15}")
     private long timeoutSegundos;
 
+    private static final Logger log = LoggerFactory.getLogger(GroqService.class);
+
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    // ---- Diagnostico (lido por GET /ia/status; nunca expoe a chave) ----------
+    // Guardamos so o ULTIMO resultado observado, para conferir na feira se a IA
+    // esta mesmo respondendo sem precisar abrir os logs do Render.
+    private volatile String ultimoModeloOk;   // modelo que respondeu por ultimo
+    private volatile String ultimoErro;       // ex.: "404 openai/... model_not_found"
 
     // HttpClient do JDK (java.net.http) — SEM dependencia nova.
     private final HttpClient httpClient = HttpClient.newBuilder()
@@ -98,16 +139,68 @@ public class GroqService implements ProvedorIA {
         return chamar(mensagens, imagemBase64, null);
     }
 
-    // Faz a chamada HTTP. imagemBase64 == null => texto (modelo de texto);
-    // != null => visao (modelo multimodal, imagem anexada a ultima msg do usuario).
+    // Ponto de entrada das duas modalidades. imagemBase64 == null => TEXTO (cadeia
+    // de modelos); != null => VISAO (modelo multimodal, imagem anexada a ultima
+    // msg do usuario, com queda para texto se a visao nao atender).
     // opcoes == null => usa os defaults (temperatura configurada, sem teto de tokens).
     private Optional<String> chamar(List<MensagemIA> mensagens, String imagemBase64, OpcoesIA opcoes) {
         if (!disponivel() || mensagens == null || mensagens.isEmpty()) {
             return Optional.empty();
         }
+        boolean comImagem = imagemBase64 != null && !imagemBase64.isBlank();
+        if (!comImagem) {
+            return chamarTexto(mensagens, opcoes);
+        }
 
+        // VISAO: so o modelo multimodal aceita imagem. Ele vive dando 503 "over
+        // capacity" no free tier, entao insistimos algumas vezes antes de
+        // desistir da FOTO — e mesmo assim respondemos, so que sem ela.
+        for (int i = 0; i < Math.max(1, tentativasVisao); i++) {
+            Tentativa t = uma(modeloVisao, mensagens, imagemBase64, opcoes);
+            if (t.texto() != null) return Optional.of(t.texto());
+            if (!t.erroHttp()) break; // rede/timeout: insistir so faz o usuario esperar
+        }
+        log.warn("IA: visao indisponivel ({}), respondendo sem a foto", modeloVisao);
+        return chamarTexto(mensagens, opcoes);
+    }
+
+    // TEXTO: tenta o modelo principal e, se ele devolver ERRO HTTP, os reservas.
+    private Optional<String> chamarTexto(List<MensagemIA> mensagens, OpcoesIA opcoes) {
+        for (String m : cadeiaDeModelos()) {
+            Tentativa t = uma(m, mensagens, null, opcoes);
+            if (t.texto() != null) {
+                ultimoModeloOk = m;
+                return Optional.of(t.texto());
+            }
+            // Rede/timeout: nao adianta trocar de modelo (o problema nao e o
+            // modelo) e cada tentativa custaria mais 15s de espera.
+            if (!t.erroHttp()) break;
+        }
+        return Optional.empty();
+    }
+
+    /** Modelo principal + reservas (sem repetidos, sem vazios), na ordem. */
+    private List<String> cadeiaDeModelos() {
+        List<String> lista = new ArrayList<>();
+        if (modelo != null && !modelo.isBlank()) lista.add(modelo.trim());
+        if (modelosReserva != null) {
+            for (String m : modelosReserva.split(",")) {
+                String limpo = m.trim();
+                if (!limpo.isEmpty() && !lista.contains(limpo)) lista.add(limpo);
+            }
+        }
+        return lista;
+    }
+
+    /**
+     * UMA chamada HTTP a um modelo. Nunca lanca.
+     * texto != null => sucesso. texto == null + erroHttp == true => o modelo
+     * respondeu um erro (vale tentar o proximo da cadeia); erroHttp == false =>
+     * timeout/rede/JSON (nao vale insistir).
+     */
+    private Tentativa uma(String modeloAlvo, List<MensagemIA> mensagens, String imagemBase64, OpcoesIA opcoes) {
         try {
-            String corpo = montarCorpo(mensagens, imagemBase64, opcoes);
+            String corpo = montarCorpo(modeloAlvo, mensagens, imagemBase64, opcoes);
 
             HttpRequest req = HttpRequest.newBuilder()
                     .uri(URI.create(url))
@@ -120,42 +213,94 @@ public class GroqService implements ProvedorIA {
             HttpResponse<String> resp =
                     httpClient.send(req, HttpResponse.BodyHandlers.ofString());
 
-            // 429 (rate limit da cota), 5xx, etc. -> cai no fallback por regras.
+            // 404 (modelo aposentado), 429 (cota do minuto), 503 (sobrecarga)...
             if (resp.statusCode() < 200 || resp.statusCode() >= 300) {
-                return Optional.empty();
+                registrarFalha(modeloAlvo, resp.statusCode(), resp.body());
+                return Tentativa.erroDoModelo();
             }
 
             JsonNode raiz = objectMapper.readTree(resp.body());
             JsonNode conteudo = raiz.path("choices").path(0).path("message").path("content");
-            if (conteudo.isMissingNode() || conteudo.isNull()) {
-                return Optional.empty();
+            String texto = conteudo.isMissingNode() || conteudo.isNull()
+                    ? "" : limpar(conteudo.asText(""));
+            if (texto.isBlank()) {
+                // Resposta vazia costuma ser modelo "pensante" gastando o teto de
+                // tokens no raciocinio: tratamos como erro do modelo (tenta o proximo).
+                registrarFalha(modeloAlvo, resp.statusCode(), "resposta vazia");
+                return Tentativa.erroDoModelo();
             }
-            String texto = conteudo.asText("").trim();
-            return texto.isBlank() ? Optional.empty() : Optional.of(texto);
+            return Tentativa.ok(texto);
 
         } catch (Exception e) {
-            // Timeout, rede, JSON, qualquer coisa: silencioso -> fallback.
-            // (NUNCA logar a chave nem o corpo, que carrega o header Authorization.)
-            return Optional.empty();
+            // Timeout, rede, JSON. (NUNCA logar a chave nem o corpo da requisicao,
+            // que carrega o header Authorization e pode conter a foto do doador.)
+            ultimoErro = modeloAlvo + ": " + e.getClass().getSimpleName();
+            log.warn("IA: falha de rede/timeout em {} ({})", modeloAlvo, e.getClass().getSimpleName());
+            return Tentativa.falhaLocal();
         }
+    }
+
+    // Anota e LOGA a falha. Antes isto era 100% silencioso — foi por isso que a
+    // IA passou dias inteira no "Modo basico" sem ninguem perceber. Logamos o
+    // status, o modelo e a mensagem de erro da Groq (que nao tem dado nosso);
+    // nunca a chave nem o corpo enviado.
+    private void registrarFalha(String modeloAlvo, int status, String corpoResposta) {
+        String motivo = "";
+        try {
+            JsonNode erro = objectMapper.readTree(corpoResposta).path("error").path("message");
+            if (!erro.isMissingNode()) motivo = erro.asText("");
+        } catch (Exception ignore) {
+            // corpo nao-JSON (ex.: "resposta vazia"): usa como esta
+            motivo = corpoResposta == null ? "" : corpoResposta;
+        }
+        if (motivo.length() > 200) motivo = motivo.substring(0, 200) + "...";
+        ultimoErro = status + " " + modeloAlvo + (motivo.isBlank() ? "" : " — " + motivo);
+        log.warn("IA: modelo {} respondeu HTTP {} — {}", modeloAlvo, status, motivo);
+    }
+
+    /**
+     * Tira o bloco de raciocinio que alguns modelos "pensantes" (Qwen) deixam
+     * escapar dentro do texto. Sem isto o doador leria "&lt;think&gt; the user
+     * wants..." no meio da resposta.
+     */
+    private String limpar(String texto) {
+        if (texto == null) return "";
+        String t = texto;
+        int ini = t.indexOf("<think>");
+        if (ini >= 0) {
+            int fim = t.indexOf("</think>", ini);
+            t = fim >= 0 ? t.substring(0, ini) + t.substring(fim + 8) : t.substring(0, ini);
+        }
+        return t.trim();
+    }
+
+    /** Resultado de UMA chamada (ver {@link #uma}). */
+    private record Tentativa(String texto, boolean erroHttp) {
+        static Tentativa ok(String texto) { return new Tentativa(texto, false); }
+        static Tentativa erroDoModelo() { return new Tentativa(null, true); }
+        static Tentativa falhaLocal() { return new Tentativa(null, false); }
     }
 
     // Monta o JSON do chat/completions no formato OpenAI. Quando imagemBase64 != null,
     // usa o modelo de VISAO e anexa a imagem a ULTIMA mensagem "user" (content array
     // com {type:image_url}). As demais mensagens seguem como content string simples.
-    private String montarCorpo(List<MensagemIA> mensagens, String imagemBase64, OpcoesIA opcoes) throws Exception {
+    private String montarCorpo(String modeloUsado, List<MensagemIA> mensagens, String imagemBase64, OpcoesIA opcoes) throws Exception {
         boolean comImagem = imagemBase64 != null && !imagemBase64.isBlank();
 
         ObjectNode raiz = objectMapper.createObjectNode();
-        String modeloUsado = comImagem ? modeloVisao : modelo;
         raiz.put("model", modeloUsado);
 
-        // Modelos "pensantes" (Qwen3) devolvem o raciocinio no proprio texto e
-        // gastam o teto de tokens pensando (resposta chega vazia). reasoning_effort
-        // = "none" desliga isso e traz so a resposta final. So enviamos o parametro
-        // para esses modelos: os demais (ex.: llama-3.1) nao o reconhecem.
-        if (modeloUsado != null && modeloUsado.toLowerCase().contains("qwen3")) {
+        // Modelos "pensantes" devolvem o raciocinio junto do texto e gastam o teto
+        // de tokens pensando (resposta chega vazia). O parametro que desliga isso
+        // tem valores DIFERENTES por familia, e quem nao o reconhece devolve 400 —
+        // por isso so mandamos para quem sabemos que aceita:
+        //   - Qwen3        -> "none" (desliga de vez)
+        //   - OpenAI gpt-oss -> "low" (o minimo aceito; "none" da 400)
+        String ml = modeloUsado == null ? "" : modeloUsado.toLowerCase();
+        if (ml.contains("qwen3")) {
             raiz.put("reasoning_effort", "none");
+        } else if (ml.contains("gpt-oss")) {
+            raiz.put("reasoning_effort", "low");
         }
 
         // Temperatura: a da chamada (por tarefa) quando informada; senao o default.
@@ -209,6 +354,33 @@ public class GroqService implements ProvedorIA {
         return "data:image/jpeg;base64," + s;
     }
 
-    /** Nome do modelo de visao em uso (para diagnostico; nunca expoe a chave). */
-    public String getModeloVisao() { return modeloVisao; }
+    // ---- Diagnostico (ver ProvedorIA; nunca expoe a chave) ------------------
+
+    /** Nome do modelo de visao em uso. */
+    @Override
+    public String modeloVisao() { return modeloVisao; }
+
+    /** Cadeia de modelos de texto em uso, na ordem. */
+    @Override
+    public List<String> modelos() { return cadeiaDeModelos(); }
+
+    @Override
+    public String ultimoModeloOk() { return ultimoModeloOk; }
+
+    @Override
+    public String ultimoErro() { return ultimoErro; }
+
+    /**
+     * Chamada minima ao modelo principal (com os reservas) so para saber se a IA
+     * responde de verdade. Usado pelo GET /ia/status?ping=true antes de apresentar.
+     */
+    @Override
+    public boolean ping() {
+        if (!disponivel()) return false;
+        // 64 tokens, e nao 5: os modelos atuais "pensam" antes de responder e um
+        // teto apertado demais devolve texto VAZIO — o ping acusaria falha com a
+        // IA funcionando perfeitamente.
+        return chamarTexto(List.of(new MensagemIA("user", "responda apenas: ok")),
+                OpcoesIA.de(0.0, 64)).isPresent();
+    }
 }

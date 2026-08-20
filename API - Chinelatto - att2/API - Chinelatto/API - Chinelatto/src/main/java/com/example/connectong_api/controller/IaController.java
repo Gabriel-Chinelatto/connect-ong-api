@@ -3,6 +3,7 @@ package com.example.connectong_api.controller;
 import com.example.connectong_api.dto.RedacaoRequestDTO;
 import com.example.connectong_api.dto.ResumoImpactoRequestDTO;
 import com.example.connectong_api.dto.SobreOngRequestDTO;
+import com.example.connectong_api.service.ProvedorIA;
 import com.example.connectong_api.service.RateLimitService;
 import com.example.connectong_api.service.RedacaoService;
 import com.example.connectong_api.service.ResumoImpactoService;
@@ -14,10 +15,15 @@ import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /**
  * Recursos REST /ia/*: apoios de IA (com fallback por regras) que funcionam mesmo
@@ -37,6 +43,7 @@ public class IaController {
     @Autowired private ResumoImpactoService resumoImpactoService;
     @Autowired private SobreOngService sobreOngService;
     @Autowired private RateLimitService rateLimitService;
+    @Autowired private ProvedorIA provedorIA;
 
     @Value("${app.ia.redacao.ratelimit.max:30}")
     private int maxRedacao;
@@ -46,6 +53,38 @@ public class IaController {
 
     @Value("${app.ia.sobre.ratelimit.max:30}")
     private int maxSobre;
+
+    /**
+     * Diagnostico da IA — responde se a chave esta configurada NAQUELE ambiente
+     * (local ou Render), quais modelos estao na cadeia e qual foi o ultimo erro
+     * observado. Existe porque a IA ja ficou dias inteira em "Modo basico" sem
+     * sinal nenhum na tela: o assistente cai no fallback por regras em silencio.
+     *
+     * {@code ?ping=true} faz uma chamada MINIMA de verdade a Groq (poucos tokens)
+     * para confirmar, antes da apresentacao, que a IA responde mesmo.
+     *
+     * NUNCA devolve a chave — so se ela existe.
+     */
+    @GetMapping("/status")
+    @Operation(summary = "Diagnostico da IA: chave, modelos e ultimo erro (publico, sem segredo)")
+    public ResponseEntity<?> status(@RequestParam(defaultValue = "false") boolean ping) {
+        Map<String, Object> corpo = new LinkedHashMap<>();
+        boolean temChave = provedorIA.disponivel();
+        corpo.put("chaveConfigurada", temChave);
+        corpo.put("modelos", provedorIA.modelos());
+        corpo.put("modeloVisao", provedorIA.modeloVisao());
+        if (ping) {
+            if (rateLimitService.excedeuSolicitacoes("ia-status-ping", 10)) {
+                return RateLimitService.resposta429();
+            }
+            corpo.put("ping", provedorIA.ping() ? "ok" : "falhou");
+        }
+        // Lidos DEPOIS do ping, senao mostrariam o estado anterior a ele.
+        corpo.put("ultimoModeloOk", provedorIA.ultimoModeloOk());
+        corpo.put("ultimoErro", provedorIA.ultimoErro());
+        corpo.put("modo", temChave ? "ia" : "regras (sem chave)");
+        return ResponseEntity.ok(corpo);
+    }
 
     @PostMapping("/redacao")
     @Operation(summary = "Reescrever uma necessidade da ONG (publico)")
