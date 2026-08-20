@@ -558,4 +558,121 @@ class AssistenteTest {
                 .andExpect(jsonPath("$.modo").value("regras"))
                 .andExpect(jsonPath("$.sugestoes", empty()));
     }
+
+    // ===============================================================
+    // PERTO VALE MAIS (correcao de 20/08): com o banco cheio (2.000 ONGs
+    // pelas 27 UFs) a Dora chegou a sugerir uma ONG a 2.400 km para quem
+    // queria doar arroz em Limeira. A cidade valia +1 e a categoria +2:
+    // "alimentos em Maraa-AM" empatava com "alimentos aqui do lado" e,
+    // sendo urgente, passava na frente.
+    // ===============================================================
+
+    /**
+     * Mesma categoria dos dois lados, mas a de longe e URGENTE (o desempate que
+     * a fazia ganhar). A de perto tem que vir primeiro na lista injetada.
+     */
+    @Test
+    @SuppressWarnings("unchecked")
+    void necessidadeDaMesmaCidade_venceAUrgenteDoOutroEstado() throws Exception {
+        Mockito.when(provedorIA.disponivel()).thenReturn(true);
+        Mockito.when(provedorIA.completar(Mockito.anyList(), Mockito.any()))
+                .thenReturn(Optional.of("Veja estas opcoes."));
+        long n = SEQ.getAndIncrement();
+
+        // Longe (outro estado) e URGENTE.
+        Ong longe = new Ong("Mesa Farta " + n, "longe" + n + "@assist.test",
+                "9733334000", "Maraa - AM", "Distribui alimentos.");
+        longe.setVerificada(true);
+        longe = ongRepository.save(longe);
+        Necessidade arrozLonge = new Necessidade();
+        arrozLonge.setOng(longe);
+        arrozLonge.setTitulo("Arroz e feijao AMAZONAS " + n);
+        arrozLonge.setCategoria("Alimentos");
+        arrozLonge.setUrgente(true);
+        necessidadeRepository.save(arrozLonge);
+
+        // Perto (mesma cidade do doador), NAO urgente.
+        Ong perto = new Ong("Cozinha Solidaria " + n, "perto" + n + "@assist.test",
+                "1934445000", "Limeira - SP", "Cozinha comunitaria.");
+        perto = ongRepository.save(perto);
+        Necessidade arrozPerto = new Necessidade();
+        arrozPerto.setOng(perto);
+        arrozPerto.setTitulo("Arroz LIMEIRA " + n);
+        arrozPerto.setCategoria("Alimentos");
+        arrozPerto.setUrgente(false);
+        necessidadeRepository.save(arrozPerto);
+
+        mockMvc.perform(post("/assistente")
+                        .contentType("application/json")
+                        .content("{\"mensagem\":\"tenho arroz pra doar\",\"cidade\":\"Limeira\"}"))
+                .andExpect(status().isOk());
+
+        ArgumentCaptor<List<ProvedorIA.MensagemIA>> captor = ArgumentCaptor.forClass(List.class);
+        Mockito.verify(provedorIA).completar(captor.capture(), Mockito.any());
+        String system = captor.getValue().stream()
+                .filter(m -> "system".equals(m.papel()))
+                .map(ProvedorIA.MensagemIA::conteudo)
+                .findFirst().orElse("");
+
+        int posPerto = system.indexOf("Arroz LIMEIRA " + n);
+        int posLonge = system.indexOf("Arroz e feijao AMAZONAS " + n);
+        org.junit.jupiter.api.Assertions.assertTrue(posPerto >= 0,
+                "a necessidade da cidade do doador tem que estar na lista injetada");
+        org.junit.jupiter.api.Assertions.assertTrue(posLonge < 0 || posPerto < posLonge,
+                "a de Limeira deveria vir antes da urgente de Maraa-AM");
+    }
+
+    /**
+     * O degrau do meio: mesmo estado conta mais que outro estado. A cidade do
+     * doador vem sem UF ("Limeira"), entao a UF sai da base offline do IBGE.
+     */
+    @Test
+    @SuppressWarnings("unchecked")
+    void mesmoEstado_venceOutroEstado_mesmoSemUfNaCidadeDoDoador() throws Exception {
+        Mockito.when(provedorIA.disponivel()).thenReturn(true);
+        Mockito.when(provedorIA.completar(Mockito.anyList(), Mockito.any()))
+                .thenReturn(Optional.of("Veja estas opcoes."));
+        long n = SEQ.getAndIncrement();
+
+        Ong outroEstado = new Ong("Amigos do Norte " + n, "norte" + n + "@assist.test",
+                "9233335000", "Manaus - AM", "Apoio a familias.");
+        outroEstado.setVerificada(true);
+        outroEstado = ongRepository.save(outroEstado);
+        Necessidade livrosLonge = new Necessidade();
+        livrosLonge.setOng(outroEstado);
+        livrosLonge.setTitulo("Livros MANAUS " + n);
+        livrosLonge.setCategoria("Livros");
+        livrosLonge.setUrgente(true);
+        necessidadeRepository.save(livrosLonge);
+
+        // Outra cidade, mas MESMO estado do doador (Limeira e SP).
+        Ong mesmoEstado = new Ong("Biblioteca Viva " + n, "bauru" + n + "@assist.test",
+                "1433336000", "Bauru - SP", "Incentivo a leitura.");
+        mesmoEstado = ongRepository.save(mesmoEstado);
+        Necessidade livrosPerto = new Necessidade();
+        livrosPerto.setOng(mesmoEstado);
+        livrosPerto.setTitulo("Livros BAURU " + n);
+        livrosPerto.setCategoria("Livros");
+        livrosPerto.setUrgente(false);
+        necessidadeRepository.save(livrosPerto);
+
+        mockMvc.perform(post("/assistente")
+                        .contentType("application/json")
+                        .content("{\"mensagem\":\"quero doar livros\",\"cidade\":\"Limeira\"}"))
+                .andExpect(status().isOk());
+
+        ArgumentCaptor<List<ProvedorIA.MensagemIA>> captor = ArgumentCaptor.forClass(List.class);
+        Mockito.verify(provedorIA).completar(captor.capture(), Mockito.any());
+        String system = captor.getValue().stream()
+                .filter(m -> "system".equals(m.papel()))
+                .map(ProvedorIA.MensagemIA::conteudo)
+                .findFirst().orElse("");
+
+        int posSp = system.indexOf("Livros BAURU " + n);
+        int posAm = system.indexOf("Livros MANAUS " + n);
+        org.junit.jupiter.api.Assertions.assertTrue(posSp >= 0,
+                "a necessidade do mesmo estado tem que estar na lista injetada");
+        org.junit.jupiter.api.Assertions.assertTrue(posAm < 0 || posSp < posAm,
+                "Bauru-SP deveria vir antes de Manaus-AM para um doador de Limeira");
+    }
 }

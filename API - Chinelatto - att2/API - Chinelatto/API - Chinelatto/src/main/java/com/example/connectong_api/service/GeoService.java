@@ -140,6 +140,27 @@ public class GeoService {
     }
 
     /**
+     * Sigla da UF de uma cidade (ex.: "Limeira" -> "SP"). Mesma politica de
+     * desempate de {@link #coordenadas}: em colisao de nome entre estados,
+     * prefere a CAPITAL e depois a primeira da base. Vazio se a cidade nao
+     * estiver na base.
+     *
+     * Existe porque o perfil do doador guarda so o nome da cidade, sem estado, e
+     * o assistente precisa saber o estado para nao tratar "a cidade vizinha" e
+     * "do outro lado do pais" como a mesma coisa.
+     */
+    public Optional<String> ufDaCidade(String cidade) {
+        if (cidade == null || cidade.isBlank()) return Optional.empty();
+        List<Cidade> candidatas = indice.get(normalizar(cidade));
+        if (candidatas == null || candidatas.isEmpty()) return Optional.empty();
+        for (Cidade c : candidatas) {
+            if (c.capital && !c.uf.isEmpty()) return Optional.of(c.uf);
+        }
+        String uf = candidatas.get(0).uf;
+        return uf.isEmpty() ? Optional.empty() : Optional.of(uf);
+    }
+
+    /**
      * Distancia em KM (inteiro, arredondado) entre duas cidades, pela formula de
      * Haversine (raio da Terra = 6371 km). Vazio se uma das cidades nao estiver
      * na base offline.

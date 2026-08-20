@@ -67,6 +67,9 @@ public class AssistenteService {
     @Autowired private SecurityUtils security;
     @Autowired private RateLimitService rateLimitService;
     @Autowired private ProvedorIA provedorIA;
+    // Base offline do IBGE: usada so para descobrir a UF de uma cidade solta
+    // ("Limeira" -> "SP"), ja que o perfil do doador nao guarda o estado.
+    @Autowired private GeoService geoService;
 
     // Teto de mensagens por IP/janela (protege a cota gratuita da Groq). Alto o
     // bastante para uma conversa normal; nos testes o properties o desliga.
@@ -982,10 +985,14 @@ public class AssistenteService {
                     .add(Categorias.normalizar(n.getCategoria()));
         }
 
+        // Estado do lugar de referencia: um degrau entre "na sua cidade" e "do
+        // outro lado do pais" (ver pontuacaoNecessidade).
+        String ufRef = ufDoLugar(cidade);
+
         // Necessidades: relevancia (categoria+cidade) primeiro, depois urgente/recente.
         List<Necessidade> necessidades = new ArrayList<>(necessidadesAbertas);
         necessidades.sort(Comparator
-                .comparingInt((Necessidade n) -> -pontuacaoNecessidade(n, cidade, categoriasQuery))
+                .comparingInt((Necessidade n) -> -pontuacaoNecessidade(n, cidade, ufRef, categoriasQuery))
                 .thenComparing(n -> Boolean.TRUE.equals(n.getUrgente()) ? 0 : 1)
                 .thenComparing(n -> n.getDataCriacao() != null
                         ? n.getDataCriacao() : LocalDateTime.MIN, Comparator.reverseOrder()));
@@ -995,7 +1002,7 @@ public class AssistenteService {
         // ONGs: relevancia (cidade+categoria) primeiro, depois verificada/nota.
         List<Ong> ongs = new ArrayList<>(ongsAtivas);
         ongs.sort(Comparator
-                .comparingInt((Ong o) -> -pontuacaoOng(o, cidade, categoriasQuery, catsPorOngTodas))
+                .comparingInt((Ong o) -> -pontuacaoOng(o, cidade, ufRef, categoriasQuery, catsPorOngTodas))
                 .thenComparing(o -> o.getVerificada() ? 0 : 1)
                 .thenComparing(Ong::getNotaMedia, Comparator.reverseOrder()));
         ctx.ongs = limitar(ongs, LIMITE_ONGS);
@@ -1011,25 +1018,38 @@ public class AssistenteService {
         return ctx;
     }
 
-    // Relevancia da necessidade p/ a pergunta: +2 se casa alguma categoria citada,
-    // +1 se e da localizacao detectada. (Sem categoria/cidade na pergunta => 0,
-    // degradando para o desempate por urgente/recente = comportamento antigo.)
-    private int pontuacaoNecessidade(Necessidade n, String cidade, Set<String> categoriasQuery) {
+    /**
+     * Relevancia da necessidade p/ a pergunta: +2 se casa alguma categoria
+     * citada, +2 se e da cidade detectada, +1 se e do mesmo ESTADO (cidade
+     * diferente). Sem categoria/cidade na pergunta => 0, degradando para o
+     * desempate por urgente/recente (comportamento antigo).
+     *
+     * O degrau do estado existe porque, com o banco cheio (2.000 ONGs pelas 27
+     * UFs), a cidade valia +1 e a categoria +2: uma necessidade de alimentos em
+     * Maraa-AM empatava com uma de alimentos na cidade vizinha e, sendo urgente,
+     * passava na frente — a Dora chegou a sugerir uma ONG a 2.400 km para quem
+     * queria doar arroz em Limeira. Doacao e coisa que alguem precisa entregar:
+     * perto vale mais.
+     */
+    private int pontuacaoNecessidade(Necessidade n, String cidade, String ufRef,
+                                     Set<String> categoriasQuery) {
         int p = 0;
         if (!categoriasQuery.isEmpty() && categoriasQuery.stream()
                 .anyMatch(c -> Categorias.iguais(n.getCategoria(), c))) {
             p += 2;
         }
-        if (mesmaCidadeNec(n, cidade)) p += 1;
+        if (mesmaCidadeNec(n, cidade)) p += 2;
+        else if (n.getOng() != null && mesmoEstado(n.getOng().getCidade(), ufRef)) p += 1;
         return p;
     }
 
-    // Relevancia da ONG p/ a pergunta: +2 se e da localizacao detectada, +1 se
-    // costuma pedir alguma categoria citada.
-    private int pontuacaoOng(Ong o, String cidade, Set<String> categoriasQuery,
+    // Relevancia da ONG p/ a pergunta: +2 se e da cidade detectada (ou +1 se e do
+    // mesmo estado), +1 se costuma pedir alguma categoria citada.
+    private int pontuacaoOng(Ong o, String cidade, String ufRef, Set<String> categoriasQuery,
                              Map<Long, Set<String>> catsPorOng) {
         int p = 0;
         if (mesmoLugar(o.getCidade(), cidade)) p += 2;
+        else if (mesmoEstado(o.getCidade(), ufRef)) p += 1;
         if (!categoriasQuery.isEmpty()) {
             Set<String> cats = catsPorOng.get(o.getId());
             if (cats != null && cats.stream()
@@ -1038,6 +1058,27 @@ public class AssistenteService {
             }
         }
         return p;
+    }
+
+    /**
+     * Sigla da UF do lugar detectado. Aceita o sentinel "UF:SP", o formato
+     * "Cidade - UF" e o nome solto da cidade — este ultimo resolvido na base
+     * offline do IBGE, porque o perfil do doador guarda so "Limeira".
+     * Vazio quando nao da para saber (ai o degrau de estado simplesmente nao
+     * pontua e tudo volta a valer como antes).
+     */
+    private String ufDoLugar(String lugar) {
+        if (!temTexto(lugar)) return "";
+        if (lugar.startsWith("UF:")) return lugar.substring(3).toUpperCase();
+        String uf = parteUf(lugar);
+        if (!uf.isEmpty()) return uf;
+        return geoService.ufDaCidade(parteCidade(lugar)).orElse("");
+    }
+
+    /** true se a ONG (campo "Cidade - UF") e do estado `ufRef` (sigla). */
+    private boolean mesmoEstado(String cidadeCampoOng, String ufRef) {
+        if (!temTexto(ufRef) || !temTexto(cidadeCampoOng)) return false;
+        return ufRef.equalsIgnoreCase(parteUf(cidadeCampoOng));
     }
 
     // ================================================================
