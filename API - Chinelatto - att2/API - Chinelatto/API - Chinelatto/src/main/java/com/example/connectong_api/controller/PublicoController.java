@@ -2,6 +2,7 @@ package com.example.connectong_api.controller;
 
 import com.example.connectong_api.dto.EstatisticasPublicasDTO;
 import com.example.connectong_api.service.EstatisticasService;
+import com.example.connectong_api.service.ImagemOngService;
 import com.example.connectong_api.service.TransparenciaService;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -21,6 +22,7 @@ public class PublicoController {
 
     @Autowired private EstatisticasService estatisticasService;
     @Autowired private TransparenciaService transparenciaService;
+    @Autowired private ImagemOngService imagemOngService;
 
     @GetMapping("/estatisticas")
     @Operation(summary = "Numeros publicos da plataforma (transparencia / impacto)")
@@ -29,6 +31,23 @@ public class PublicoController {
         // (Antes eram 7 chamadas separadas = 7 idas ao banco; com o banco longe
         // do servidor isso custava ~4,8s. Ver EstatisticasService.)
         return estatisticasService.publicas();
+    }
+
+    // ---- Imagens da ONG servidas por URL (ver ImagemOngService) ----
+    // Publicas de proposito: o perfil da ONG ja e publico, e uma <img src=...>
+    // do navegador nao manda header Authorization. Sao as imagens que os CARDS
+    // das listagens usam; o perfil detalhado continua recebendo base64 no JSON.
+
+    @GetMapping("/ongs/{id}/logo")
+    @Operation(summary = "Logo (foto de perfil) da ONG como imagem; 404 se ela nao tiver")
+    public ResponseEntity<byte[]> logoDaOng(@PathVariable Long id) {
+        return imagemOngService.logo(id);
+    }
+
+    @GetMapping("/ongs/{id}/capa")
+    @Operation(summary = "Capa do perfil da ONG como imagem; 404 se ela nao tiver")
+    public ResponseEntity<byte[]> capaDaOng(@PathVariable Long id) {
+        return imagemOngService.capa(id);
     }
 
     @GetMapping("/ranking")

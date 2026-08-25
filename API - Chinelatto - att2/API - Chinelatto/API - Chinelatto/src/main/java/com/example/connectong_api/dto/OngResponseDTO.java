@@ -26,6 +26,7 @@ public class OngResponseDTO {
 
     // Perfil rico (preenchidos no GET /ongs/{id} e no PUT; ficam null na
     // listagem para nao inflar a resposta com megabytes de base64).
+    private String logoBase64;
     private String capaBase64;
     private String endereco;
     private List<String> fotosLocal;
@@ -99,6 +100,9 @@ public class OngResponseDTO {
     public Integer getTotalAvaliacoes() {
         return totalAvaliacoes;
     }
+
+    public String getLogoBase64() { return logoBase64; }
+    public void setLogoBase64(String logoBase64) { this.logoBase64 = logoBase64; }
 
     public String getCapaBase64() { return capaBase64; }
     public void setCapaBase64(String capaBase64) { this.capaBase64 = capaBase64; }

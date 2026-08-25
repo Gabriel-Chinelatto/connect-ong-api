@@ -29,7 +29,8 @@ public class PerfilPublicoOngDTO {
     private int transparenciaScore;     // 0-100 (Bloco 26)
     private String nivelTransparencia;  // BRONZE | PRATA | OURO
 
-    // Perfil rico (feira): capa em base64, endereco e fotos do local.
+    // Perfil rico (feira): logo e capa em base64, endereco e fotos do local.
+    private String logoBase64;
     private String capaBase64;
     private String endereco;
     private Double latitude;
@@ -66,6 +67,7 @@ public class PerfilPublicoOngDTO {
         this.notaMedia = o.getNotaMedia();
         this.totalAvaliacoes = o.getTotalAvaliacoes();
 
+        this.logoBase64 = o.getLogoBase64();
         this.capaBase64 = o.getCapaBase64();
         this.endereco = o.getEndereco();
         this.latitude = o.getLatitude();
@@ -103,6 +105,7 @@ public class PerfilPublicoOngDTO {
     public int getTransparenciaScore() { return transparenciaScore; }
     public String getNivelTransparencia() { return nivelTransparencia; }
 
+    public String getLogoBase64() { return logoBase64; }
     public String getCapaBase64() { return capaBase64; }
     public String getEndereco() { return endereco; }
     public Double getLatitude() { return latitude; }

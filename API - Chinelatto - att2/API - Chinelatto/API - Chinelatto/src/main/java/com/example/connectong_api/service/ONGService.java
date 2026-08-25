@@ -274,16 +274,17 @@ public class ONGService {
         // PreferenciaRepository.privacidadePorOng().
         Map<Long, boolean[]> privacidades = privacidadesPorOng();
 
+        // PERFORMANCE: a listagem NAO leva imagem nenhuma (nem capa, nem logo).
+        // Ela devolve TODAS as ONGs de uma vez (hoje 2.000) — com a demonstracao
+        // ilustrada, uma capa por ONG jogaria a resposta de 2,4 MB para ~80 MB.
+        // Quem quiser a imagem de um card busca por URL, uma a uma e so quando o
+        // card aparece na tela: GET /publico/ongs/{id}/logo e .../capa (o
+        // navegador ainda guarda em cache). O perfil detalhado continua trazendo
+        // as imagens embutidas em base64, como antes.
         return lista.stream()
                 .filter(o -> o.getDataExclusao() == null) // esconde ONGs excluidas
                 .filter(o -> !ongsBloqueadoras.contains(o.getId()))
-                .map(o -> {
-                    OngResponseDTO dto = toDTO(o, privacidades.getOrDefault(o.getId(), PRIVACIDADE_PADRAO));
-                    // Capa (miniatura do card na web). Incluida SO na listagem;
-                    // as fotos do local (mais pesadas) ficam so no perfil detalhado.
-                    dto.setCapaBase64(o.getCapaBase64());
-                    return dto;
-                })
+                .map(o -> toDTO(o, privacidades.getOrDefault(o.getId(), PRIVACIDADE_PADRAO)))
                 .collect(Collectors.toList());
     }
 
@@ -366,6 +367,9 @@ public class ONGService {
 
                     // Perfil rico: capa/endereco so sobrescrevem quando enviados
                     // (null = mantem o atual, igual a foto do PerfilService).
+                    if (dados.getLogoBase64() != null) {
+                        ong.setLogoBase64(dados.getLogoBase64());
+                    }
                     if (dados.getCapaBase64() != null) {
                         ong.setCapaBase64(dados.getCapaBase64());
                     }
@@ -496,6 +500,7 @@ public class ONGService {
     // nao inflar a resposta com megabytes de base64.
     private OngResponseDTO toDTORico(Ong o) {
         OngResponseDTO dto = toDTO(o);
+        dto.setLogoBase64(o.getLogoBase64());
         dto.setCapaBase64(o.getCapaBase64());
         dto.setEndereco(o.getEndereco());
         dto.setFotosLocal(fotosLocal(o.getId()));

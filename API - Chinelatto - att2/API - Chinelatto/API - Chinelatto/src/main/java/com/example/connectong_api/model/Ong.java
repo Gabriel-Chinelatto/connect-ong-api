@@ -67,6 +67,13 @@ public class Ong {
     @Column(name = "capa_base64", columnDefinition = "MEDIUMTEXT")
     private String capaBase64;
 
+    // Logo da ONG (a "foto de perfil" que aparece no circulo do cabecalho e no
+    // avatar dos cards) como base64 — mesma regra da capa, nunca URL. E uma
+    // imagem PEQUENA de proposito (~4 KB): ela viaja junto do perfil e, ao
+    // contrario da capa, aparece em varias telas.
+    @Column(name = "logo_base64", columnDefinition = "MEDIUMTEXT")
+    private String logoBase64;
+
     @Size(max = 255)
     private String endereco;
 
@@ -135,6 +142,9 @@ public class Ong {
 
     public String getCapaBase64() { return capaBase64; }
     public void setCapaBase64(String capaBase64) { this.capaBase64 = capaBase64; }
+
+    public String getLogoBase64() { return logoBase64; }
+    public void setLogoBase64(String logoBase64) { this.logoBase64 = logoBase64; }
 
     public String getEndereco() { return endereco; }
     public void setEndereco(String endereco) { this.endereco = endereco; }

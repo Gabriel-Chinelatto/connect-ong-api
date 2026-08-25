@@ -121,3 +121,48 @@ botões de capa e de fotos do local. Só cuide do tamanho: o aplicativo aceita
 imagens grandes, e uma foto de 3 MB tirada do celular deixa o perfil pesado
 para sempre. Reduza antes (qualquer site de "comprimir imagem" serve) ou use o
 script, que já faz isso sozinho.
+
+---
+
+## E se eu quiser ilustrar TODAS as ONGs de uma vez?
+
+O `subir_fotos.py` acima é para escolher a dedo: você separa a foto e diz de
+qual ONG ela é. Isso resolve as 6 instituições que aparecem no telão, mas deixa
+as outras 1.994 com o cabeçalho vazio — e o visitante da feira que abre uma ONG
+qualquer vê a diferença na hora.
+
+Para cobrir o banco inteiro existe o **`ilustrar_demo.py`**:
+
+```bash
+python ferramentas/ilustrar_demo.py \
+  --imagens "...\FEIRA ESCOLA\interno\imagens-demo" \
+  --host 127.0.0.1 --usuario feira --senha feira123 \
+  --sql "...\FEIRA ESCOLA\interno\fotos-demo.sql"
+```
+
+Ele descobre a **causa** de cada ONG pelo nome (toda ONG gerada carrega um
+"núcleo" da sua causa: *Lar Viva*, *Abrigo Patinhas*, *Semente do Amanhã*…) e
+dá a ela:
+
+- um **logo** — disco na cor da causa com um pictograma branco (desenho nosso,
+  feito com a fonte Material Icons; não é marca de ninguém);
+- uma **capa** — foto de licença livre daquela causa;
+- e, de quebra, um **retrato** para cada doador, escolhido pelo sexo do primeiro
+  nome, para a foto combinar com o nome que aparece ao lado.
+
+As 6 ONGs do telão continuam com a capa escolhida a dedo: elas estão em
+`imagens-demo/capa-curada/<id>.jpg` e o script nunca as substitui.
+
+### Por que ele também gera um `.sql`
+
+O `RESTAURAR-DEMO.bat` (o "voltar ao início" entre uma apresentação e outra)
+reimporta o dump da escola — que **não tem imagem nenhuma**. Sem uma forma
+rápida de repor, as fotos sumiriam na primeira restauração.
+
+O `.sql` gerado agrupa as ONGs que dividem a mesma imagem num único
+`UPDATE ... WHERE id IN (...)`: são ~290 comandos no lugar de 5.200, o arquivo
+fica em ~5 MB (em vez de ~150 MB) e a reposição leva ~35 s. O `RESTAURAR-DEMO`
+e o `ATUALIZAR-BANCO-DA-ESCOLA` já rodam esse arquivo sozinhos.
+
+De onde vem cada imagem, com autor e licença: `imagens-demo/CREDITOS.md`.
+Os scripts que geram as imagens estão em `ferramentas/imagens/`.

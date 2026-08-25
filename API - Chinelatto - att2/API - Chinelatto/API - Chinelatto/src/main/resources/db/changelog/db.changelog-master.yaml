@@ -1405,3 +1405,29 @@ databaseChangeLog:
               - column:
                   name: longitude
                   type: double
+
+  # =====================================================================
+  # Logo da ONG (a "foto de perfil" do circulo do cabecalho e do avatar dos
+  # cards). ADITIVO e idempotente (precondicao not columnExists + MARK_RAN,
+  # compativel com MySQL 5.6). Coluna OPCIONAL (NULL): ONG sem logo continua
+  # caindo na inicial do nome, como sempre foi.
+  # MEDIUMTEXT igual a capa, mas o conteudo e pequeno de proposito (~4 KB):
+  # o logo viaja em mais telas que a capa.
+  # =====================================================================
+  - changeSet:
+      id: feira-ong-logo-base64
+      author: connect-ong
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: ong
+                columnName: logo_base64
+      changes:
+        - addColumn:
+            tableName: ong
+            columns:
+              - column:
+                  name: logo_base64
+                  type: mediumtext
