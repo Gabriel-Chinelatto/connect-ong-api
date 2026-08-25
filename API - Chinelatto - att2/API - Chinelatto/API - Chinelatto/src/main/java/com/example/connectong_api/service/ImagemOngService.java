@@ -84,6 +84,15 @@ public class ImagemOngService {
             return ResponseEntity.notFound().build();
         }
 
+        // Sem data-URI (que e o caso do base64 puro gravado pelo aplicativo e
+        // pelo ilustrar_demo.py) o tipo vem dos PRIMEIROS BYTES: PNG comeca com
+        // 0x89 'P' 'N' 'G'. Sem isso um logo PNG sairia anunciado como JPEG.
+        if (!dataUri.startsWith("data:") && bytes.length > 4
+                && (bytes[0] & 0xFF) == 0x89 && bytes[1] == 'P'
+                && bytes[2] == 'N' && bytes[3] == 'G') {
+            tipo = "image/png";
+        }
+
         MediaType mime;
         try {
             mime = MediaType.parseMediaType(tipo);

@@ -52,10 +52,16 @@ from seed_demo import causa_por_nome, conectar, sem_acento  # noqa: E402
 CURADAS = os.path.join("capa-curada")
 
 
-def como_data_uri(caminho):
-    tipo = "image/png" if str(caminho).lower().endswith(".png") else "image/jpeg"
-    dados = pathlib.Path(caminho).read_bytes()
-    return f"data:{tipo};base64," + base64.b64encode(dados).decode()
+def como_base64(caminho):
+    """Base64 PURO, sem o prefixo "data:image/...;base64,".
+
+    E o formato que o proprio aplicativo grava quando a ONG ou o doador
+    escolhe uma imagem — e, portanto, o unico que TODAS as telas sabem ler.
+    Varias delas chamam base64Decode direto: com data-URI o decode estoura, o
+    catch engole e a imagem some **sem erro nenhum na tela**. Foi exatamente o
+    que aconteceu com as capas gravadas em 24/08. O tipo da imagem o backend
+    descobre pelos primeiros bytes (ver ImagemOngService)."""
+    return base64.b64encode(pathlib.Path(caminho).read_bytes()).decode()
 
 
 def catalogo(pasta, sub, extensao):
@@ -64,7 +70,7 @@ def catalogo(pasta, sub, extensao):
     raiz = pathlib.Path(pasta) / sub
     for arq in sorted(raiz.glob(f"*{extensao}")):
         causa = arq.stem.rsplit("-", 1)[0]
-        saida[causa].append(como_data_uri(arq))
+        saida[causa].append(como_base64(arq))
     return saida
 
 
@@ -72,7 +78,7 @@ def retratos(pasta):
     saida = {}
     for sexo in ("m", "f"):
         raiz = pathlib.Path(pasta) / "rosto" / sexo
-        saida[sexo] = [como_data_uri(a) for a in sorted(raiz.glob("*.jpg"))]
+        saida[sexo] = [como_base64(a) for a in sorted(raiz.glob("*.jpg"))]
     return saida
 
 
@@ -212,7 +218,7 @@ def main():
     if (pasta / CURADAS).exists():
         for arq in sorted((pasta / CURADAS).glob("*.jpg")):
             if arq.stem.isdigit():
-                curadas[int(arq.stem)] = como_data_uri(arq)
+                curadas[int(arq.stem)] = como_base64(arq)
     if not capas or not logos or not rostos["m"]:
         sys.exit(f"Pasta de imagens incompleta: {pasta} (precisa de capa/, logo/ e rosto/)")
 
