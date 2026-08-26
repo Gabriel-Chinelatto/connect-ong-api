@@ -249,19 +249,11 @@ public class ONGService {
             String nome
     ) {
 
-        List<Ong> lista;
-
-        if (nome != null &&
-                !nome.isEmpty()) {
-
-            lista =
-                    repository.findByNomeContainingIgnoreCase(nome);
-
-        } else {
-
-            lista =
-                    repository.findAll();
-        }
+        // Projecao enxuta: sem o base64 das imagens (ver ONGRepository.listagemLeve).
+        List<Object[]> lista =
+                (nome != null && !nome.isEmpty())
+                        ? repository.listagemLevePorNome(nome)
+                        : repository.listagemLeve();
 
         // BLOQUEIO: na busca feita por um DOADOR autenticado, as ONGs que o
         // bloquearam nao aparecem (anonimo/ONG = conjunto vazio, nao filtra).
@@ -281,10 +273,10 @@ public class ONGService {
         // card aparece na tela: GET /publico/ongs/{id}/logo e .../capa (o
         // navegador ainda guarda em cache). O perfil detalhado continua trazendo
         // as imagens embutidas em base64, como antes.
+        // (A consulta ja filtra data_exclusao; aqui so resta o filtro de bloqueio.)
         return lista.stream()
-                .filter(o -> o.getDataExclusao() == null) // esconde ONGs excluidas
-                .filter(o -> !ongsBloqueadoras.contains(o.getId()))
-                .map(o -> toDTO(o, privacidades.getOrDefault(o.getId(), PRIVACIDADE_PADRAO)))
+                .map(l -> toDTO(l, privacidades))
+                .filter(dto -> !ongsBloqueadoras.contains(dto.getId()))
                 .collect(Collectors.toList());
     }
 
@@ -459,6 +451,32 @@ public class ONGService {
                     return ResponseEntity.ok(toDTO(repository.save(ong)));
                 })
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    /**
+     * Monta o DTO a partir da PROJECAO da listagem (ver ONGRepository.listagemLeve).
+     * A ordem dos campos aqui e a mesma do select — mexer num lado exige mexer no
+     * outro. Vale a pena: e o que evita ler dezenas de MB de imagem a cada
+     * listagem so para descartar.
+     */
+    private OngResponseDTO toDTO(Object[] l, Map<Long, boolean[]> privacidades) {
+        Long id = ((Number) l[0]).longValue();
+        boolean[] p = privacidades.getOrDefault(id, PRIVACIDADE_PADRAO);
+        OngResponseDTO dto = new OngResponseDTO(
+                id,
+                (String) l[1],
+                p[0] ? (String) l[2] : null,
+                p[1] ? (String) l[3] : null,
+                (String) l[4],
+                (String) l[5],
+                (String) l[6],
+                (Boolean) l[7],
+                (Double) l[8],
+                (Integer) l[9]
+        );
+        dto.setLatitude((Double) l[10]);
+        dto.setLongitude((Double) l[11]);
+        return dto;
     }
 
     private OngResponseDTO toDTO(Ong o) {
