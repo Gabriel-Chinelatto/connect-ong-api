@@ -390,10 +390,14 @@ public class AssistenteService {
             int inicio = Math.max(0, h.size() - MAX_HISTORICO);
             for (int i = inicio; i < h.size(); i++) {
                 AssistenteRequestDTO.MensagemHistorico m = h.get(i);
-                if (m == null || m.getTexto() == null || m.getTexto().isBlank()) continue;
+                if (m == null) continue;
+                // textoParaIa CORTA a troca longa (ver MensagemHistorico): o
+                // historico da contexto, nao reenvia a conversa inteira.
+                String texto = m.textoParaIa();
+                if (texto == null) continue;
                 String papel = "assistente".equalsIgnoreCase(m.getPapel())
                         ? "assistant" : "user";
-                mensagens.add(new ProvedorIA.MensagemIA(papel, m.getTexto().trim()));
+                mensagens.add(new ProvedorIA.MensagemIA(papel, texto));
             }
         }
         mensagens.add(new ProvedorIA.MensagemIA("user", mensagem));

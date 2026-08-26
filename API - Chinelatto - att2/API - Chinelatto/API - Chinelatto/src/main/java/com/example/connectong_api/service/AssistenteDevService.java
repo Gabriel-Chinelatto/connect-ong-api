@@ -117,8 +117,8 @@ public class AssistenteDevService {
             for (int i = hist.size() - 1; i >= 0; i--) {
                 AssistenteRequestDTO.MensagemHistorico h = hist.get(i);
                 if (h != null && !"assistente".equalsIgnoreCase(h.getPapel())
-                        && h.getTexto() != null && !h.getTexto().isBlank()) {
-                    consulta.append(' ').append(h.getTexto());
+                        && h.textoParaIa() != null) {
+                    consulta.append(' ').append(h.textoParaIa());
                     break;
                 }
             }
@@ -129,9 +129,14 @@ public class AssistenteDevService {
             int ini = Math.max(0, hist.size() - MAX_HISTORICO);
             for (int i = ini; i < hist.size(); i++) {
                 AssistenteRequestDTO.MensagemHistorico h = hist.get(i);
-                if (h == null || h.getTexto() == null || h.getTexto().isBlank()) continue;
+                if (h == null) continue;
+                // textoParaIa CORTA a troca longa (ver MensagemHistorico): as
+                // respostas deste assistente sao compridas, e reenviar todas
+                // inteiras a cada pergunta so gasta tokens.
+                String texto = h.textoParaIa();
+                if (texto == null) continue;
                 String papel = "assistente".equalsIgnoreCase(h.getPapel()) ? "assistant" : "user";
-                msgs.add(new ProvedorIA.MensagemIA(papel, h.getTexto()));
+                msgs.add(new ProvedorIA.MensagemIA(papel, texto));
             }
         }
         msgs.add(new ProvedorIA.MensagemIA("user", pergunta.isBlank() ? "Fale sobre o desenvolvimento do projeto." : pergunta));

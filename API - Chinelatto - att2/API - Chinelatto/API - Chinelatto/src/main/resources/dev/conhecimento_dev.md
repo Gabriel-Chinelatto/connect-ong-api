@@ -62,13 +62,28 @@ A entidade `Interesse` guarda também a data de cada mudança de status (`dataSt
 `RateLimitService` conta tentativas por origem real de acesso (respeitando o cabeçalho de proxy) numa janela de **15 minutos**, com limite padrão de **5 tentativas**. Vale para login, cadastro, recuperação de senha, contribuição via PIX e os endpoints de IA (que têm limite próprio). Excedido, a API responde **429**.
 
 ## Banco de dados e migrações
-MySQL. O esquema é versionado com **Liquibase** (58 changesets no `db.changelog-master.yaml`), e o Hibernate roda em `ddl-auto=validate` — ou seja, o Hibernate NÃO altera mais o banco; ele apenas confere se as entidades batem com o esquema. Foi escolhido Liquibase e não Flyway porque a versão Community do Flyway deixou de suportar o MySQL 5.6 da escola (exigiria a edição paga). Os changesets são aditivos (criam tabelas, colunas e índices) para nunca perder dado existente.
+MySQL. O esquema é versionado com **Liquibase** (59 changesets no `db.changelog-master.yaml`), e o Hibernate roda em `ddl-auto=validate` — ou seja, o Hibernate NÃO altera mais o banco; ele apenas confere se as entidades batem com o esquema. Foi escolhido Liquibase e não Flyway porque a versão Community do Flyway deixou de suportar o MySQL 5.6 da escola (exigiria a edição paga). Os changesets são aditivos (criam tabelas, colunas e índices) para nunca perder dado existente.
 
 ## Performance: a regra dos 600 ms
 O backend roda no Render (Oregon, EUA) e o MySQL fica na escola (Brasil). **Cada ida ao banco custa ~600 ms** — o SQL em si roda em 0,025 s; o custo é a viagem. Portanto o tempo de um endpoint ≈ (nº de consultas) × 600 ms. Duas regras nasceram disso:
 1. Nunca fazer consulta dentro de laço (problema N+1).
 2. `@ManyToOne` é EAGER por padrão no JPA, então um `findAll()` dispara uma consulta por relação por item. A correção padrão é `LEFT JOIN FETCH` numa `@Query`.
 Resultados medidos: `/publico/estatisticas` caiu de 4,8 s para 0,50 s; `/necessidades` de 3,9 s para 0,77 s; `/ongs` de 6,9 s para 1,85 s.
+3. O que a entidade CARREGA conta tanto quanto o que a resposta ENVIA. Uma coluna grande (imagem em base64, texto longo) vem junto no `findAll()` mesmo que o DTO a descarte; quando isso pesa, a saída é uma **projeção** só com as colunas usadas. Foi assim que `GET /ongs` foi de 0,35 s para 0,08 s depois que as 2.000 ONGs ganharam imagem.
+
+## Imagens do perfil da ONG (logo e capa) e foto do doador
+Cada ONG tem duas imagens: o **logo** (a foto de perfil, redonda, no alto do perfil e ao lado do nome nas listas) e a **capa** (a faixa larga atrás do cabeçalho). Ficam no banco, em **base64**, nas colunas `ong.logo_base64` e `ong.capa_base64`; o doador tem `usuario.foto_base64`. Guardar no banco em vez de num serviço de arquivos foi decisão consciente: não há servidor de mídia no projeto, o backup do banco já leva as imagens junto e o deploy continua sendo só `git push`.
+
+Ao subir uma imagem pelo painel, ela é reduzida antes de virar base64 (o logo entra com no máximo 512 px e a capa com 1600 px), porque o custo aqui não é o disco: é o tamanho da resposta JSON.
+
+**Como a imagem chega na tela — e por que existem dois caminhos.** O perfil de UMA ONG traz as imagens embutidas no próprio JSON (é uma ONG só, e a tela precisa delas na hora). Já a LISTAGEM `GET /ongs` devolve **todas** as ONGs numa resposta só — na demonstração, 2.000. Embutir uma capa em cada uma levaria essa resposta de 2,4 MB para cerca de 80 MB, e o aplicativo simplesmente não abriria. Por isso os CARDS buscam a imagem por URL, uma a uma:
+
+- `GET /publico/ongs/{id}/logo`
+- `GET /publico/ongs/{id}/capa`
+
+São endpoints públicos (uma tag `<img>` do navegador não envia o cabeçalho `Authorization`), devolvem os **bytes** da imagem com o `Content-Type` certo e um `Cache-Control` de 12 horas. Com `loading="lazy"`, o navegador baixa só o que aparece na tela e guarda em cache; no Flutter o mesmo papel é do widget `LogoOng`. Quando a ONG não tem logo o endpoint responde 404 e a tela cai na inicial do nome — nunca aparece ícone de imagem quebrada.
+
+**A armadilha que isso escondeu.** Tirar o base64 da RESPOSTA não bastou: o `findAll()` do JPA traz a ENTIDADE, e a entidade carrega as colunas de imagem. Cada `GET /ongs` lia cerca de 78 MB do banco só para descartar na hora de montar o DTO — e o lixo de memória disso derrubava as telas seguintes (o `/necessidades` chegou a 8,4 s logo depois de um `/ongs`). A correção foi trocar o `findAll()` por uma **projeção** com as 12 colunas que a listagem realmente mostra: `GET /ongs` caiu de 0,35 s para 0,08 s, com a resposta byte a byte idêntica. Lição que ficou: **numa consulta pesada, o que importa não é só o que a resposta envia, é o que a entidade carrega.**
 
 ## Score de transparência e o "foguinho" (streak)
 `TransparenciaService` calcula uma nota de 0 a 100: +25 se a ONG é verificada, até +25 pela nota média das avaliações, +5 por prestação de contas (até 5), +5 por campanha concluída (até 5) e **−5 por pendência** (campanha concluída há mais de 10 dias sem prestação de contas). O score vira um nível: OURO (≥75), PRATA, BRONZE. A ONG que está em 1º lugar acumula dias no topo, exibidos como um chip de "foguinho" 🔥 (estilo streak do TikTok) no perfil, no ranking e nos destaques.
@@ -118,9 +133,10 @@ Decisão consciente: como mobile e desktop já são Flutter, fazer a web em Java
 - Limitações conhecidas do plano gratuito do Render: o serviço **hiberna após ~15 minutos** sem acesso (a primeira chamada seguinte pode levar de 10 a 95 segundos) e tem apenas **512 MB de memória**. O estouro desses 512 MB chegou a derrubar a API; a correção foi limitar a JVM no Dockerfile (heap máximo, coletor serial, metaspace limitado) e reduzir o Tomcat de 200 para 25 threads — medido: 271 MB em uso, com folga.
 
 ## Testes automatizados
-- Backend: **165 testes** (JUnit + Spring Boot Test) rodando em banco H2 em memória, então a suíte não toca o banco da escola.
-- App do doador (mobile): cerca de 90 testes, incluindo testes que previnem estouro de layout com fonte grande.
-- Painel da ONG (desktop): dezenas de testes de regras e de rede.
+- Backend: **191 testes** (JUnit + Spring Boot Test) em 22 classes, rodando em banco H2 em memória — a suíte não toca o banco da escola.
+- App do doador (mobile): **101 testes**, incluindo testes que previnem estouro de layout com fonte grande.
+- Painel da ONG (desktop): **52 testes** de regras e de rede.
+- Total: **344 testes automatizados**, todos verdes na última verificação (26/08/2026).
 - Além disso, cada rodada de mudanças é verificada ao vivo contra a API real, e a interface é conferida por capturas de tela automatizadas.
 
 ## Métodos e boas práticas de desenvolvimento
@@ -144,6 +160,7 @@ Decisão consciente: como mobile e desktop já são Flutter, fazer a web em Java
 - v2.0 — Recursos exclusivos da web: mapa interativo, comparador de ONGs, Modo Quiosque, relatório imprimível e busca rápida (Ctrl/Cmd + K).
 - v2.1 — Voz, cartão de impacto, QR Code do perfil e instalação como aplicativo (PWA).
 - v2.2 — Polimento e acessibilidade: portal institucional com caminho único de login, documentos legais redesenhados, correções de contraste no tema escuro e ganhos de desempenho.
+- v2.3 — Identidade visual das instituições: logo e capa em todas as ONGs e foto de perfil em todos os doadores, imagens dos cards servidas por URL com cache e carregamento sob demanda, e a listagem de ONGs reescrita com projeção (0,35 s → 0,08 s).
 
 ## Marcos e eventos
 O projeto foi preparado para a FECITEC (feira de ciências e tecnologia). Há "Modo Feira/Quiosque" e contas de demonstração para apresentações. A entrega final do curso ocorre no fim do ano.
