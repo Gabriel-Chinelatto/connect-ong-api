@@ -43,14 +43,16 @@ public class ONGController {
     }
 
     @GetMapping
-    @Operation(summary = "Listar ONGs (filtra por nome com o parametro 'nome')")
+    @Operation(summary = "Listar ONGs. 'nome' busca por nome OU cidade; "
+                       + "'pagina' e 'tamanho' carregam aos poucos (sem eles, vem tudo)")
     public ResponseEntity<?> listar(
-            @RequestParam(required = false)
-            String nome
+            @RequestParam(required = false) String nome,
+            @RequestParam(required = false) Integer pagina,
+            @RequestParam(required = false) Integer tamanho
     ) {
 
         return ResponseEntity.ok(
-                service.listar(nome)
+                service.listar(nome, pagina, tamanho)
         );
     }
 

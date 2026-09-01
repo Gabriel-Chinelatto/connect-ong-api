@@ -93,7 +93,7 @@ A contribuição para uma campanha acontece em duas etapas: primeiro o doador co
 
 ## Inteligência Artificial no projeto
 - A assistente de doações se chama **Dora**. Ela sugere o que doar, encontra ONGs perto do doador, tira dúvidas e analisa a FOTO de um item para identificar categoria e estimar peso.
-- Provedor: **API da Groq** (modelos de linguagem gratuitos). O modelo de texto padrão é o `llama-3.1-8b-instant` e o de visão é um modelo Llama 4 Scout. A URL e os modelos são configuráveis por propriedade.
+- Provedor: **API da Groq** (modelos de linguagem gratuitos). Não é um modelo só: há uma **cadeia de reserva** — `openai/gpt-oss-120b` (padrão), `openai/gpt-oss-20b` e `qwen/qwen3.6-27b`; o de visão é o `qwen/qwen3.6-27b`. Se um modelo devolve 429 (a cota gratuita é de 8.000 tokens por minuto **por modelo**), o pedido cai para o próximo da fila. A cadeia existe porque um modelo já foi **aposentado** pela Groq sem aviso e tudo caiu no modo por regras em silêncio; hoje o endpoint `GET /ia/status` diz se a chave está configurada, qual foi o último modelo que respondeu e qual foi o último erro. URL e modelos são configuráveis por propriedade.
 - A chave da API fica SEMPRE no backend (nunca no aplicativo). O backend injeta dados reais como contexto — técnica de **grounding** — para as respostas serem fiéis ao que existe no banco.
 - Cada tarefa usa uma **temperatura** diferente (mais baixa para tarefas factuais, mais alta para redação) e um limite de tokens próprio, para controlar custo e alucinação.
 - Há um modo de reserva (**fallback por regras**): se a IA estiver indisponível, sem chave ou no limite de uso, o sistema responde por regras simples — nunca deixa o usuário sem resposta. Quando isso acontece, a resposta vem marcada como "Modo básico".

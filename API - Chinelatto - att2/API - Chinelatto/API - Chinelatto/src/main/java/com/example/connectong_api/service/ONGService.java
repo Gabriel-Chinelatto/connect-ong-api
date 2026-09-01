@@ -17,6 +17,8 @@ import com.example.connectong_api.security.SecurityUtils;
 import com.example.connectong_api.security.UsuarioAutenticado;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -245,15 +247,40 @@ public class ONGService {
     // =========================
     // LISTAR
     // =========================
-    public List<OngResponseDTO> listar(
-            String nome
-    ) {
+    public List<OngResponseDTO> listar(String nome) {
+        return listar(nome, null, null);
+    }
+
+    /**
+     * Lista as ONGs. Quando {@code tamanho} vem preenchido, devolve so aquele
+     * pedaco — e o cliente pede o proximo conforme rola a tela.
+     *
+     * Por que a paginacao e OPCIONAL: o site e o painel consomem esta mesma rota
+     * sem paginar, e quebrar os dois na vespera da feira nao era opcao. Sem os
+     * parametros, o comportamento e exatamente o de antes.
+     *
+     * REGRA DO FIM DA LISTA: o cliente para quando receber uma pagina VAZIA, e
+     * nao quando receber menos itens do que pediu. O filtro de bloqueio roda
+     * DEPOIS da consulta, entao uma pagina cheia no banco pode chegar menor aqui
+     * — parar por tamanho cortaria a lista no meio sem ninguem perceber.
+     */
+    public List<OngResponseDTO> listar(String nome, Integer pagina, Integer tamanho) {
 
         // Projecao enxuta: sem o base64 das imagens (ver ONGRepository.listagemLeve).
-        List<Object[]> lista =
-                (nome != null && !nome.isEmpty())
-                        ? repository.listagemLevePorNome(nome)
-                        : repository.listagemLeve();
+        boolean buscando = nome != null && !nome.isEmpty();
+        List<Object[]> lista;
+        if (tamanho != null && tamanho > 0) {
+            Pageable p = PageRequest.of(
+                    pagina == null || pagina < 0 ? 0 : pagina,
+                    Math.min(tamanho, MAX_POR_PAGINA));
+            lista = buscando
+                    ? repository.listagemLevePorNomePaginada(nome, p)
+                    : repository.listagemLevePaginada(p);
+        } else {
+            lista = buscando
+                    ? repository.listagemLevePorNome(nome)
+                    : repository.listagemLeve();
+        }
 
         // BLOQUEIO: na busca feita por um DOADOR autenticado, as ONGs que o
         // bloquearam nao aparecem (anonimo/ONG = conjunto vazio, nao filtra).
@@ -279,6 +306,9 @@ public class ONGService {
                 .filter(dto -> !ongsBloqueadoras.contains(dto.getId()))
                 .collect(Collectors.toList());
     }
+
+    // Teto por pagina: o cliente pede o tamanho, mas nao manda mais que isso.
+    private static final int MAX_POR_PAGINA = 100;
 
     // Defaults seguros, iguais aos de privacidadeDaOng: email oculto, telefone visivel.
     private static final boolean[] PRIVACIDADE_PADRAO = { false, true };

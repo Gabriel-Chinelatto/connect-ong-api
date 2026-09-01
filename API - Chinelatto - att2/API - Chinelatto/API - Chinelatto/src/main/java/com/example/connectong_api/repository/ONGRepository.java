@@ -1,6 +1,7 @@
 package com.example.connectong_api.repository;
 
 import com.example.connectong_api.model.Ong;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -45,6 +46,22 @@ public interface ONGRepository extends JpaRepository<Ong, Long> {
 
     @Query("select o.id, o.nome, o.email, o.telefone, o.cidade, o.descricao, o.cnpj, coalesce(o.verificada, false), coalesce(o.notaMedia, 0.0), coalesce(o.totalAvaliacoes, 0), o.latitude, o.longitude "
          + "from Ong o where o.dataExclusao is null "
-         + "and lower(o.nome) like lower(concat('%', :nome, '%')) order by o.id")
-    List<Object[]> listagemLevePorNome(@Param("nome") String nome);
+         + "and (lower(o.nome) like lower(concat('%', :busca, '%')) "
+         + "  or lower(o.cidade) like lower(concat('%', :busca, '%'))) order by o.id")
+    List<Object[]> listagemLevePorNome(@Param("busca") String busca);
+
+    // PAGINADAS. O app do doador carrega a lista aos poucos (rolagem
+    // infinita): com 2.000 ONGs, trazer tudo de uma vez travava a tela de
+    // busca — nao pela rede, mas por criar 2.000 objetos de uma vez na
+    // thread da interface. Pageable com uma projecao de colunas soltas
+    // dispensa a consulta de contagem que o Page<> faria.
+    @Query("select o.id, o.nome, o.email, o.telefone, o.cidade, o.descricao, o.cnpj, coalesce(o.verificada, false), coalesce(o.notaMedia, 0.0), coalesce(o.totalAvaliacoes, 0), o.latitude, o.longitude "
+         + "from Ong o where o.dataExclusao is null order by o.id")
+    List<Object[]> listagemLevePaginada(Pageable pagina);
+
+    @Query("select o.id, o.nome, o.email, o.telefone, o.cidade, o.descricao, o.cnpj, coalesce(o.verificada, false), coalesce(o.notaMedia, 0.0), coalesce(o.totalAvaliacoes, 0), o.latitude, o.longitude "
+         + "from Ong o where o.dataExclusao is null "
+         + "and (lower(o.nome) like lower(concat('%', :busca, '%')) "
+         + "  or lower(o.cidade) like lower(concat('%', :busca, '%'))) order by o.id")
+    List<Object[]> listagemLevePorNomePaginada(@Param("busca") String busca, Pageable pagina);
 }
