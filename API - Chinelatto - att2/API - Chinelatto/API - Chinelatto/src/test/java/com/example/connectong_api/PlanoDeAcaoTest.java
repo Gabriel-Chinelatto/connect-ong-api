@@ -200,8 +200,11 @@ class PlanoDeAcaoTest {
     @Test
     void f03_migracaoCifraDadoLegadoEmTextoPuro() {
         Usuario u = doador("Legado", null);
+        Usuario u2 = doador("Legado Dois", null);
         jdbc.update("UPDATE usuario SET telefone = ? WHERE id = ?", "(19) 3451-9999", u.getId());
-        assertTrue(migracao.migrar("usuario", "telefone") >= 1);
+        jdbc.update("UPDATE usuario SET telefone = ? WHERE id = ?", "(11) 98765-4321", u2.getId());
+        assertTrue(migracao.migrar("usuario", "telefone") >= 2, "o lote cifra varias linhas num comando so");
+        assertEquals("(11) 98765-4321", usuarioRepository.findById(u2.getId()).orElseThrow().getTelefone());
         String bruto = jdbc.queryForObject("SELECT telefone FROM usuario WHERE id = ?", String.class, u.getId());
         assertTrue(bruto.startsWith("enc:v1:"));
         assertEquals("(19) 3451-9999", usuarioRepository.findById(u.getId()).orElseThrow().getTelefone());

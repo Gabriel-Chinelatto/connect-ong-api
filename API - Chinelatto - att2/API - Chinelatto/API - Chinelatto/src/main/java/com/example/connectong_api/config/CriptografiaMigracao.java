@@ -33,7 +33,7 @@ import java.util.Map;
 public class CriptografiaMigracao implements ApplicationRunner {
 
     private static final Logger log = LoggerFactory.getLogger(CriptografiaMigracao.class);
-    private static final int LOTE = 500;
+    private static final int LOTE = 300;
 
     // tabela -> coluna. Devem ser as MESMAS colunas marcadas com
     // @Convert(converter = CampoCifradoConverter.class) nas entidades.
@@ -58,6 +58,14 @@ public class CriptografiaMigracao implements ApplicationRunner {
         if (!criptografia.ligada()) return;
         conferirChave();
         if (!ativo) return;
+        // Em segundo plano: a API ja atende enquanto o legado e cifrado (o
+        // conversor le texto puro normalmente).
+        Thread t = new Thread(this::migrarTudo, "cripto-migracao");
+        t.setDaemon(true);
+        t.start();
+    }
+
+    void migrarTudo() {
         for (String[] tc : COLUNAS) {
             try {
                 int total = migrar(tc[0], tc[1]);
@@ -77,18 +85,34 @@ public class CriptografiaMigracao implements ApplicationRunner {
         String select = "SELECT id, " + coluna + " AS v FROM " + tabela
                 + " WHERE " + coluna + " IS NOT NULL AND " + coluna + " NOT LIKE 'enc:v1:%'"
                 + " AND id > ? ORDER BY id LIMIT " + LOTE;
-        String update = "UPDATE " + tabela + " SET " + coluna + " = ? WHERE id = ?";
         long ultimoId = 0;
         int total = 0;
         while (true) {
             List<Map<String, Object>> linhas = jdbc.queryForList(select, ultimoId);
             if (linhas.isEmpty()) return total;
+            // O lote inteiro num UNICO comando (UPDATE ... CASE id): com o banco
+            // longe (~0,2 s por ida), um UPDATE por linha levava ~40 min para os
+            // 13 mil registros da escola. (batchUpdate nao resolve: sem
+            // rewriteBatchedStatements o driver do MySQL manda um por um.)
+            StringBuilder caso = new StringBuilder();
+            StringBuilder ids = new StringBuilder();
+            List<Object> params = new java.util.ArrayList<>();
+            List<Object> paramsIds = new java.util.ArrayList<>();
             for (Map<String, Object> l : linhas) {
                 long id = ((Number) l.get("id")).longValue();
-                jdbc.update(update, criptografia.cifrar((String) l.get("v")), id);
+                caso.append(" WHEN ? THEN ?");
+                params.add(id);
+                params.add(criptografia.cifrar((String) l.get("v")));
+                ids.append(ids.length() == 0 ? "?" : ",?");
+                paramsIds.add(id);
                 ultimoId = id;
-                total++;
             }
+            params.addAll(paramsIds);
+            // So troca o que AINDA esta em texto puro: nao sobrescreve algo que
+            // outra instancia cifrou no meio do caminho (ex.: durante um deploy).
+            jdbc.update("UPDATE " + tabela + " SET " + coluna + " = CASE id" + caso + " END"
+                    + " WHERE id IN (" + ids + ") AND " + coluna + " NOT LIKE 'enc:v1:%'", params.toArray());
+            total += linhas.size();
         }
     }
 
