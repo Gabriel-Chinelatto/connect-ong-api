@@ -24,7 +24,10 @@ public class Mensagem {
 
     private String remetente;
 
-    @Column(length = 1000)
+    // Cifrado em repouso (AES-256-GCM, item F-03). Coluna larga porque o texto
+    // cifrado em base64 ocupa ~4/3 do original + 47 caracteres fixos.
+    @Convert(converter = com.example.connectong_api.security.CampoCifradoConverter.class)
+    @Column(columnDefinition = "TEXT")
     private String conteudo;
 
     private LocalDateTime dataEnvio;

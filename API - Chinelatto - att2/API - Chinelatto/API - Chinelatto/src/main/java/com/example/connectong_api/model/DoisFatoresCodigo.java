@@ -24,7 +24,8 @@ public class DoisFatoresCodigo {
     private Long usuarioId;
 
     // Codigo numerico de 6 digitos (texto para preservar zeros a esquerda).
-    @Column(length = 10)
+    // Guarda o HMAC-SHA256 do codigo (64 hex), nunca o codigo em si (F-03).
+    @Column(length = 64)
     private String codigo;
 
     // Momento em que o codigo deixa de valer (criacao + 10 minutos).

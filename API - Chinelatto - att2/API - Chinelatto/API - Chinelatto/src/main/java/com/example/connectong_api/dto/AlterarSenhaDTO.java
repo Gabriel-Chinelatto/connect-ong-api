@@ -1,5 +1,6 @@
 package com.example.connectong_api.dto;
 
+import com.example.connectong_api.validacao.*;
 import jakarta.validation.constraints.Size;
 
 /**
@@ -10,7 +11,7 @@ public class AlterarSenhaDTO {
     private String senhaAtual;
 
     // Politica de senha padronizada: minimo de 6 caracteres (igual ao cadastro).
-    @Size(min = 6, message = "A nova senha deve ter ao menos 6 caracteres")
+    @SenhaForte
     private String novaSenha;
 
     public String getSenhaAtual() { return senhaAtual; }

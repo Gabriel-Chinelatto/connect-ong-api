@@ -1,5 +1,6 @@
 package com.example.connectong_api.dto;
 
+import com.example.connectong_api.validacao.*;
 import jakarta.validation.constraints.Size;
 
 import java.util.List;
@@ -12,18 +13,24 @@ import java.util.List;
 public class OngUpdateDTO {
 
     @Size(max = 100)
+    @TextoLegivel(message = "Nome da ONG inválido: use letras e sem os caracteres < e >")
     private String nome;
 
+    @jakarta.validation.constraints.Email(message = "E-mail inválido")
+    @Size(max = 150, message = "O e-mail é muito longo")
     private String email;
 
     @Size(max = 20)
+    @Telefone
     private String telefone;
 
     @Size(max = 50)
+    @NomeProprio(message = "Cidade inválida: use apenas letras (ex.: Limeira - SP)")
     private String cidade;
 
     // Ate 1000 chars: acomoda o "Sobre" gerado pela IA (SobreOngService, ~600).
     @Size(max = 1000)
+    @TextoLegivel
     private String descricao;
 
     // Logo (foto de perfil) em base64. So sobrescreve quando enviado
@@ -38,12 +45,17 @@ public class OngUpdateDTO {
     private String capaBase64;
 
     @Size(max = 255)
+    @TextoLegivel(message = "Endereço inválido")
     private String endereco;
 
     // Coordenadas do endereco escolhido no autocomplete de mapa (opcionais).
     // So sobrescrevem quando enviadas (null = mantem as atuais). Validadas em
     // faixa geografica valida no service.
+    @jakarta.validation.constraints.DecimalMin(value = "-90", message = "Latitude inválida")
+    @jakarta.validation.constraints.DecimalMax(value = "90", message = "Latitude inválida")
     private Double latitude;
+    @jakarta.validation.constraints.DecimalMin(value = "-180", message = "Longitude inválida")
+    @jakarta.validation.constraints.DecimalMax(value = "180", message = "Longitude inválida")
     private Double longitude;
 
     // Fotos do local: quando presente, SUBSTITUI todas as existentes.

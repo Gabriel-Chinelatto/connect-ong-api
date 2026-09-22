@@ -153,7 +153,7 @@ class SecurityEnforcementTest {
         mockMvc.perform(post("/usuarios")
                         .contentType("application/json")
                         .content("{\"nome\":\"Hacker\",\"email\":\"esc@x.com\","
-                                + "\"senha\":\"senha123\",\"tipo\":\"ONG\"}"))
+                                + "\"senha\":\"doacao2026\",\"tipo\":\"ONG\",\"aceiteTermos\":true}"))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.tipo").value("DOADOR"));
     }

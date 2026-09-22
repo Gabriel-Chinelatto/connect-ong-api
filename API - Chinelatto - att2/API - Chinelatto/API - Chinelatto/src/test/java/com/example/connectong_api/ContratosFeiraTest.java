@@ -722,7 +722,7 @@ class ContratosFeiraTest {
                         .contentType("application/json")
                         .content("{\"nome\":\"" + ong.getNome() + "\""
                                 + ",\"email\":\"" + ong.getEmail() + "\""
-                                + ",\"telefone\":\"1988887777\""
+                                + ",\"telefone\":\"1938887777\""
                                 + ",\"cidade\":\"Campinas\""
                                 + ",\"descricao\":\"nova desc\""
                                 + ",\"capaBase64\":\"CAPAB64\""

@@ -66,7 +66,7 @@ public class DoisFatoresService {
 
         DoisFatoresCodigo novo = new DoisFatoresCodigo();
         novo.setUsuarioId(u.getId());
-        novo.setCodigo(codigo);
+        novo.setCodigo(hashDoCodigo(u.getId(), codigo));
         novo.setExpiraEm(agora.plusMinutes(VALIDADE_MINUTOS));
         repository.save(novo);
 
@@ -100,7 +100,8 @@ public class DoisFatoresService {
         Usuario u = usuario.get();
 
         Optional<DoisFatoresCodigo> encontrado = repository
-                .findTopByUsuarioIdAndCodigoAndUsadoEmIsNullOrderByIdDesc(u.getId(), codigo);
+                .findTopByUsuarioIdAndCodigoAndUsadoEmIsNullOrderByIdDesc(
+                        u.getId(), hashDoCodigo(u.getId(), codigo));
 
         // Codigo inexistente / ja usado / expirado: mesma falha generica.
         if (encontrado.isEmpty()
@@ -136,5 +137,13 @@ public class DoisFatoresService {
         Map<String, String> erro = new HashMap<>();
         erro.put("erro", MENSAGEM_CODIGO_INVALIDO);
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(erro);
+    }
+
+    // O banco guarda so o HMAC do codigo, amarrado ao usuario (F-03): quem ler
+    // a tabela nao consegue usar o codigo, nem quebra-lo por forca bruta sem a
+    // chave do servidor. A busca continua sendo por igualdade.
+    private String hashDoCodigo(Long usuarioId, String codigo) {
+        return com.example.connectong_api.security.Criptografia.get()
+                .hmac(usuarioId + ":" + (codigo == null ? "" : codigo.trim()));
     }
 }

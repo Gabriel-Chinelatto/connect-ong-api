@@ -1,5 +1,6 @@
 package com.example.connectong_api.dto;
 
+import com.example.connectong_api.validacao.*;
 import jakarta.validation.constraints.*;
 
 import java.time.LocalDate;
@@ -7,17 +8,21 @@ import java.time.LocalDate;
 /**
  * Dados de entrada para uma ONG criar/editar uma campanha.
  */
+@PeriodoCampanha
 public class CampanhaRequestDTO {
 
     @NotBlank(message = "O titulo e obrigatorio")
     @Size(min = 3, max = 150, message = "O titulo deve ter entre 3 e 150 caracteres")
+    @TextoLegivel
     private String titulo;
 
     @Size(max = 255, message = "A descricao deve ter no maximo 255 caracteres")
+    @TextoLegivel
     private String descricao;
 
     @NotNull(message = "A meta e obrigatoria")
     @DecimalMin(value = "1.0", message = "A meta deve ser maior que zero")
+    @jakarta.validation.constraints.DecimalMax(value = "10000000.00", message = "A meta máxima é R$ 10 milhões")
     private Double metaValor;
 
     @Size(max = 60, message = "Categoria muito longa")

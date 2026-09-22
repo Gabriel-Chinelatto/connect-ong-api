@@ -96,7 +96,7 @@ public class SenhaResetService {
 
         SenhaReset reset = new SenhaReset();
         reset.setUsuarioId(u.getId());
-        reset.setCodigo(codigo);
+        reset.setCodigo(hashDoCodigo(u.getId(), codigo));
         reset.setExpiraEm(agora.plusMinutes(VALIDADE_MINUTOS));
         repository.save(reset);
 
@@ -135,7 +135,8 @@ public class SenhaResetService {
         Usuario u = usuario.get();
 
         Optional<SenhaReset> reset = repository
-                .findTopByUsuarioIdAndCodigoAndUsadoEmIsNullOrderByIdDesc(u.getId(), dto.getCodigo());
+                .findTopByUsuarioIdAndCodigoAndUsadoEmIsNullOrderByIdDesc(
+                        u.getId(), hashDoCodigo(u.getId(), dto.getCodigo()));
 
         // Codigo inexistente/ja usado/expirado: mesma falha generica.
         if (reset.isEmpty()
@@ -172,5 +173,13 @@ public class SenhaResetService {
         Map<String, String> erro = new HashMap<>();
         erro.put("erro", MENSAGEM_CODIGO_INVALIDO);
         return ResponseEntity.badRequest().body(erro);
+    }
+
+    // O banco guarda so o HMAC do codigo, amarrado ao usuario (F-03): quem ler
+    // a tabela nao consegue usar o codigo, nem quebra-lo por forca bruta sem a
+    // chave do servidor. A busca continua sendo por igualdade.
+    private String hashDoCodigo(Long usuarioId, String codigo) {
+        return com.example.connectong_api.security.Criptografia.get()
+                .hmac(usuarioId + ":" + (codigo == null ? "" : codigo.trim()));
     }
 }

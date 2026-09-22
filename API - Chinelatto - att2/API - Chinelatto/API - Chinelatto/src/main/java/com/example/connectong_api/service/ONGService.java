@@ -40,6 +40,10 @@ import java.util.stream.Collectors;
  */
 @Service
 public class ONGService {
+    // LGPD (F-04): consentimento no cadastro e anonimizacao na exclusao.
+    @Autowired
+    private LgpdService lgpdService;
+
 
     @Autowired
     private ONGRepository repository;
@@ -225,6 +229,7 @@ public class ONGService {
         usuario.setTipo("ONG");
         usuario.setOngId(ongSalva.getId());
         Usuario usuarioSalvo = usuarioRepository.save(usuario);
+        lgpdService.registrarConsentimento(usuarioSalvo.getId());
 
         UsuarioResponseDTO resposta = new UsuarioResponseDTO(
                 usuarioSalvo.getId(),
@@ -452,6 +457,7 @@ public class ONGService {
                     usuarioRepository.findByOngId(ong.getId()).ifPresent(conta -> {
                         conta.setDataExclusao(agora);
                         usuarioRepository.save(conta);
+                        lgpdService.anonimizar(conta);
                     });
 
                     return ResponseEntity

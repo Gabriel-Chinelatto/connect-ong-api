@@ -1431,3 +1431,87 @@ databaseChangeLog:
               - column:
                   name: logo_base64
                   type: mediumtext
+
+  # =====================================================================
+  # F-03 (Plano de Acao pos-FECITEC): colunas que passam a guardar texto
+  # CIFRADO (AES-256-GCM em base64, ~4/3 do original + 47 caracteres) e os
+  # codigos de verificacao que passam a ser guardados como HMAC (64 hex).
+  # ALTER direto (sem precondicao): a licao do ong-descricao-varchar-1000 e que
+  # modifyDataType com precondicao pode virar MARK_RAN sem executar no MySQL.
+  # MODIFY para um tipo MAIOR e seguro e idempotente. So MySQL (nos testes o
+  # schema vem das entidades).
+  # =====================================================================
+  - changeSet:
+      id: f03-colunas-cifradas
+      author: connect-ong
+      changes:
+        - sql:
+            dbms: mysql
+            sql: ALTER TABLE usuario MODIFY telefone VARCHAR(255)
+        - sql:
+            dbms: mysql
+            sql: ALTER TABLE mensagem MODIFY conteudo TEXT
+        - sql:
+            dbms: mysql
+            sql: ALTER TABLE denuncia MODIFY descricao TEXT
+        - sql:
+            dbms: mysql
+            sql: ALTER TABLE senha_reset MODIFY codigo VARCHAR(64)
+        - sql:
+            dbms: mysql
+            sql: ALTER TABLE dois_fatores_codigo MODIFY codigo VARCHAR(64)
+
+  # =====================================================================
+  # F-04 (LGPD): registro do consentimento. Uma linha por aceite, com a
+  # VERSAO do documento aceito, a data e o IP — e a prova de que o titular
+  # consentiu (LGPD art. 8, par. 2: o onus da prova e do controlador).
+  # =====================================================================
+  - changeSet:
+      id: f04-consentimento-create-table
+      author: connect-ong
+      preConditions:
+        - onFail: MARK_RAN
+        - onError: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: consentimento
+      changes:
+        - createTable:
+            tableName: consentimento
+            columns:
+              - column:
+                  name: id
+                  type: bigint
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: usuario_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: documento
+                  type: varchar(40)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: versao
+                  type: varchar(20)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: aceito_em
+                  type: datetime
+                  constraints:
+                    nullable: false
+              - column:
+                  name: ip
+                  type: varchar(64)
+        - createIndex:
+            tableName: consentimento
+            indexName: idx_consentimento_usuario
+            columns:
+              - column:
+                  name: usuario_id

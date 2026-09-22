@@ -1,5 +1,6 @@
 package com.example.connectong_api.dto;
 
+import com.example.connectong_api.validacao.*;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
@@ -14,6 +15,8 @@ import jakarta.validation.constraints.Size;
 public class CadastroUsuarioDTO {
 
     @NotBlank(message = "O nome é obrigatório")
+    @Size(max = 120, message = "O nome deve ter no máximo 120 caracteres")
+    @NomeProprio(message = "Nome inválido: use apenas letras (sem números ou símbolos)")
     private String nome;
 
     @NotBlank(message = "O email é obrigatório")
@@ -21,7 +24,7 @@ public class CadastroUsuarioDTO {
     private String email;
 
     @NotBlank(message = "A senha é obrigatória")
-    @Size(min = 6, message = "A senha deve ter ao menos 6 caracteres")
+    @SenhaForte
     private String senha;
 
     @NotBlank(message = "O tipo é obrigatório")
@@ -39,4 +42,12 @@ public class CadastroUsuarioDTO {
 
     public String getTipo() { return tipo; }
     public void setTipo(String tipo) { this.tipo = tipo; }
+
+    // LGPD (F-04): mesmo aceite obrigatorio do /usuarios/registro.
+    @jakarta.validation.constraints.NotNull(message = "É preciso aceitar os Termos de Uso e a Política de Privacidade")
+    @jakarta.validation.constraints.AssertTrue(message = "É preciso aceitar os Termos de Uso e a Política de Privacidade")
+    private Boolean aceiteTermos;
+
+    public Boolean getAceiteTermos() { return aceiteTermos; }
+    public void setAceiteTermos(Boolean aceiteTermos) { this.aceiteTermos = aceiteTermos; }
 }

@@ -1,5 +1,6 @@
 package com.example.connectong_api.dto;
 
+import com.example.connectong_api.validacao.*;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -12,6 +13,7 @@ public class OngRegistroDTO {
 
     @NotBlank(message = "O nome da ONG e obrigatorio")
     @Size(min = 2, max = 120, message = "O nome deve ter entre 2 e 120 caracteres")
+    @TextoLegivel(message = "Nome da ONG inválido: use letras e sem os caracteres < e >")
     private String nome;
 
     @NotBlank(message = "O e-mail e obrigatorio")
@@ -20,19 +22,23 @@ public class OngRegistroDTO {
     private String email;
 
     @Size(max = 20, message = "Telefone muito longo")
+    @Telefone
     private String telefone;
 
     @Size(max = 100, message = "Cidade muito longa")
+    @NomeProprio(message = "Cidade inválida: use apenas letras (ex.: Limeira - SP)")
     private String cidade;
 
     @Size(max = 1000, message = "A descricao deve ter no maximo 1000 caracteres")
+    @TextoLegivel
     private String descricao;
 
     @Size(max = 20, message = "CNPJ muito longo")
+    @Cnpj
     private String cnpj;
 
     @NotBlank(message = "A senha e obrigatoria")
-    @Size(min = 6, max = 100, message = "A senha deve ter no minimo 6 caracteres")
+    @SenhaForte
     private String senha;
 
     public String getNome() { return nome; }
@@ -55,4 +61,13 @@ public class OngRegistroDTO {
 
     public String getSenha() { return senha; }
     public void setSenha(String senha) { this.senha = senha; }
+
+    // LGPD (F-04): o cadastro so e aceito com o aceite explicito dos Termos de
+    // Uso e da Politica de Privacidade; o aceite e gravado na tabela consentimento.
+    @jakarta.validation.constraints.NotNull(message = "É preciso aceitar os Termos de Uso e a Política de Privacidade")
+    @jakarta.validation.constraints.AssertTrue(message = "É preciso aceitar os Termos de Uso e a Política de Privacidade")
+    private Boolean aceiteTermos;
+
+    public Boolean getAceiteTermos() { return aceiteTermos; }
+    public void setAceiteTermos(Boolean aceiteTermos) { this.aceiteTermos = aceiteTermos; }
 }

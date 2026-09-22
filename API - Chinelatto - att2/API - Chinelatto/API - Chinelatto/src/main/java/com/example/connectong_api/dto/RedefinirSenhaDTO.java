@@ -1,5 +1,6 @@
 package com.example.connectong_api.dto;
 
+import com.example.connectong_api.validacao.*;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -21,7 +22,7 @@ public class RedefinirSenhaDTO {
     private String codigo;
 
     @NotBlank(message = "A nova senha é obrigatória")
-    @Size(min = 6, max = 100, message = "A senha deve ter ao menos 6 caracteres")
+    @SenhaForte
     private String novaSenha;
 
     public String getEmail() { return email; }

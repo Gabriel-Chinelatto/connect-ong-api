@@ -30,6 +30,10 @@ import java.util.Optional;
  */
 @Service
 public class UsuarioService {
+    // LGPD (F-04): consentimento no cadastro e anonimizacao na exclusao.
+    @Autowired
+    private LgpdService lgpdService;
+
 
     @Autowired
     private UsuarioRepository usuarioRepository;
@@ -98,6 +102,7 @@ public class UsuarioService {
 
         Usuario novo =
                 usuarioRepository.save(usuario);
+        lgpdService.registrarConsentimento(novo.getId());
 
         UsuarioResponseDTO resposta =
                 new UsuarioResponseDTO(
@@ -157,6 +162,7 @@ public class UsuarioService {
 
         Usuario novo =
                 usuarioRepository.save(usuario);
+        lgpdService.registrarConsentimento(novo.getId());
 
         auditService.registrar("CADASTRO_DOADOR", novo.getId(),
                 "Novo doador registrado pelo app: " + novo.getEmail());

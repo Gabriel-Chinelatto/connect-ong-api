@@ -41,7 +41,7 @@ class UsuarioRegistroTest {
     private static String json(String nome, String email, String senha) {
         return "{\"nome\":\"" + nome + "\",\"email\":\"" + email
                 + "\",\"senha\":\"" + senha + "\",\"telefone\":\"(45) 99999-0000\""
-                + ",\"cidade\":\"Toledo\",\"estado\":\"PR\"}";
+                + ",\"cidade\":\"Toledo\",\"estado\":\"PR\",\"aceiteTermos\":true}";
     }
 
     @Test
@@ -49,7 +49,7 @@ class UsuarioRegistroTest {
         // Sem token: prova tambem que a rota e publica
         mockMvc.perform(post("/usuarios/registro")
                         .contentType("application/json")
-                        .content(json("Maria Doadora", "maria.registro@teste.com", "123456")))
+                        .content(json("Maria Doadora", "maria.registro@teste.com", "doacao2026")))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").isNumber())
                 .andExpect(jsonPath("$.nome").value("Maria Doadora"))
@@ -57,14 +57,14 @@ class UsuarioRegistroTest {
                 .andExpect(jsonPath("$.tipo").value("DOADOR"))
                 // a senha (nem o hash) NUNCA pode voltar no corpo
                 .andExpect(content().string(not(containsString("senha"))))
-                .andExpect(content().string(not(containsString("123456"))));
+                .andExpect(content().string(not(containsString("doacao2026"))));
 
         // No banco: tipo DOADOR e senha em hash BCrypt (mesmo formato que o login valida)
         Usuario salvo = usuarioRepository.findByEmail("maria.registro@teste.com").orElseThrow();
         assertEquals("DOADOR", salvo.getTipo());
-        assertNotEquals("123456", salvo.getSenha());
+        assertNotEquals("doacao2026", salvo.getSenha());
         assertTrue(salvo.getSenha().startsWith("$2"), "senha deve ser hash BCrypt");
-        assertTrue(passwordEncoder.matches("123456", salvo.getSenha()),
+        assertTrue(passwordEncoder.matches("doacao2026", salvo.getSenha()),
                 "o hash gravado deve validar com o mesmo encoder do login");
         assertEquals("Toledo", salvo.getCidade());
     }
@@ -73,13 +73,13 @@ class UsuarioRegistroTest {
     void registroComEmailDuplicado_retorna409() throws Exception {
         mockMvc.perform(post("/usuarios/registro")
                         .contentType("application/json")
-                        .content(json("Joao Doador", "joao.duplicado@teste.com", "123456")))
+                        .content(json("Joao Doador", "joao.duplicado@teste.com", "doacao2026")))
                 .andExpect(status().isCreated());
 
         // Segunda tentativa com o MESMO email -> 409 com mensagem legivel
         mockMvc.perform(post("/usuarios/registro")
                         .contentType("application/json")
-                        .content(json("Joao Clone", "joao.duplicado@teste.com", "654321")))
+                        .content(json("Joao Clone", "joao.duplicado@teste.com", "outra2026senha")))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.erro").value("Email já cadastrado"));
     }
@@ -90,14 +90,14 @@ class UsuarioRegistroTest {
                         .contentType("application/json")
                         .content(json("Ana Doadora", "ana.senhacurta@teste.com", "123")))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.erro").value("A senha deve ter ao menos 6 caracteres"));
+                .andExpect(jsonPath("$.erro").value("A senha deve ter ao menos 8 caracteres, com letras e números (e não pode ser uma senha comum)"));
     }
 
     @Test
     void registroComEmailInvalido_retorna400() throws Exception {
         mockMvc.perform(post("/usuarios/registro")
                         .contentType("application/json")
-                        .content(json("Ana Doadora", "email-invalido", "123456")))
+                        .content(json("Ana Doadora", "email-invalido", "doacao2026")))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.erro").value("Email inválido"));
     }

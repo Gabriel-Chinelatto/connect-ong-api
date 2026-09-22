@@ -1,5 +1,6 @@
 package com.example.connectong_api.dto;
 
+import com.example.connectong_api.validacao.*;
 import jakarta.validation.constraints.Size;
 
 /**
@@ -8,12 +9,23 @@ import jakarta.validation.constraints.Size;
 public class PerfilDTO {
 
     private Long id;
+    @Size(max = 120, message = "O nome deve ter no máximo 120 caracteres")
+    @TextoLegivel(message = "Nome inválido: use letras e sem os caracteres < e >")
     private String nome;
     private String email;
+    @Size(max = 20, message = "Telefone muito longo")
+    @Telefone
     private String telefone;
+    @Size(max = 100, message = "Cidade muito longa")
+    @NomeProprio(message = "Cidade inválida: use apenas letras")
     private String cidade;
+    @Size(max = 50, message = "Estado muito longo")
+    @Uf
     private String estado;
+    @Size(max = 500, message = "A bio deve ter no máximo 500 caracteres")
+    @TextoLegivel(message = "Bio inválida: escreva com letras e sem os caracteres < e >")
     private String bio;
+    @Size(max = 500, message = "URL da foto muito longa")
     private String fotoUrl;
 
     // Foto embutida em base64. Limita o tamanho para evitar payloads gigantes

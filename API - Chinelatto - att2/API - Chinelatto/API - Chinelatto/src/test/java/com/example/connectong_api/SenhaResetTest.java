@@ -91,7 +91,9 @@ class SenhaResetTest {
         // o codigo foi persistido para o usuario certo, valido e nao usado
         List<SenhaReset> pendentes = senhaResetRepository.findByUsuarioIdAndUsadoEmIsNull(u.getId());
         assertEquals(1, pendentes.size());
-        assertEquals(codigo, pendentes.get(0).getCodigo());
+        // F-03: o banco guarda so o HMAC do codigo (64 hex), nunca o codigo em si
+        assertNotEquals(codigo, pendentes.get(0).getCodigo());
+        assertTrue(pendentes.get(0).getCodigo().matches("[0-9a-f]{64}"), "codigo deve estar guardado como HMAC");
         assertTrue(pendentes.get(0).getExpiraEm().isAfter(LocalDateTime.now()));
     }
 
@@ -205,6 +207,6 @@ class SenhaResetTest {
 
         redefinir("reset.curta@teste.com", codigo, "123")
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.erro").value("A senha deve ter ao menos 6 caracteres"));
+                .andExpect(jsonPath("$.erro").value("A senha deve ter ao menos 8 caracteres, com letras e números (e não pode ser uma senha comum)"));
     }
 }

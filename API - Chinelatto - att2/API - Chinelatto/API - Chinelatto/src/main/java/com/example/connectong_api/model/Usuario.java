@@ -32,6 +32,10 @@ public class Usuario {
     private Long ongId;
 
     // ----- Dados de perfil -----
+    // Cifrado em repouso (AES-256-GCM, item F-03). Coluna larga porque o texto
+    // cifrado em base64 ocupa ~4/3 do original + 47 caracteres fixos.
+    @Convert(converter = com.example.connectong_api.security.CampoCifradoConverter.class)
+    @Column(length = 255)
     private String telefone;
     private String cidade;
     private String estado;

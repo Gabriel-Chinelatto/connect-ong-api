@@ -28,6 +28,19 @@ public class ONGController {
     @Autowired
     private TransparenciaService transparenciaService;
 
+    @Autowired
+    private com.example.connectong_api.service.IndicadoresService indicadoresService;
+
+    @Autowired
+    private com.example.connectong_api.security.SecurityUtils securityUtils;
+
+    @GetMapping("/{id}/indicadores")
+    @Operation(summary = "Indicadores da propria ONG: funil, taxa de atendimento, tempo de resposta, categorias e evolucao mensal")
+    public ResponseEntity<?> indicadores(@PathVariable Long id) {
+        securityUtils.exigirOng(id);
+        return ResponseEntity.ok(indicadoresService.daOng(id));
+    }
+
     @PostMapping("/registro")
     @Operation(summary = "Cadastrar uma ONG (cria o perfil + a conta de login juntos)")
     public ResponseEntity<?> registrar(

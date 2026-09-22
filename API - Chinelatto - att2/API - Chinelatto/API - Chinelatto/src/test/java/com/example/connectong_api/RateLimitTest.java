@@ -148,8 +148,8 @@ class RateLimitTest {
             mockMvc.perform(post("/usuarios/registro")
                             .with(ip("10.9.1.5"))
                             .contentType("application/json")
-                            .content("{\"nome\":\"Doador " + i + "\",\"email\":\"rl.cad"
-                                    + i + "@teste.com\",\"senha\":\"123456\"}"))
+                            .content("{\"nome\":\"Doador " + (char) ('A' + i) + "\",\"email\":\"rl.cad"
+                                    + i + "@teste.com\",\"senha\":\"doacao2026\",\"aceiteTermos\":true}"))
                     .andExpect(status().isCreated());
         }
 
@@ -157,8 +157,8 @@ class RateLimitTest {
         mockMvc.perform(post("/usuarios/registro")
                         .with(ip("10.9.1.5"))
                         .contentType("application/json")
-                        .content("{\"nome\":\"Doador 6\",\"email\":\"rl.cad6@teste.com\","
-                                + "\"senha\":\"123456\"}"))
+                        .content("{\"nome\":\"Doador Sexto\",\"email\":\"rl.cad6@teste.com\",\"aceiteTermos\":true,"
+                                + "\"senha\":\"doacao2026\"}"))
                 .andExpect(status().isTooManyRequests())
                 .andExpect(jsonPath("$.erro").value(MSG_429));
     }

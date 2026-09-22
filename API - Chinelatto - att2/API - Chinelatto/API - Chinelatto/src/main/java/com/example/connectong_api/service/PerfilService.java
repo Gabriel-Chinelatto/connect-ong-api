@@ -43,6 +43,9 @@ public class PerfilService {
     @Autowired
     private AuditService auditService;
 
+    @Autowired
+    private LgpdService lgpdService;
+
     // ===================== PERFIL =====================
     public ResponseEntity<?> obterPerfil(Long usuarioId) {
         Usuario u = usuarioRepository.findById(usuarioId).orElse(null);
@@ -184,6 +187,8 @@ public class PerfilService {
         LocalDateTime agora = LocalDateTime.now();
         u.setDataExclusao(agora);
         usuarioRepository.save(u);
+        // LGPD art. 18, VI: some tambem o dado pessoal, nao so o acesso.
+        lgpdService.anonimizar(u);
 
         if (u.getOngId() != null) {
             ongRepository.findById(u.getOngId()).ifPresent(ong -> {
@@ -193,7 +198,7 @@ public class PerfilService {
         }
 
         Map<String, String> ok = new HashMap<>();
-        ok.put("mensagem", "Conta excluída.");
+        ok.put("mensagem", "Conta excluída e dados pessoais anonimizados.");
         return ResponseEntity.ok(ok);
     }
 

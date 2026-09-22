@@ -23,6 +23,28 @@ public class PublicoController {
     @Autowired private EstatisticasService estatisticasService;
     @Autowired private TransparenciaService transparenciaService;
     @Autowired private ImagemOngService imagemOngService;
+    @Autowired private com.example.connectong_api.service.IndicadoresService indicadoresService;
+
+    @Autowired private com.example.connectong_api.security.Criptografia criptografia;
+
+    @GetMapping("/seguranca")
+    @Operation(summary = "Resumo PUBLICO das protecoes ativas (sem nenhum segredo): serve para conferir o deploy")
+    public ResponseEntity<?> seguranca() {
+        java.util.Map<String, Object> r = new java.util.LinkedHashMap<>();
+        r.put("criptografiaEmRepouso", criptografia.ligada());
+        r.put("algoritmo", "AES-256-GCM");
+        r.put("camposProtegidos", java.util.List.of("telefone do usuário", "mensagens do chat", "descrição das denúncias"));
+        r.put("senhas", "BCrypt (hash, irreversível)");
+        r.put("codigosDeVerificacao", "HMAC-SHA256 (o código em si nunca é gravado)");
+        r.put("versaoDosTermos", com.example.connectong_api.model.Consentimento.VERSAO_ATUAL);
+        return ResponseEntity.ok(r);
+    }
+
+    @GetMapping("/indicadores")
+    @Operation(summary = "Indicadores de resultado da plataforma: funil, taxa de atendimento, tempo de resposta, por categoria, por estado e mes a mes")
+    public ResponseEntity<?> indicadores() {
+        return ResponseEntity.ok(indicadoresService.publicos());
+    }
 
     @GetMapping("/estatisticas")
     @Operation(summary = "Numeros publicos da plataforma (transparencia / impacto)")

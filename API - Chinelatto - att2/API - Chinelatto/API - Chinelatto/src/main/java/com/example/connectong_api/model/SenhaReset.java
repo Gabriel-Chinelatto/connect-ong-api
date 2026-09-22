@@ -24,9 +24,8 @@ public class SenhaReset {
     @Column(name = "usuario_id", nullable = false)
     private Long usuarioId;
 
-    // Codigo numerico de 6 digitos (guardado como texto para preservar zeros
-    // a esquerda, ex.: "042317").
-    @Column(length = 10)
+    // Guarda o HMAC-SHA256 do codigo (64 hex), nunca o codigo em si (F-03).
+    @Column(length = 64)
     private String codigo;
 
     // Momento em que o codigo deixa de valer (criacao + 15 minutos).

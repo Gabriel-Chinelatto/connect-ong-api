@@ -31,6 +31,27 @@ public class PerfilController {
     @Autowired
     private SecurityUtils security;
 
+    @Autowired
+    private com.example.connectong_api.service.LgpdService lgpdService;
+
+    @GetMapping("/meus-dados")
+    @Operation(summary = "LGPD: baixar todos os dados pessoais guardados sobre o usuário (acesso e portabilidade)")
+    public ResponseEntity<?> meusDados(@PathVariable Long id) {
+        security.exigirUsuario(id);
+        return lgpdService.exportar(id)
+                .<ResponseEntity<?>>map(dados -> ResponseEntity.ok()
+                        .header("Content-Disposition", "attachment; filename=\"connect-ong-meus-dados.json\"")
+                        .body(dados))
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/consentimentos")
+    @Operation(summary = "LGPD: histórico de aceites dos Termos de Uso e da Política de Privacidade")
+    public ResponseEntity<?> consentimentos(@PathVariable Long id) {
+        security.exigirUsuario(id);
+        return ResponseEntity.ok(lgpdService.consentimentos(id));
+    }
+
     @GetMapping("/perfil")
     @Operation(summary = "Obter o perfil do usuário")
     public ResponseEntity<?> obterPerfil(@PathVariable Long id) {
@@ -69,7 +90,7 @@ public class PerfilController {
     }
 
     @DeleteMapping
-    @Operation(summary = "Excluir a própria conta (soft-delete: preserva histórico, some da UI, não loga mais)")
+    @Operation(summary = "Excluir a própria conta: deixa de logar e os dados pessoais são anonimizados (LGPD)")
     public ResponseEntity<?> excluirConta(@PathVariable Long id) {
         security.exigirUsuario(id);
         return service.excluirConta(id);

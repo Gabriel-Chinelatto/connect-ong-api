@@ -334,13 +334,13 @@ public class GroqService implements ProvedorIA {
                 parteTexto.put("type", "text");
                 parteTexto.put("text", m.conteudo() == null || m.conteudo().isBlank()
                         ? "Descreva o que aparece nesta foto e para quem eu poderia doar."
-                        : m.conteudo());
+                        : paraEnvio(m));
                 ObjectNode parteImg = conteudo.addObject();
                 parteImg.put("type", "image_url");
                 ObjectNode urlNode = parteImg.putObject("image_url");
                 urlNode.put("url", comoDataUrl(imagemBase64));
             } else {
-                msg.put("content", m.conteudo());
+                msg.put("content", paraEnvio(m));
             }
         }
         return objectMapper.writeValueAsString(raiz);
@@ -382,5 +382,14 @@ public class GroqService implements ProvedorIA {
         // IA funcionando perfeitamente.
         return chamarTexto(List.of(new MensagemIA("user", "responda apenas: ok")),
                 OpcoesIA.de(0.0, 64)).isPresent();
+    }
+
+    // F-10 (minimizacao, LGPD art. 6, III): o que a PESSOA escreveu sai do
+    // servidor sem e-mail, telefone, CPF ou CNPJ. As instrucoes do sistema
+    // (papel "system") sao nossas e ficam intactas.
+    private static String paraEnvio(MensagemIA m) {
+        return "system".equals(m.papel())
+                ? m.conteudo()
+                : com.example.connectong_api.security.RedatorDadosPessoais.redigir(m.conteudo());
     }
 }

@@ -1,5 +1,6 @@
 package com.example.connectong_api.dto;
 
+import com.example.connectong_api.validacao.*;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -18,10 +19,12 @@ public class PrestacaoRequestDTO {
 
     @NotBlank(message = "O titulo e obrigatorio")
     @Size(max = 150, message = "O titulo deve ter no maximo 150 caracteres")
+    @TextoLegivel
     private String titulo;
 
     @NotBlank(message = "A descricao e obrigatoria")
     @Size(max = 2000, message = "A descricao deve ter no maximo 2000 caracteres")
+    @TextoLegivel
     private String descricao;
 
     @Size(max = 500, message = "A URL da foto e muito longa")

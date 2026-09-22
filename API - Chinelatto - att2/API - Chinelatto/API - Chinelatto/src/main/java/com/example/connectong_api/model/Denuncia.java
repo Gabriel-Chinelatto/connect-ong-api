@@ -24,7 +24,10 @@ public class Denuncia {
 
     private String motivo;        // categoria curta (ex.: SPAM, FRAUDE, ABUSO)
 
-    @Column(length = 1000)
+    // Cifrado em repouso (AES-256-GCM, item F-03). Coluna larga porque o texto
+    // cifrado em base64 ocupa ~4/3 do original + 47 caracteres fixos.
+    @Convert(converter = com.example.connectong_api.security.CampoCifradoConverter.class)
+    @Column(columnDefinition = "TEXT")
     private String descricao;     // detalhes
 
     private String status;        // ABERTA | RESOLVIDA
