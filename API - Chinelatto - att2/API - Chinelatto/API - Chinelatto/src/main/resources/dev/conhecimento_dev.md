@@ -58,6 +58,14 @@ A entidade `Interesse` guarda também a data de cada mudança de status (`dataSt
 - Sessão expirada: se qualquer chamada autenticada recebe 401, os apps deslogam e voltam ao login automaticamente, em vez de travar a tela.
 - 2FA opcional no login (`POST /usuarios/login-2fa`) e alteração de e-mail exigindo a senha atual.
 
+## Segurança e LGPD depois da FECITEC (Plano de Ação)
+Na FECITEC o avaliador apontou que os campos aceitavam qualquer coisa, que não havia criptografia de dados sensíveis e que a LGPD não tinha sido tratada. A resposta, entregue em setembro de 2026:
+- **Validação de formato** (antes só se limitava o tamanho): telefone brasileiro com DDD válido, CNPJ com dígito verificador (inclusive o CNPJ alfanumérico de 2026), nome só com letras, texto sem HTML, UF, senha forte (8+ caracteres com letras e números, fora das senhas mais comuns) e campanha que não termina antes de começar. As regras ficam em `validacao/Regras.java` e são espelhadas nos três frontends, para o erro aparecer embaixo do campo antes de enviar — mas a API é sempre a palavra final.
+- **Criptografia em repouso AES-256-GCM** no telefone do usuário, nas mensagens do chat e nas denúncias (um conversor JPA cifra ao gravar e decifra ao ler). Cada valor tem um IV aleatório, e qualquer alteração no banco é detectada. A chave vem da variável `APP_CRYPTO_KEY`, e uma "impressão digital" dela fica no banco: um ambiente com a chave errada se recusa a subir, para não misturar chaves. Dados antigos em texto puro são cifrados no startup.
+- **Códigos de recuperação de senha e de 2FA** são guardados só como HMAC-SHA256, nunca o código em si.
+- **LGPD**: o cadastro exige o aceite dos Termos e da Política, gravado com versão, data e IP (tabela `consentimento`); `GET /usuarios/{id}/meus-dados` exporta tudo o que o sistema guarda sobre a pessoa (acesso e portabilidade, art. 18); excluir a conta **anonimiza** nome, e-mail, telefone, cidade, bio e foto. A Política de Privacidade foi reescrita com bases legais, retenção e fornecedores fora do país.
+- `GET /publico/seguranca` mostra, sem segredo nenhum, quais proteções estão ativas no servidor.
+
 ## Rate limiting (proteção contra abuso)
 `RateLimitService` conta tentativas por origem real de acesso (respeitando o cabeçalho de proxy) numa janela de **15 minutos**, com limite padrão de **5 tentativas**. Vale para login, cadastro, recuperação de senha, contribuição via PIX e os endpoints de IA (que têm limite próprio). Excedido, a API responde **429**.
 
@@ -97,6 +105,7 @@ A contribuição para uma campanha acontece em duas etapas: primeiro o doador co
 - A chave da API fica SEMPRE no backend (nunca no aplicativo). O backend injeta dados reais como contexto — técnica de **grounding** — para as respostas serem fiéis ao que existe no banco.
 - Cada tarefa usa uma **temperatura** diferente (mais baixa para tarefas factuais, mais alta para redação) e um limite de tokens próprio, para controlar custo e alucinação.
 - Há um modo de reserva (**fallback por regras**): se a IA estiver indisponível, sem chave ou no limite de uso, o sistema responde por regras simples — nunca deixa o usuário sem resposta. Quando isso acontece, a resposta vem marcada como "Modo básico".
+- **Minimização de dados**: antes de o texto de uma pessoa ir para a Groq, o backend remove e-mail, telefone, CPF e CNPJ (`RedatorDadosPessoais`). As telas de IA avisam que as respostas podem conter erros.
 - Usos da IA: Dora (chat do doador), análise de foto do item, estimativa de peso/categoria no frete, redação de necessidades, texto "Sobre" da ONG (com loop de refino), resumo de impacto da ONG, sugestões personalizadas e este assistente "Sobre o Desenvolvimento".
 
 ## Simulador de frete (como é calculado)
@@ -132,11 +141,14 @@ Decisão consciente: como mobile e desktop já são Flutter, fazer a web em Java
 - APP DO DOADOR e PAINEL DA ONG: publicados como site estático no **GitHub Pages** por GitHub Actions, que roda `flutter analyze` + testes e só publica se tudo passar.
 - Limitações conhecidas do plano gratuito do Render: o serviço **hiberna após ~15 minutos** sem acesso (a primeira chamada seguinte pode levar de 10 a 95 segundos) e tem apenas **512 MB de memória**. O estouro desses 512 MB chegou a derrubar a API; a correção foi limitar a JVM no Dockerfile (heap máximo, coletor serial, metaspace limitado) e reduzir o Tomcat de 200 para 25 threads — medido: 271 MB em uso, com folga.
 
+## Indicadores de resultado
+`GET /publico/indicadores` (site) e `GET /ongs/{id}/indicadores` (painel da ONG) respondem "a plataforma funciona?": funil necessidade → interesse → aceite → doação concluída, taxa de atendimento, taxa de aceite, **mediana** de dias até a ONG responder e até a doação chegar, e recortes por categoria, por estado e mês a mês. Tudo sai em duas consultas (as agregações num único `UNION ALL`), por causa da regra dos 600 ms, e a versão pública fica 10 minutos em cache.
+
 ## Testes automatizados
-- Backend: **191 testes** (JUnit + Spring Boot Test) em 22 classes, rodando em banco H2 em memória — a suíte não toca o banco da escola.
-- App do doador (mobile): **101 testes**, incluindo testes que previnem estouro de layout com fonte grande.
-- Painel da ONG (desktop): **52 testes** de regras e de rede.
-- Total: **344 testes automatizados**, todos verdes na última verificação (26/08/2026).
+- Backend: **231 testes** (JUnit + Spring Boot Test), rodando em banco H2 em memória — a suíte não toca o banco da escola.
+- App do doador (mobile): **124 testes**, incluindo testes que previnem estouro de layout com fonte grande e os das regras de validação.
+- Painel da ONG (desktop): **75 testes** de regras, validação e rede.
+- Total: **430 testes automatizados**, todos verdes na última verificação (22/09/2026). Os casos de validação são os MESMOS no Java e no Dart, para provar que tela e servidor concordam.
 - Além disso, cada rodada de mudanças é verificada ao vivo contra a API real, e a interface é conferida por capturas de tela automatizadas.
 
 ## Métodos e boas práticas de desenvolvimento
@@ -160,7 +172,8 @@ Decisão consciente: como mobile e desktop já são Flutter, fazer a web em Java
 - v2.0 — Recursos exclusivos da web: mapa interativo, comparador de ONGs, Modo Quiosque, relatório imprimível e busca rápida (Ctrl/Cmd + K).
 - v2.1 — Voz, cartão de impacto, QR Code do perfil e instalação como aplicativo (PWA).
 - v2.2 — Polimento e acessibilidade: portal institucional com caminho único de login, documentos legais redesenhados, correções de contraste no tema escuro e ganhos de desempenho.
+- v2.4 — Plano de Ação pós-FECITEC: validação de formato em todos os campos, criptografia de dados sensíveis, LGPD (consentimento registrado, exportação e anonimização), indicadores de resultado, página "Para empresas" com o modelo de negócio e minimização de dados enviados à IA.
 - v2.3 — Identidade visual das instituições: logo e capa em todas as ONGs e foto de perfil em todos os doadores, imagens dos cards servidas por URL com cache e carregamento sob demanda, e a listagem de ONGs reescrita com projeção (0,35 s → 0,08 s).
 
 ## Marcos e eventos
-O projeto foi preparado para a FECITEC (feira de ciências e tecnologia). Há "Modo Feira/Quiosque" e contas de demonstração para apresentações. A entrega final do curso ocorre no fim do ano.
+O projeto foi apresentado na FECITEC (31/08 a 02/09/2026) e recebeu média 6,6 de dois avaliadores do mercado: notas altas em interface, arquitetura, inovação e impacto; notas baixas em segurança e privacidade, modelo de negócios e análise de dados. Isso virou um Plano de Ação com backlog priorizado (MoSCoW) e a versão v2.4. Há "Modo Feira/Quiosque" e contas de demonstração para apresentações. A banca final do curso ocorre no fim do ano.
