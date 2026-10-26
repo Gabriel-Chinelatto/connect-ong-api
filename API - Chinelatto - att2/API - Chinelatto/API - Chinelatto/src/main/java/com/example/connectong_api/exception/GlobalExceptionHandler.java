@@ -89,6 +89,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<Map<String, String>> tratarIntegridade(
             DataIntegrityViolationException ex) {
+        if (caractereNaoSuportado(ex)) return badRequest(ERRO_EMOJI);
         return badRequest("Nao foi possivel salvar: verifique os dados enviados "
                 + "(algum campo pode estar longo demais ou duplicado).");
     }
@@ -147,14 +148,35 @@ public class GlobalExceptionHandler {
                     .orElse("Dados invalidos.");
             return badRequest(detalhe);
         }
+        if (caractereNaoSuportado(ex)) return badRequest(ERRO_EMOJI);
         Map<String, String> corpo = new HashMap<>();
         corpo.put("erro", "Ocorreu um erro inesperado no servidor.");
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(corpo);
     }
 
+    // Texto com caractere que o banco nao guarda (emoji num MySQL utf8 de 3
+    // bytes -> SQL 1366 "Incorrect string value"). Sem isto virava 500 generico
+    // e a ONG so via "erro inesperado" ao salvar o perfil (achado em 02/09/2026).
+    // O ONGService/SobreOngService ja limpam o texto; este handler cobre os
+    // demais campos livres (chat, necessidade, avaliacao...) com uma mensagem
+    // que diz o que fazer, em vez de parecer servidor quebrado.
+    private static final String ERRO_EMOJI =
+            "Este texto tem um caractere que o banco nao aceita (emoji). Remova-o e salve de novo.";
+
+    private static boolean caractereNaoSuportado(Throwable ex) {
+        for (Throwable t = ex; t != null; t = t.getCause()) {
+            if (t instanceof java.sql.SQLException sql && sql.getErrorCode() == 1366) return true;
+            String m = t.getMessage();
+            if (m != null && m.contains("Incorrect string value")) return true;
+            if (t.getCause() == t) break;
+        }
+        return false;
+    }
+
     // Qualquer outra excecao nao prevista -> 500 com mensagem generica (sem vazar detalhes)
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, String>> tratarGenerico(Exception ex) {
+        if (caractereNaoSuportado(ex)) return badRequest(ERRO_EMOJI);
         Map<String, String> corpo = new HashMap<>();
         corpo.put("erro", "Ocorreu um erro inesperado no servidor.");
 

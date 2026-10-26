@@ -20,6 +20,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import com.example.connectong_api.util.TextoBanco;
 
 /**
  * Ajuda a ONG a escrever/refinar o texto "Sobre" (descricao institucional) do
@@ -213,6 +214,11 @@ public class SobreOngService {
             sb.append(l);
         }
         s = sb.length() > 0 ? sb.toString() : s;
+
+        // Emoji fora: o modelo adora enfeitar o texto com coracao/estrela, e o
+        // MySQL da escola (utf8 de 3 bytes) recusa esses caracteres — era o
+        // "Salvar" do perfil da ONG virando 500 depois de "Escrever com IA".
+        s = TextoBanco.semEmoji(s);
 
         // Colapsa espacos e remove aspas ao redor (retas ou tipograficas).
         s = s.replaceAll("\\s{2,}", " ").trim();

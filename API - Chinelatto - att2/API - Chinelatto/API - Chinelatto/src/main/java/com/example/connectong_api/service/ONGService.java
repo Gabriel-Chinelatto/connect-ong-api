@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import com.example.connectong_api.util.TextoBanco;
 
 /**
  * Gerencia as ONGs: CRUD, verificacao (selo) e o perfil publico agregado que o
@@ -375,21 +376,24 @@ public class ONGService {
                     // carregava vazio e reenviava "" ao salvar — a validacao da
                     // entidade estourava no flush e a resposta virava 500. Na
                     // pratica, a ONG nao conseguia salvar NADA no perfil.
+                    // TextoBanco.semEmoji em TODO campo de texto: o MySQL da
+                    // escola e utf8 de 3 bytes e recusa emoji (SQL 1366), o que
+                    // fazia o "Salvar" do perfil responder 500 sem explicacao.
                     if (naoVazio(dados.getNome())) {
-                        ong.setNome(dados.getNome());
+                        ong.setNome(TextoBanco.semEmoji(dados.getNome()));
                     }
                     if (naoVazio(dados.getEmail())) {
                         ong.setEmail(dados.getEmail());
                     }
                     // Opcionais: null = nao mexe; vazio = a ONG limpou de fato.
                     if (dados.getTelefone() != null) {
-                        ong.setTelefone(dados.getTelefone());
+                        ong.setTelefone(TextoBanco.semEmoji(dados.getTelefone()));
                     }
                     if (dados.getCidade() != null) {
-                        ong.setCidade(dados.getCidade());
+                        ong.setCidade(TextoBanco.semEmoji(dados.getCidade()));
                     }
                     if (dados.getDescricao() != null) {
-                        ong.setDescricao(dados.getDescricao());
+                        ong.setDescricao(TextoBanco.semEmoji(dados.getDescricao()));
                     }
 
                     // Perfil rico: capa/endereco so sobrescrevem quando enviados
@@ -401,7 +405,7 @@ public class ONGService {
                         ong.setCapaBase64(dados.getCapaBase64());
                     }
                     if (dados.getEndereco() != null) {
-                        ong.setEndereco(dados.getEndereco());
+                        ong.setEndereco(TextoBanco.semEmoji(dados.getEndereco()));
                     }
                     // Coordenadas do endereco (opcionais): so sobrescrevem quando
                     // enviadas E dentro de faixa geografica valida (evita gravar
